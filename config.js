@@ -1,1 +1,1 @@
-window.SUIVI_API_BASE = "https://suivi-poteaux-pro.onrender.com/api";
+window.SUIVI_API_BASE = `${window.location.origin}/api`;
