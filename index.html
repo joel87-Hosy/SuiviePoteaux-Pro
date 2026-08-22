@@ -1039,6 +1039,71 @@
     </div>
   </div>
 
+  <div class="drawer" id="stockEntryDrawer" aria-hidden="true">
+    <div class="drawer-backdrop" data-close-stock-drawer></div>
+    <div class="drawer-panel">
+      <div class="section-head" style="padding:0 0 14px;border-bottom:1px solid var(--line);margin-bottom:16px">
+        <div>
+          <h3>Entree de poteaux en depot</h3>
+          <p class="muted" style="margin:4px 0 0">Reception fournisseur, retour chantier ou regularisation inventaire.</p>
+        </div>
+        <button class="btn icon-btn" type="button" data-close-stock-drawer title="Fermer">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <form id="stockEntryForm" class="grid">
+        <div class="form-grid">
+          <div class="field">
+            <label for="entryCode">Code poteau / QR</label>
+            <input id="entryCode" placeholder="POT-2026-B11-001" required>
+          </div>
+          <div class="field">
+            <label for="entryType">Type</label>
+            <select id="entryType" required>
+              <option value="BETON">BETON</option>
+              <option value="METALLIQUE">METALLIQUE</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="entryHeight">Hauteur (m)</label>
+            <input id="entryHeight" type="number" min="3" max="30" step="0.5" value="12" required>
+          </div>
+          <div class="field">
+            <label for="entryEffort">Classe d'effort</label>
+            <input id="entryEffort" placeholder="400 daN" required>
+          </div>
+          <div class="field">
+            <label for="entryWeight">Poids (kg)</label>
+            <input id="entryWeight" type="number" min="1" step="1" value="850" required>
+          </div>
+          <div class="field">
+            <label for="entryDepot">Depot de reception</label>
+            <input id="entryDepot" value="Depot Central" required>
+          </div>
+          <div class="field span-2">
+            <label for="entryMaker">Constructeur / Numero de lot</label>
+            <input id="entryMaker" placeholder="SIPREL / Lot B11" required>
+          </div>
+          <div class="field span-2">
+            <label for="entryStatus">Statut initial</label>
+            <select id="entryStatus">
+              <option>En Stock</option>
+              <option>En Transit</option>
+              <option>Anomalie</option>
+            </select>
+          </div>
+        </div>
+        <div class="toolbar" style="justify-content:flex-start">
+          <button class="btn primary" type="submit">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Enregistrer l'entree
+          </button>
+          <button class="btn" type="button" id="entryGenerateCodeBtn">Generer un code</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1427,7 +1492,10 @@
         <div class="card">
           <div class="section-head">
             <h3>Inventaire depot et chantier</h3>
-            <button class="btn primary" type="button" id="requisitionBtn">${icon("M12 5v14M5 12h14")} Bon de sortie</button>
+            <div class="toolbar">
+              <button class="btn primary" type="button" id="stockEntryBtn">${icon("M12 5v14M5 12h14")} Entree stock</button>
+              <button class="btn" type="button" id="requisitionBtn">${icon("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3")} Bon de sortie</button>
+            </div>
           </div>
           <div class="section-body">
             <div class="filters">
@@ -1441,6 +1509,7 @@
         </div>
       `;
       ["stockSearch", "typeFilter", "statusFilter", "heightFilter"].forEach(id => $(`#${id}`).addEventListener("input", drawStockRows));
+      $("#stockEntryBtn").addEventListener("click", openStockEntryDrawer);
       $("#requisitionBtn").addEventListener("click", createRequisition);
       drawStockRows();
     }
@@ -1668,6 +1737,70 @@
     function closeDrawer() {
       $("#interventionDrawer").classList.remove("open");
       $("#interventionDrawer").setAttribute("aria-hidden", "true");
+    }
+
+    function openStockEntryDrawer() {
+      $("#stockEntryDrawer").classList.add("open");
+      $("#stockEntryDrawer").setAttribute("aria-hidden", "false");
+      $("#stockEntryForm").reset();
+      $("#entryType").value = "BETON";
+      $("#entryHeight").value = "12";
+      $("#entryEffort").value = "400 daN";
+      $("#entryWeight").value = "850";
+      $("#entryDepot").value = "Depot Central";
+      $("#entryStatus").value = "En Stock";
+      $("#entryCode").value = generatePoleCode();
+      $("#entryMaker").value = "SIPREL / Lot " + new Date().getFullYear();
+    }
+
+    function closeStockEntryDrawer() {
+      $("#stockEntryDrawer").classList.remove("open");
+      $("#stockEntryDrawer").setAttribute("aria-hidden", "true");
+    }
+
+    function generatePoleCode() {
+      const year = new Date().getFullYear();
+      const type = $("#entryType")?.value === "METALLIQUE" ? "M" : "B";
+      const count = state.poles.filter(p => p.id.includes(`POT-${year}-${type}`)).length + 1;
+      return `POT-${year}-${type}${String(count).padStart(2, "0")}-${String(state.poles.length + 1).padStart(3, "0")}`;
+    }
+
+    async function saveStockEntry() {
+      const form = $("#stockEntryForm");
+      if (!form.reportValidity()) return;
+      const pole = {
+        id: $("#entryCode").value.trim().toUpperCase(),
+        type: $("#entryType").value,
+        height: Number($("#entryHeight").value),
+        effort: $("#entryEffort").value.trim(),
+        weight: Number($("#entryWeight").value),
+        maker: $("#entryMaker").value.trim(),
+        status: $("#entryStatus").value,
+        depot: $("#entryDepot").value.trim()
+      };
+      if (state.poles.some(item => item.id === pole.id)) {
+        toast("Ce code poteau existe deja");
+        return;
+      }
+      state.poles.push(pole);
+      const operation = { type: "stock-entry", poleId: pole.id, payload: pole, date: new Date().toISOString() };
+      state.offlineQueue.push(operation);
+      saveState();
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch("/poles", {
+          method: "POST",
+          body: JSON.stringify(pole)
+        });
+        state.poles = state.poles.map(item => item.id === pole.id ? payload.pole : item);
+        state.offlineQueue = state.offlineQueue.filter(item => item !== operation);
+        saveState();
+      } catch (error) {
+        console.info("Entree stock conservee offline:", error.message);
+      }
+      closeStockEntryDrawer();
+      renderCurrentView();
+      toast(`${pole.id} ajoute au depot`);
     }
 
     function renderPhotoInputs() {
@@ -1914,6 +2047,16 @@
       if (!navigator.onLine) return toast("Synchronisation differee: reseau indisponible");
       try {
         await ensureApiSession();
+        for (const operation of [...state.offlineQueue]) {
+          if (operation.type === "stock-entry" && operation.payload) {
+            await apiFetch("/poles", {
+              method: "POST",
+              body: JSON.stringify(operation.payload)
+            }).catch(error => {
+              if (!String(error.message).includes("deja")) throw error;
+            });
+          }
+        }
         const payload = await apiFetch("/sync", {
           method: "POST",
           body: JSON.stringify({ operations: state.offlineQueue })
@@ -2009,7 +2152,20 @@
         event.preventDefault();
         saveIntervention(false);
       });
+      $("#stockEntryForm").addEventListener("submit", event => {
+        event.preventDefault();
+        saveStockEntry();
+      });
+      $("#entryGenerateCodeBtn").addEventListener("click", () => {
+        $("#entryCode").value = generatePoleCode();
+      });
+      $("#entryType").addEventListener("change", () => {
+        if (!$("#entryCode").value || /^POT-\d{4}-[BM]/.test($("#entryCode").value)) {
+          $("#entryCode").value = generatePoleCode();
+        }
+      });
       $all("[data-close-drawer]").forEach(node => node.addEventListener("click", closeDrawer));
+      $all("[data-close-stock-drawer]").forEach(node => node.addEventListener("click", closeStockEntryDrawer));
       window.addEventListener("online", updateNetwork);
       window.addEventListener("offline", updateNetwork);
       if ("serviceWorker" in navigator) {
