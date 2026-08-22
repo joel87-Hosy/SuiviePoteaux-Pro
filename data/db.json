@@ -1,0 +1,140 @@
+{
+  "users": [
+    {
+      "id": "USR-001",
+      "email": "admin@itc.local",
+      "passwordHash": "d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791",
+      "name": "Aminata Kone",
+      "role": "super_admin"
+    },
+    {
+      "id": "USR-002",
+      "email": "depot@itc.local",
+      "passwordHash": "d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791",
+      "name": "Magasin Central",
+      "role": "magasinier"
+    },
+    {
+      "id": "USR-003",
+      "email": "terrain@itc.local",
+      "passwordHash": "d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791",
+      "name": "Equipe Terrain A",
+      "role": "terrain"
+    },
+    {
+      "id": "USR-004",
+      "email": "controle@itc.local",
+      "passwordHash": "d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791",
+      "name": "Controle Qualite",
+      "role": "controleur"
+    }
+  ],
+  "projects": [
+    {
+      "id": "CH-MOOV-A1",
+      "name": "MOOV - Axe Yopougon PK12",
+      "client": "MOOV",
+      "zone": "Abidjan Nord"
+    },
+    {
+      "id": "CH-CIE-B4",
+      "name": "CIE - Extension reseau B4",
+      "client": "CIE",
+      "zone": "Bouake Est"
+    },
+    {
+      "id": "CH-ORG-T2",
+      "name": "Orange - Fibre rurale T2",
+      "client": "Orange",
+      "zone": "Daloa Sud"
+    }
+  ],
+  "poles": [
+    {
+      "id": "POT-2026-B9-001",
+      "type": "BETON",
+      "height": 12,
+      "effort": "400 daN",
+      "weight": 860,
+      "maker": "SIPREL / Lot B9",
+      "status": "En Stock",
+      "depot": "Depot Central"
+    },
+    {
+      "id": "POT-2026-B9-002",
+      "type": "BETON",
+      "height": 11,
+      "effort": "300 daN",
+      "weight": 790,
+      "maker": "SIPREL / Lot B9",
+      "status": "En Transit",
+      "depot": "Camion EQ-A"
+    },
+    {
+      "id": "POT-2026-M4-018",
+      "type": "METALLIQUE",
+      "height": 9,
+      "effort": "250 daN",
+      "weight": 235,
+      "maker": "METALCI / Lot M4",
+      "status": "Pose - En attente validation",
+      "depot": "Chantier MOOV",
+      "lat": 5.39231,
+      "lng": -4.03221
+    },
+    {
+      "id": "POT-2026-M4-019",
+      "type": "METALLIQUE",
+      "height": 9,
+      "effort": "250 daN",
+      "weight": 236,
+      "maker": "METALCI / Lot M4",
+      "status": "Valide",
+      "depot": "Chantier MOOV",
+      "lat": 5.38875,
+      "lng": -4.02684
+    },
+    {
+      "id": "POT-2026-B10-021",
+      "type": "BETON",
+      "height": 12,
+      "effort": "500 daN",
+      "weight": 920,
+      "maker": "SIPREL / Lot B10",
+      "status": "Anomalie",
+      "depot": "Chantier CIE",
+      "lat": 7.69592,
+      "lng": -5.03012
+    },
+    {
+      "id": "POT-2026-M5-030",
+      "type": "METALLIQUE",
+      "height": 10,
+      "effort": "300 daN",
+      "weight": 280,
+      "maker": "METALCI / Lot M5",
+      "status": "En Stock",
+      "depot": "Depot Bouake"
+    }
+  ],
+  "interventions": [
+    {
+      "id": "RPT-2026-0001",
+      "poleId": "POT-2026-M4-019",
+      "projectId": "CH-MOOV-A1",
+      "agent": "Equipe Terrain A",
+      "agentId": "USR-003",
+      "date": "2026-08-21T08:52:28.271Z",
+      "lat": 5.38875,
+      "lng": -4.02684,
+      "soil": "Terre",
+      "depth": 1.25,
+      "validation": "Valide",
+      "notes": "Pose conforme, aplomb controle et massif cure.",
+      "teamSignature": "A. Konan",
+      "clientSignature": "Controle Qualite",
+      "photos": []
+    }
+  ],
+  "auditLog": []
+}

@@ -1,0 +1,2025 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f766e">
+  <title>SuiviPoteaux Pro</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f4;
+      --panel: #ffffff;
+      --panel-soft: #eef5f2;
+      --ink: #17211f;
+      --muted: #62706c;
+      --line: #dbe3df;
+      --primary: #0f766e;
+      --primary-dark: #0b5f59;
+      --accent: #d89f2b;
+      --danger: #b42318;
+      --ok: #127a43;
+      --warn: #a15c07;
+      --info: #2563a6;
+      --shadow: 0 18px 45px rgba(23, 33, 31, .08);
+      --radius: 8px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body.dark {
+      color-scheme: dark;
+      --bg: #101514;
+      --panel: #18211f;
+      --panel-soft: #202d2a;
+      --ink: #edf4f1;
+      --muted: #9dacaa;
+      --line: #31403d;
+      --shadow: 0 18px 45px rgba(0, 0, 0, .24);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(115deg, rgba(15, 118, 110, .08), transparent 38%),
+        linear-gradient(245deg, rgba(216, 159, 43, .13), transparent 32%),
+        var(--bg);
+      color: var(--ink);
+    }
+
+    button, input, select, textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 22px 18px;
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      border-right: 1px solid var(--line);
+      backdrop-filter: blur(18px);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 4px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      background: linear-gradient(145deg, var(--primary), #1c9b72);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 12px 24px rgba(15, 118, 110, .25);
+    }
+
+    .brand-mark svg { width: 26px; height: 26px; fill: #fff; }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .brand p {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .nav {
+      display: grid;
+      gap: 8px;
+    }
+
+    .nav button {
+      min-height: 44px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 12px;
+      color: var(--muted);
+      background: transparent;
+      border-radius: var(--radius);
+      text-align: left;
+    }
+
+    .nav button svg, .icon {
+      width: 19px;
+      height: 19px;
+      flex: 0 0 auto;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .nav button.active, .nav button:hover {
+      background: var(--panel-soft);
+      color: var(--primary);
+    }
+
+    .sync-box {
+      margin-top: auto;
+      padding: 14px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      display: grid;
+      gap: 10px;
+    }
+
+    .user-card {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      display: grid;
+      gap: 6px;
+    }
+
+    .user-card strong {
+      font-size: 14px;
+    }
+
+    .user-card small {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--ok);
+      box-shadow: 0 0 0 5px color-mix(in srgb, var(--ok) 12%, transparent);
+    }
+
+    .status-dot.offline {
+      background: var(--warn);
+      box-shadow: 0 0 0 5px color-mix(in srgb, var(--warn) 14%, transparent);
+    }
+
+    .main {
+      min-width: 0;
+      padding: 24px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .page-title h2 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 36px);
+      letter-spacing: 0;
+    }
+
+    .page-title p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      max-width: 760px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 13px;
+      border-radius: var(--radius);
+      color: var(--ink);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 0 8px 20px rgba(23, 33, 31, .04);
+      white-space: nowrap;
+    }
+
+    .btn.primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .btn.warning {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #1e1604;
+    }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      padding: 0;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .card {
+      background: color-mix(in srgb, var(--panel) 96%, transparent);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .metric {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .metric strong {
+      font-size: 32px;
+      line-height: 1;
+    }
+
+    .metric small {
+      color: var(--muted);
+    }
+
+    .content-grid {
+      grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr);
+      margin-top: 16px;
+    }
+
+    .section-head {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .section-head h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .section-body {
+      padding: 18px;
+    }
+
+    .table-wrap {
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+      font-size: 14px;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 650;
+      background: color-mix(in srgb, var(--panel-soft) 65%, transparent);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 650;
+      white-space: nowrap;
+      background: var(--panel-soft);
+      color: var(--muted);
+    }
+
+    .badge.ok { background: rgba(18, 122, 67, .13); color: var(--ok); }
+    .badge.warn { background: rgba(161, 92, 7, .14); color: var(--warn); }
+    .badge.info { background: rgba(37, 99, 166, .13); color: var(--info); }
+    .badge.danger { background: rgba(180, 35, 24, .13); color: var(--danger); }
+
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: var(--radius);
+      padding: 10px 11px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(15, 118, 110, .13);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .span-2 { grid-column: 1 / -1; }
+
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .photo-tile {
+      position: relative;
+      min-height: 172px;
+      border: 1px dashed color-mix(in srgb, var(--primary) 55%, var(--line));
+      background: var(--panel-soft);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 10px;
+    }
+
+    .photo-tile input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .photo-tile img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .photo-tile .caption {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      border-radius: 6px;
+      color: #fff;
+      background: rgba(0, 0, 0, .62);
+      padding: 7px;
+      font-size: 11px;
+      text-align: left;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+    }
+
+    .timeline-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: var(--primary);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .timeline-item p {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .progress {
+      height: 12px;
+      background: var(--panel-soft);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: var(--value);
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+    }
+
+    #map {
+      height: min(64vh, 620px);
+      min-height: 420px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+
+    .report-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .report-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    .drawer {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 50;
+    }
+
+    .drawer.open { display: block; }
+
+    .drawer-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, .45);
+    }
+
+    .drawer-panel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: min(760px, 100%);
+      height: 100%;
+      overflow: auto;
+      background: var(--bg);
+      border-left: 1px solid var(--line);
+      padding: 20px;
+    }
+
+    .mobile-tabs {
+      display: none;
+    }
+
+    .hidden { display: none !important; }
+
+    .muted { color: var(--muted); }
+
+    .empty {
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      padding: 22px;
+      text-align: center;
+      color: var(--muted);
+      background: var(--panel-soft);
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%) translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      background: #111;
+      color: #fff;
+      padding: 11px 14px;
+      border-radius: var(--radius);
+      z-index: 80;
+      transition: .2s ease;
+      box-shadow: 0 16px 34px rgba(0, 0, 0, .22);
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .login-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: grid;
+      grid-template-columns: minmax(360px, .82fr) minmax(0, 1.18fr);
+      min-height: 100vh;
+      background: var(--bg);
+    }
+
+    .login-screen.hidden {
+      display: none;
+    }
+
+    .login-panel {
+      padding: clamp(24px, 5vw, 56px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+    }
+
+    .login-panel .brand {
+      border-bottom: 0;
+      padding: 0;
+      margin-bottom: 36px;
+    }
+
+    .login-panel h2 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 42px);
+      letter-spacing: 0;
+      line-height: 1.05;
+    }
+
+    .login-panel p {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .login-form {
+      display: grid;
+      gap: 14px;
+      max-width: 440px;
+      margin-top: 16px;
+    }
+
+    .password-field {
+      position: relative;
+    }
+
+    .password-field input {
+      padding-right: 48px;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 5px;
+      bottom: 5px;
+      width: 38px;
+      height: 38px;
+      border-radius: 7px;
+      color: var(--muted);
+      background: transparent;
+      display: grid;
+      place-items: center;
+    }
+
+    .password-toggle:hover {
+      background: var(--panel-soft);
+      color: var(--primary);
+    }
+
+    .auth-switch {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      max-width: 440px;
+      padding: 5px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-soft);
+    }
+
+    .auth-switch button {
+      min-height: 36px;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .auth-switch button.active {
+      color: #fff;
+      background: var(--primary);
+    }
+
+    .auth-form.hidden {
+      display: none;
+    }
+
+    .login-visual {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(24px, 5vw, 60px);
+      display: flex;
+      align-items: flex-end;
+      background:
+        linear-gradient(160deg, rgba(15, 118, 110, .93), rgba(13, 66, 61, .94)),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 900'%3E%3Cpath d='M0 670 900 420v480H0z' fill='%23d89f2b' opacity='.22'/%3E%3Cpath d='M110 740h680' stroke='white' stroke-opacity='.25' stroke-width='6'/%3E%3Cg fill='white' opacity='.9'%3E%3Crect x='210' y='250' width='22' height='420'/%3E%3Crect x='172' y='310' width='98' height='18'/%3E%3Crect x='450' y='190' width='22' height='500'/%3E%3Crect x='410' y='265' width='102' height='18'/%3E%3Crect x='682' y='310' width='22' height='360'/%3E%3Crect x='646' y='365' width='94' height='18'/%3E%3C/g%3E%3C/svg%3E");
+      background-size: cover;
+      color: #fff;
+    }
+
+    .login-visual::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(0deg, rgba(0, 0, 0, .42), transparent 58%);
+    }
+
+    .login-copy {
+      position: relative;
+      max-width: 680px;
+    }
+
+    .login-copy h3 {
+      margin: 0;
+      font-size: clamp(30px, 5vw, 58px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .login-copy p {
+      color: rgba(255, 255, 255, .82);
+      max-width: 560px;
+      line-height: 1.6;
+    }
+
+    .login-hint {
+      margin-top: 18px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-soft);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .main { padding: 16px 16px 86px; }
+      .mobile-tabs {
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        z-index: 40;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 6px;
+        padding: 8px;
+        background: color-mix(in srgb, var(--panel) 94%, transparent);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(16px);
+      }
+      .mobile-tabs button {
+        min-height: 46px;
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        background: transparent;
+        border-radius: 8px;
+      }
+      .mobile-tabs button.active {
+        color: #fff;
+        background: var(--primary);
+      }
+      .content-grid, .stats { grid-template-columns: 1fr 1fr; }
+      .login-screen { grid-template-columns: 1fr; }
+      .login-visual { display: none; }
+    }
+
+    @media (max-width: 720px) {
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .toolbar { justify-content: flex-start; width: 100%; }
+      .content-grid, .stats, .filters, .form-grid, .photo-grid { grid-template-columns: 1fr; }
+      .drawer-panel { padding: 14px; }
+      table { min-width: 680px; }
+      #map { min-height: 360px; }
+      .btn { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <section class="login-screen hidden" id="loginScreen">
+    <div class="login-panel">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M11 2h2v20h-2zM5 6h14v3H5zM7 12h10v3H7z"/></svg>
+        </div>
+        <div>
+          <h1>SuiviPoteaux Pro</h1>
+          <p>Acces securise operations terrain</p>
+        </div>
+      </div>
+      <h2>Connexion</h2>
+      <p>Accedez au stock, aux fiches de pose, a la carte GPS et aux rapports selon votre role.</p>
+      <div class="auth-switch" role="tablist" aria-label="Options d'authentification">
+        <button class="active" type="button" data-auth-mode="login">Connexion</button>
+        <button type="button" data-auth-mode="register">Creer compte</button>
+        <button type="button" data-auth-mode="reset">Mot de passe</button>
+      </div>
+      <form class="login-form auth-form" id="loginForm" data-auth-form="login">
+        <div class="field">
+          <label for="loginEmail">Adresse email</label>
+          <input id="loginEmail" type="email" autocomplete="username" value="admin@itc.local" required>
+        </div>
+        <div class="field password-field">
+          <label for="loginPassword">Mot de passe</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" value="demo123" required>
+          <button class="password-toggle" type="button" data-toggle-password="loginPassword" title="Voir ou cacher le mot de passe" aria-label="Voir ou cacher le mot de passe">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <button class="btn primary" type="submit">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+          Se connecter
+        </button>
+      </form>
+      <form class="login-form auth-form hidden" id="registerForm" data-auth-form="register">
+        <div class="field">
+          <label for="registerName">Nom complet</label>
+          <input id="registerName" autocomplete="name" placeholder="Ex: Koffi Traore" required>
+        </div>
+        <div class="field">
+          <label for="registerEmail">Adresse email</label>
+          <input id="registerEmail" type="email" autocomplete="email" placeholder="nom@entreprise.com" required>
+        </div>
+        <div class="field">
+          <label for="registerRole">Role demande</label>
+          <select id="registerRole" required>
+            <option value="terrain">Agent Terrain</option>
+            <option value="magasinier">Magasinier</option>
+            <option value="controleur">Controleur Qualite</option>
+          </select>
+        </div>
+        <div class="field password-field">
+          <label for="registerPassword">Mot de passe</label>
+          <input id="registerPassword" type="password" autocomplete="new-password" minlength="6" required>
+          <button class="password-toggle" type="button" data-toggle-password="registerPassword" title="Voir ou cacher le mot de passe" aria-label="Voir ou cacher le mot de passe">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <button class="btn primary" type="submit">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Creer le compte
+        </button>
+      </form>
+      <form class="login-form auth-form hidden" id="resetForm" data-auth-form="reset">
+        <div class="field">
+          <label for="resetEmail">Email du compte</label>
+          <input id="resetEmail" type="email" autocomplete="username" placeholder="votre@email.com" required>
+        </div>
+        <div class="field password-field">
+          <label for="resetPassword">Nouveau mot de passe</label>
+          <input id="resetPassword" type="password" autocomplete="new-password" minlength="6" required>
+          <button class="password-toggle" type="button" data-toggle-password="resetPassword" title="Voir ou cacher le mot de passe" aria-label="Voir ou cacher le mot de passe">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <button class="btn primary" type="submit">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+          Reinitialiser
+        </button>
+      </form>
+        <div class="login-hint">
+          Comptes demo : admin@itc.local, depot@itc.local, terrain@itc.local, controle@itc.local. Mot de passe : demo123.
+        </div>
+    </div>
+    <div class="login-visual">
+      <div class="login-copy">
+        <h3>Suivi terrain, stock et preuves photo dans un seul flux.</h3>
+        <p>RBAC, GPS, offline-first, validation qualite et rapports PDF pour les poses de poteaux beton et metalliques.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M11 2h2v20h-2zM5 6h14v3H5zM7 12h10v3H7z"/></svg>
+        </div>
+        <div>
+          <h1>SuiviPoteaux Pro</h1>
+          <p>ERP terrain & depot</p>
+        </div>
+      </div>
+      <nav class="nav" id="desktopNav"></nav>
+      <div class="sync-box">
+        <div class="user-card">
+          <strong id="currentUserName">Non connecte</strong>
+          <small id="currentUserEmail">Session locale</small>
+          <span class="badge info" id="currentUserRole">offline</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="status-dot" id="networkDot"></span>
+          <strong id="networkText">En ligne</strong>
+        </div>
+        <small class="muted" id="syncText">Synchronisation locale active</small>
+        <button class="btn primary" id="syncBtn" type="button">Synchroniser</button>
+        <button class="btn" id="logoutBtn" type="button">Deconnexion</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="page-title">
+          <h2 id="viewTitle">Tableau de bord</h2>
+          <p id="viewSubtitle">Pilotage global des stocks, poses, validations et preuves terrain.</p>
+        </div>
+        <div class="toolbar">
+          <span class="badge info" id="topCurrentUser">Non connecte</span>
+          <button class="btn" id="seedBtn" type="button" title="Recharger les donnees exemple">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/></svg>
+            Demo
+          </button>
+          <button class="btn icon-btn" id="themeBtn" type="button" title="Theme clair/sombre">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 6 9 9 0 1 1-9-6Z"/></svg>
+          </button>
+          <button class="btn primary" id="newInterventionBtn" type="button">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Fiche de pose
+          </button>
+          <button class="btn" id="topLogoutBtn" type="button">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            Sortir
+          </button>
+        </div>
+      </header>
+
+      <section id="dashboardView" class="view"></section>
+      <section id="stockView" class="view hidden"></section>
+      <section id="fieldView" class="view hidden"></section>
+      <section id="mapView" class="view hidden"></section>
+      <section id="reportsView" class="view hidden"></section>
+    </main>
+  </div>
+
+  <nav class="mobile-tabs" id="mobileNav"></nav>
+
+  <div class="drawer" id="interventionDrawer" aria-hidden="true">
+    <div class="drawer-backdrop" data-close-drawer></div>
+    <div class="drawer-panel">
+      <div class="section-head" style="padding:0 0 14px;border-bottom:1px solid var(--line);margin-bottom:16px">
+        <div>
+          <h3>Fiche technique de pose</h3>
+          <p class="muted" style="margin:4px 0 0">Capture mobile GPS, photos et validation terrain.</p>
+        </div>
+        <button class="btn icon-btn" type="button" data-close-drawer title="Fermer">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <form id="interventionForm" class="grid">
+        <div class="form-grid">
+          <div class="field">
+            <label for="poleId">Poteau attribue</label>
+            <select id="poleId" required></select>
+          </div>
+          <div class="field">
+            <label for="agent">Chef d'equipe</label>
+            <input id="agent" required value="Equipe Terrain A">
+          </div>
+          <div class="field">
+            <label for="project">Chantier / Axe</label>
+            <select id="project" required></select>
+          </div>
+          <div class="field">
+            <label for="soil">Type de sol</label>
+            <select id="soil" required>
+              <option>Terre</option>
+              <option>Roche</option>
+              <option>Bitume</option>
+              <option>Remblai</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="depth">Profondeur de fouille (m)</label>
+            <input id="depth" type="number" min="0.4" max="3" step="0.05" value="1.20" required>
+          </div>
+          <div class="field">
+            <label for="validation">Statut de validation</label>
+            <select id="validation">
+              <option>Pose - En attente validation</option>
+              <option>Valide</option>
+              <option>Anomalie</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="latitude">Latitude GPS</label>
+            <input id="latitude" required>
+          </div>
+          <div class="field">
+            <label for="longitude">Longitude GPS</label>
+            <input id="longitude" required>
+          </div>
+          <div class="field span-2">
+            <button class="btn warning" id="gpsBtn" type="button">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg>
+              Capturer la position GPS
+            </button>
+          </div>
+          <div class="field span-2">
+            <label for="notes">Remarques / Observations</label>
+            <textarea id="notes" placeholder="Controle aplomb, calage, acces chantier, anomalies..."></textarea>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-head" style="padding:0 0 12px;border-bottom:0">
+            <h3>Preuves photographiques</h3>
+            <span class="badge info" id="photoCount">0/5</span>
+          </div>
+          <div class="photo-grid" id="photoGrid"></div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="teamSignature">Signature chef d'equipe</label>
+            <input id="teamSignature" value="A. Konan">
+          </div>
+          <div class="field">
+            <label for="clientSignature">Controleur / Client</label>
+            <input id="clientSignature" value="Controle Qualite">
+          </div>
+        </div>
+
+        <div class="toolbar" style="justify-content:flex-start">
+          <button class="btn primary" type="submit">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+            Enregistrer
+          </button>
+          <button class="btn" type="button" id="draftBtn">Brouillon offline</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <script>
+    const STORAGE_KEY = "suiviPoteauxPro:v1";
+    const API_TOKEN_KEY = "suiviPoteauxPro:apiToken";
+    const API_BASE = `${window.location.origin}/api`;
+    const PHOTO_STEPS = [
+      "Avant travaux - fouille",
+      "Marquage constructeur",
+      "Levage et aplomb",
+      "Massif beton / calage",
+      "Armement / tete de poteau"
+    ];
+
+    const navItems = [
+      ["dashboard", "Tableau de bord", "Pilotage global des stocks, poses, validations et preuves terrain.", "M4 13h6V4H4v9Zm10 7h6V4h-6v16ZM4 20h6v-4H4v4Z"],
+      ["stock", "Depot & Stock", "Inventaire filtrable, requisitions et bons de sortie terrain.", "M21 8a2 2 0 0 0-1-1.73L13 2.27a2 2 0 0 0-2 0L4 6.27A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z M3.3 7 12 12l8.7-5 M12 22V12"],
+      ["field", "Operations terrain", "Interface mobile offline-first pour les equipes de pose.", "M12 2 19 21 12 17 5 21 12 2Z M12 8v5"],
+      ["map", "Carte GPS", "Pins OpenStreetMap colores selon les statuts de pose.", "M9 18 3 21V6l6-3 6 3 6-3v15l-6 3-6-3Z M9 3v15 M15 6v15"],
+      ["reports", "Rapports PDF", "Export des fiches avec photos, GPS et emargements.", "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z M14 2v6h6 M8 13h8 M8 17h8 M8 9h2"]
+    ];
+
+    const seedData = {
+      theme: "light",
+      activeView: "dashboard",
+      projects: [
+        { id: "CH-MOOV-A1", name: "MOOV - Axe Yopougon PK12", client: "MOOV", zone: "Abidjan Nord" },
+        { id: "CH-CIE-B4", name: "CIE - Extension reseau B4", client: "CIE", zone: "Bouake Est" },
+        { id: "CH-ORG-T2", name: "Orange - Fibre rurale T2", client: "Orange", zone: "Daloa Sud" }
+      ],
+      poles: [
+        { id: "POT-2026-B9-001", type: "BETON", height: 12, effort: "400 daN", weight: 860, maker: "SIPREL / Lot B9", status: "En Stock", depot: "Depot Central" },
+        { id: "POT-2026-B9-002", type: "BETON", height: 11, effort: "300 daN", weight: 790, maker: "SIPREL / Lot B9", status: "En Transit", depot: "Camion EQ-A" },
+        { id: "POT-2026-M4-018", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 235, maker: "METALCI / Lot M4", status: "Pose - En attente validation", depot: "Chantier MOOV", lat: 5.39231, lng: -4.03221 },
+        { id: "POT-2026-M4-019", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 236, maker: "METALCI / Lot M4", status: "Valide", depot: "Chantier MOOV", lat: 5.38875, lng: -4.02684 },
+        { id: "POT-2026-B10-021", type: "BETON", height: 12, effort: "500 daN", weight: 920, maker: "SIPREL / Lot B10", status: "Anomalie", depot: "Chantier CIE", lat: 7.69592, lng: -5.03012 },
+        { id: "POT-2026-M5-030", type: "METALLIQUE", height: 10, effort: "300 daN", weight: 280, maker: "METALCI / Lot M5", status: "En Stock", depot: "Depot Bouake" }
+      ],
+      interventions: [
+        {
+          id: "RPT-2026-0001",
+          poleId: "POT-2026-M4-019",
+          projectId: "CH-MOOV-A1",
+          agent: "Equipe Terrain A",
+          date: new Date(Date.now() - 86400000).toISOString(),
+          lat: 5.38875,
+          lng: -4.02684,
+          soil: "Terre",
+          depth: 1.25,
+          validation: "Valide",
+          notes: "Pose conforme, aplomb controle et massif cure.",
+          teamSignature: "A. Konan",
+          clientSignature: "Controle Qualite",
+          photos: []
+        }
+      ],
+      offlineQueue: []
+    };
+
+    let state = loadState();
+    let map;
+    let selectedPhotos = [];
+    let apiToken = localStorage.getItem(API_TOKEN_KEY) || "";
+    let apiUser = null;
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        return saved ? { ...seedData, ...saved } : structuredClone(seedData);
+      } catch {
+        return structuredClone(seedData);
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    async function apiFetch(path, options = {}) {
+      const response = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {}),
+          ...(options.headers || {})
+        }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Erreur API");
+      return payload;
+    }
+
+    function roleLabel(role) {
+      return {
+        super_admin: "Super Admin",
+        magasinier: "Magasinier",
+        terrain: "Agent Terrain",
+        controleur: "Controleur"
+      }[role] || role || "offline";
+    }
+
+    function updateCurrentUser() {
+      $("#currentUserName").textContent = apiUser?.name || "Non connecte";
+      $("#currentUserEmail").textContent = apiUser?.email || "Session locale";
+      $("#currentUserRole").textContent = roleLabel(apiUser?.role);
+      $("#topCurrentUser").textContent = apiUser ? `${apiUser.name} - ${roleLabel(apiUser.role)}` : "Non connecte";
+    }
+
+    function showLogin(message = "") {
+      $("#loginScreen").classList.remove("hidden");
+      updateCurrentUser();
+      if (message) toast(message);
+    }
+
+    function hideLogin() {
+      $("#loginScreen").classList.add("hidden");
+      updateCurrentUser();
+    }
+
+    async function ensureApiSession() {
+      if (apiToken) return;
+      showLogin("Connexion requise");
+      throw new Error("Connexion requise");
+    }
+
+    async function loginWithCredentials(email, password) {
+      const payload = await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password })
+      });
+      apiToken = payload.token;
+      apiUser = payload.user;
+      localStorage.setItem(API_TOKEN_KEY, apiToken);
+      await loadBackendData();
+      hideLogin();
+      setView(state.activeView || "dashboard");
+      toast(`Connecte: ${apiUser.name}`);
+    }
+
+    async function registerAccount() {
+      const payload = await apiFetch("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: $("#registerName").value.trim(),
+          email: $("#registerEmail").value.trim(),
+          role: $("#registerRole").value,
+          password: $("#registerPassword").value
+        })
+      });
+      apiToken = payload.token;
+      apiUser = payload.user;
+      localStorage.setItem(API_TOKEN_KEY, apiToken);
+      await loadBackendData();
+      hideLogin();
+      setView(state.activeView || "dashboard");
+      toast(`Compte cree: ${apiUser.name}`);
+    }
+
+    async function resetPassword() {
+      await apiFetch("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({
+          email: $("#resetEmail").value.trim(),
+          password: $("#resetPassword").value
+        })
+      });
+      $("#loginEmail").value = $("#resetEmail").value.trim();
+      $("#loginPassword").value = "";
+      setAuthMode("login");
+      toast("Mot de passe reinitialise");
+    }
+
+    function setAuthMode(mode) {
+      $all("[data-auth-mode]").forEach(button => {
+        button.classList.toggle("active", button.dataset.authMode === mode);
+      });
+      $all("[data-auth-form]").forEach(form => {
+        form.classList.toggle("hidden", form.dataset.authForm !== mode);
+      });
+    }
+
+    function togglePassword(inputId, button) {
+      const input = $(`#${inputId}`);
+      const visible = input.type === "text";
+      input.type = visible ? "password" : "text";
+      button.innerHTML = visible
+        ? `<svg class="icon" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>`
+        : `<svg class="icon" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><path d="M4 4l16 16"/></svg>`;
+    }
+
+    async function loadBackendData() {
+      if (!apiToken) {
+        showLogin();
+        return false;
+      }
+      try {
+        const payload = await apiFetch("/bootstrap");
+        apiUser = payload.user;
+        state = {
+          ...state,
+          projects: payload.projects,
+          poles: payload.poles,
+          interventions: payload.interventions,
+          offlineQueue: state.offlineQueue || []
+        };
+        saveState();
+        hideLogin();
+        return true;
+      } catch (error) {
+        apiToken = "";
+        apiUser = null;
+        localStorage.removeItem(API_TOKEN_KEY);
+        showLogin(error.message === "Authentification requise" ? "Session expiree" : "Connexion backend requise");
+        return false;
+      }
+    }
+
+    async function logout() {
+      try {
+        if (apiToken) {
+          await apiFetch("/auth/logout", { method: "POST" });
+        }
+      } catch {
+      } finally {
+        apiToken = "";
+        apiUser = null;
+        localStorage.removeItem(API_TOKEN_KEY);
+        showLogin("Deconnecte");
+        updateNetwork();
+      }
+    }
+
+    function $(selector, root = document) {
+      return root.querySelector(selector);
+    }
+
+    function $all(selector, root = document) {
+      return [...root.querySelectorAll(selector)];
+    }
+
+    function icon(path) {
+      return `<svg class="icon" viewBox="0 0 24 24"><path d="${path}"/></svg>`;
+    }
+
+    function toast(message) {
+      const node = $("#toast");
+      node.textContent = message;
+      node.classList.add("show");
+      clearTimeout(node.timer);
+      node.timer = setTimeout(() => node.classList.remove("show"), 2600);
+    }
+
+    function statusClass(status) {
+      if (status === "Valide") return "ok";
+      if (status === "Anomalie") return "danger";
+      if (status.includes("attente") || status === "En Transit") return "warn";
+      return "info";
+    }
+
+    function renderNav() {
+      const desktop = $("#desktopNav");
+      const mobile = $("#mobileNav");
+      desktop.innerHTML = "";
+      mobile.innerHTML = "";
+      navItems.forEach(([id, label, , path]) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.view = id;
+        button.innerHTML = `${icon(path)}<span>${label}</span>`;
+        desktop.appendChild(button);
+
+        const mobileButton = document.createElement("button");
+        mobileButton.type = "button";
+        mobileButton.dataset.view = id;
+        mobileButton.title = label;
+        mobileButton.innerHTML = icon(path);
+        mobile.appendChild(mobileButton);
+      });
+      $all("[data-view]").forEach(btn => btn.addEventListener("click", () => setView(btn.dataset.view)));
+    }
+
+    function setView(view) {
+      state.activeView = view;
+      saveState();
+      $(".view:not(.hidden)")?.classList.add("hidden");
+      $(`#${view}View`).classList.remove("hidden");
+      const item = navItems.find(([id]) => id === view);
+      $("#viewTitle").textContent = item[1];
+      $("#viewSubtitle").textContent = item[2];
+      $all("[data-view]").forEach(btn => btn.classList.toggle("active", btn.dataset.view === view));
+      if (view === "map") setTimeout(renderMap, 100);
+      renderCurrentView();
+    }
+
+    function renderCurrentView() {
+      renderDashboard();
+      renderStock();
+      renderField();
+      renderReports();
+      populateFormSelects();
+      updateNetwork();
+    }
+
+    function renderDashboard() {
+      const total = state.poles.length;
+      const installed = state.poles.filter(p => ["Pose - En attente validation", "Valide", "Anomalie"].includes(p.status)).length;
+      const beton = state.poles.filter(p => p.type === "BETON").length;
+      const metal = state.poles.filter(p => p.type === "METALLIQUE").length;
+      const validated = state.poles.filter(p => p.status === "Valide").length;
+      const validationRate = installed ? Math.round(validated / installed * 100) : 0;
+
+      $("#dashboardView").innerHTML = `
+        <div class="grid stats">
+          ${metric("Total poteaux", total, "Inventaire consolide")}
+          ${metric("Poses tracees", installed, `${state.interventions.length} fiches terrain`)}
+          ${metric("Beton / Metal", `${beton}/${metal}`, "Repartition materiaux")}
+          ${metric("Validation", `${validationRate}%`, "Conformite terrain")}
+        </div>
+        <div class="grid content-grid">
+          <div class="card">
+            <div class="section-head">
+              <h3>Progression par statut</h3>
+              <span class="badge info">${installed}/${total} implantes</span>
+            </div>
+            <div class="section-body grid">
+              ${progressLine("En Stock", countStatus("En Stock"), total)}
+              ${progressLine("En Transit", countStatus("En Transit"), total)}
+              ${progressLine("En attente validation", countStatus("Pose - En attente validation"), total)}
+              ${progressLine("Valide", countStatus("Valide"), total)}
+              ${progressLine("Anomalie", countStatus("Anomalie"), total)}
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-head">
+              <h3>Dernieres operations</h3>
+              <button class="btn" type="button" onclick="setView('field')">Terrain</button>
+            </div>
+            <div class="section-body timeline">
+              ${state.interventions.slice().reverse().slice(0, 5).map((it, index) => `
+                <div class="timeline-item">
+                  <div class="timeline-dot">${index + 1}</div>
+                  <div>
+                    <strong>${it.poleId}</strong>
+                    <p>${formatDate(it.date)} - ${it.agent} - ${it.validation}</p>
+                  </div>
+                </div>
+              `).join("") || `<div class="empty">Aucune fiche terrain enregistree.</div>`}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function metric(label, value, hint) {
+      return `<div class="card metric"><span>${label}</span><strong>${value}</strong><small>${hint}</small></div>`;
+    }
+
+    function countStatus(status) {
+      return state.poles.filter(p => p.status === status).length;
+    }
+
+    function progressLine(label, value, total) {
+      const percent = total ? Math.round(value / total * 100) : 0;
+      return `
+        <div>
+          <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:8px">
+            <strong>${label}</strong><span class="muted">${value} (${percent}%)</span>
+          </div>
+          <div class="progress" style="--value:${percent}%"><span></span></div>
+        </div>
+      `;
+    }
+
+    function renderStock() {
+      $("#stockView").innerHTML = `
+        <div class="card">
+          <div class="section-head">
+            <h3>Inventaire depot et chantier</h3>
+            <button class="btn primary" type="button" id="requisitionBtn">${icon("M12 5v14M5 12h14")} Bon de sortie</button>
+          </div>
+          <div class="section-body">
+            <div class="filters">
+              <input id="stockSearch" placeholder="Code, depot, lot...">
+              <select id="typeFilter"><option value="">Tous materiaux</option><option>BETON</option><option>METALLIQUE</option></select>
+              <select id="statusFilter"><option value="">Tous statuts</option><option>En Stock</option><option>En Transit</option><option>Pose - En attente validation</option><option>Valide</option><option>Anomalie</option></select>
+              <select id="heightFilter"><option value="">Toutes hauteurs</option>${[9,10,11,12].map(h => `<option value="${h}">${h} m</option>`).join("")}</select>
+            </div>
+            <div class="table-wrap"><table id="stockTable"></table></div>
+          </div>
+        </div>
+      `;
+      ["stockSearch", "typeFilter", "statusFilter", "heightFilter"].forEach(id => $(`#${id}`).addEventListener("input", drawStockRows));
+      $("#requisitionBtn").addEventListener("click", createRequisition);
+      drawStockRows();
+    }
+
+    function drawStockRows() {
+      const query = ($("#stockSearch")?.value || "").toLowerCase();
+      const type = $("#typeFilter")?.value || "";
+      const status = $("#statusFilter")?.value || "";
+      const height = $("#heightFilter")?.value || "";
+      const rows = state.poles.filter(p => {
+        const haystack = `${p.id} ${p.depot} ${p.maker}`.toLowerCase();
+        return (!query || haystack.includes(query)) &&
+          (!type || p.type === type) &&
+          (!status || p.status === status) &&
+          (!height || String(p.height) === height);
+      });
+      $("#stockTable").innerHTML = `
+        <thead><tr><th>Code</th><th>Type</th><th>Specifications</th><th>Depot</th><th>Statut</th><th>Action</th></tr></thead>
+        <tbody>
+          ${rows.map(p => `
+            <tr>
+              <td><strong>${p.id}</strong><br><span class="muted">${p.maker}</span></td>
+              <td>${p.type}</td>
+              <td>${p.height} m - ${p.effort} - ${p.weight} kg</td>
+              <td>${p.depot}</td>
+              <td><span class="badge ${statusClass(p.status)}">${p.status}</span></td>
+              <td><button class="btn" type="button" onclick="assignPole('${p.id}')">Attribuer</button></td>
+            </tr>
+          `).join("") || `<tr><td colspan="6"><div class="empty">Aucun poteau ne correspond aux filtres.</div></td></tr>`}
+        </tbody>
+      `;
+    }
+
+    async function assignPole(id) {
+      const pole = state.poles.find(p => p.id === id);
+      if (!pole) return;
+      pole.status = "En Transit";
+      pole.depot = "Camion equipe terrain";
+      state.offlineQueue.push({ type: "stock-move", poleId: id, date: new Date().toISOString() });
+      saveState();
+      try {
+        await ensureApiSession();
+        await apiFetch(`/poles/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: pole.status, depot: pole.depot })
+        });
+        state.offlineQueue = state.offlineQueue.filter(item => !(item.type === "stock-move" && item.poleId === id));
+        saveState();
+      } catch (error) {
+        console.info("Mouvement stock conserve offline:", error.message);
+      }
+      renderCurrentView();
+      toast(`${id} attribue au terrain`);
+    }
+
+    async function createRequisition() {
+      const available = state.poles.filter(p => p.status === "En Stock").slice(0, 3);
+      if (!available.length) return toast("Aucun poteau disponible en stock");
+      const operation = { type: "requisition", poles: available.map(p => p.id), date: new Date().toISOString() };
+      available.forEach(p => {
+        p.status = "En Transit";
+        p.depot = "Bon sortie BS-" + new Date().getFullYear() + "-AUTO";
+      });
+      state.offlineQueue.push(operation);
+      saveState();
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch("/requisitions", {
+          method: "POST",
+          body: JSON.stringify({ poleIds: operation.poles, destination: available[0].depot })
+        });
+        state.poles = payload.poles;
+        state.offlineQueue = state.offlineQueue.filter(item => item !== operation);
+        saveState();
+      } catch (error) {
+        console.info("Bon de sortie conserve offline:", error.message);
+      }
+      renderCurrentView();
+      toast(`${available.length} poteaux ajoutes au bon de sortie`);
+    }
+
+    function renderField() {
+      const pending = state.poles.filter(p => p.status === "En Transit" || p.status === "En Stock");
+      $("#fieldView").innerHTML = `
+        <div class="grid content-grid">
+          <div class="card">
+            <div class="section-head">
+              <h3>Poteaux attribues</h3>
+              <button class="btn primary" type="button" onclick="openDrawer()">${icon("M12 5v14M5 12h14")} Nouvelle pose</button>
+            </div>
+            <div class="section-body">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Code</th><th>Type</th><th>Depot</th><th>Statut</th><th></th></tr></thead>
+                  <tbody>
+                    ${pending.map(p => `
+                      <tr>
+                        <td><strong>${p.id}</strong></td>
+                        <td>${p.type} - ${p.height} m</td>
+                        <td>${p.depot}</td>
+                        <td><span class="badge ${statusClass(p.status)}">${p.status}</span></td>
+                        <td><button class="btn" type="button" onclick="openDrawer('${p.id}')">Poser</button></td>
+                      </tr>
+                    `).join("") || `<tr><td colspan="5"><div class="empty">Aucun poteau attribue.</div></td></tr>`}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-head">
+              <h3>Controle terrain</h3>
+              <span class="badge ${navigator.onLine ? "ok" : "warn"}">${navigator.onLine ? "Online" : "Offline"}</span>
+            </div>
+            <div class="section-body timeline">
+              ${PHOTO_STEPS.map((step, i) => `
+                <div class="timeline-item">
+                  <div class="timeline-dot">${i + 1}</div>
+                  <div><strong>${step}</strong><p>Photo horodatee avec filigrane GPS integre au rapport.</p></div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderMap() {
+      if (!$("#map")) {
+        $("#mapView").innerHTML = `
+          <div class="card">
+            <div class="section-head">
+              <h3>Carte interactive GPS</h3>
+              <span class="badge info">${state.poles.filter(p => p.lat && p.lng).length} positions</span>
+            </div>
+            <div class="section-body"><div id="map"></div></div>
+          </div>
+        `;
+      }
+      if (!window.L) {
+        $("#map").innerHTML = `<div class="empty">Leaflet n'est pas disponible hors connexion au premier chargement.</div>`;
+        return;
+      }
+      if (!map) {
+        map = L.map("map").setView([5.35, -4.02], 11);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: "&copy; OpenStreetMap"
+        }).addTo(map);
+      }
+      map.eachLayer(layer => {
+        if (layer instanceof L.Marker || layer instanceof L.CircleMarker) map.removeLayer(layer);
+      });
+      const located = state.poles.filter(p => p.lat && p.lng);
+      located.forEach(p => {
+        const color = p.status === "Valide" ? "#127a43" : p.status === "Anomalie" ? "#b42318" : "#d89f2b";
+        L.circleMarker([p.lat, p.lng], {
+          radius: 9,
+          color,
+          weight: 3,
+          fillColor: color,
+          fillOpacity: .75
+        }).addTo(map).bindPopup(`<strong>${p.id}</strong><br>${p.type} - ${p.height} m<br>${p.status}`);
+      });
+      if (located.length) {
+        map.fitBounds(located.map(p => [p.lat, p.lng]), { padding: [28, 28], maxZoom: 14 });
+      }
+      setTimeout(() => map.invalidateSize(), 120);
+    }
+
+    function renderReports() {
+      $("#reportsView").innerHTML = `
+        <div class="card">
+          <div class="section-head">
+            <h3>Fiches de pose et exports</h3>
+            <button class="btn primary" type="button" onclick="openDrawer()">${icon("M12 5v14M5 12h14")} Nouvelle fiche</button>
+          </div>
+          <div class="section-body report-list">
+            ${state.interventions.slice().reverse().map(it => {
+              const pole = state.poles.find(p => p.id === it.poleId) || {};
+              return `
+                <div class="report-row">
+                  <div>
+                    <strong>${it.id} - ${it.poleId}</strong>
+                    <p class="muted" style="margin:4px 0 0">${formatDate(it.date)} - ${pole.type || ""} - ${it.validation}</p>
+                  </div>
+                  <div class="toolbar">
+                    <span class="badge ${statusClass(it.validation.replace("Pose - En attente validation", "Pose - En attente validation"))}">${it.photos.length}/5 photos</span>
+                    <button class="btn" type="button" onclick="generatePdf('${it.id}')">${icon("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3")} PDF</button>
+                  </div>
+                </div>
+              `;
+            }).join("") || `<div class="empty">Aucun rapport disponible.</div>`}
+          </div>
+        </div>
+      `;
+    }
+
+    function populateFormSelects() {
+      const poleSelect = $("#poleId");
+      const projectSelect = $("#project");
+      if (!poleSelect || !projectSelect) return;
+      poleSelect.innerHTML = state.poles
+        .filter(p => p.status !== "Valide")
+        .map(p => `<option value="${p.id}">${p.id} - ${p.type} ${p.height}m</option>`)
+        .join("");
+      projectSelect.innerHTML = state.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join("");
+    }
+
+    function openDrawer(poleId) {
+      $("#interventionDrawer").classList.add("open");
+      $("#interventionDrawer").setAttribute("aria-hidden", "false");
+      $("#interventionForm").reset();
+      $("#agent").value = "Equipe Terrain A";
+      $("#depth").value = "1.20";
+      $("#teamSignature").value = "A. Konan";
+      $("#clientSignature").value = "Controle Qualite";
+      selectedPhotos = [];
+      renderPhotoInputs();
+      populateFormSelects();
+      if (poleId) $("#poleId").value = poleId;
+      fillFallbackGps();
+    }
+
+    function closeDrawer() {
+      $("#interventionDrawer").classList.remove("open");
+      $("#interventionDrawer").setAttribute("aria-hidden", "true");
+    }
+
+    function renderPhotoInputs() {
+      $("#photoCount").textContent = `${selectedPhotos.filter(Boolean).length}/5`;
+      $("#photoGrid").innerHTML = PHOTO_STEPS.map((step, index) => {
+        const photo = selectedPhotos[index];
+        return `
+          <label class="photo-tile">
+            ${photo ? `<img src="${photo.data}" alt="${step}">` : `<span><strong>${step}</strong><br><small class="muted">Toucher pour capturer</small></span>`}
+            ${photo ? `<span class="caption">${step}<br>${formatDate(photo.date)} - ${photo.lat}, ${photo.lng}</span>` : ""}
+            <input type="file" accept="image/*" capture="environment" data-photo-index="${index}">
+          </label>
+        `;
+      }).join("");
+      $all("[data-photo-index]").forEach(input => input.addEventListener("change", handlePhoto));
+    }
+
+    function handlePhoto(event) {
+      const file = event.target.files[0];
+      const index = Number(event.target.dataset.photoIndex);
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        selectedPhotos[index] = {
+          step: PHOTO_STEPS[index],
+          data: reader.result,
+          date: new Date().toISOString(),
+          lat: $("#latitude").value || "N/A",
+          lng: $("#longitude").value || "N/A"
+        };
+        renderPhotoInputs();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function fillFallbackGps() {
+      if (!$("#latitude").value) $("#latitude").value = (5.35 + Math.random() * .08).toFixed(6);
+      if (!$("#longitude").value) $("#longitude").value = (-4.05 + Math.random() * .08).toFixed(6);
+    }
+
+    function captureGps() {
+      if (!navigator.geolocation) {
+        fillFallbackGps();
+        toast("GPS indisponible, position demo inseree");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(position => {
+        $("#latitude").value = position.coords.latitude.toFixed(6);
+        $("#longitude").value = position.coords.longitude.toFixed(6);
+        toast("Position GPS capturee");
+      }, () => {
+        fillFallbackGps();
+        toast("Autorisation GPS refusee, position demo conservee");
+      }, { enableHighAccuracy: true, timeout: 9000 });
+    }
+
+    async function saveIntervention(isDraft = false) {
+      const form = $("#interventionForm");
+      if (!isDraft && !form.reportValidity()) return;
+      if (!isDraft && selectedPhotos.filter(Boolean).length < 4) {
+        toast("Ajoutez au moins les 4 photos obligatoires");
+        return;
+      }
+      const poleId = $("#poleId").value;
+      const date = new Date().toISOString();
+      const intervention = {
+        id: `RPT-${new Date().getFullYear()}-${String(state.interventions.length + 1).padStart(4, "0")}`,
+        poleId,
+        projectId: $("#project").value,
+        agent: $("#agent").value,
+        date,
+        lat: Number($("#latitude").value),
+        lng: Number($("#longitude").value),
+        soil: $("#soil").value,
+        depth: Number($("#depth").value),
+        validation: $("#validation").value,
+        notes: $("#notes").value,
+        teamSignature: $("#teamSignature").value,
+        clientSignature: $("#clientSignature").value,
+        photos: selectedPhotos.filter(Boolean),
+        draft: isDraft
+      };
+      state.interventions.push(intervention);
+      const pole = state.poles.find(p => p.id === poleId);
+      if (pole) {
+        pole.status = isDraft ? "En Transit" : intervention.validation;
+        pole.lat = intervention.lat;
+        pole.lng = intervention.lng;
+        pole.depot = "Implante terrain";
+      }
+      const operation = { type: isDraft ? "draft" : "intervention", id: intervention.id, date, payload: intervention };
+      state.offlineQueue.push(operation);
+      saveState();
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch("/interventions", {
+          method: "POST",
+          body: JSON.stringify(intervention)
+        });
+        state.interventions = state.interventions.map(item => item.id === intervention.id ? payload.intervention : item);
+        state.poles = payload.poles;
+        state.offlineQueue = state.offlineQueue.filter(item => item !== operation);
+        saveState();
+      } catch (error) {
+        console.info("Fiche conservee offline:", error.message);
+      }
+      closeDrawer();
+      renderCurrentView();
+      if (map) renderMap();
+      toast(isDraft ? "Brouillon offline enregistre" : "Fiche de pose enregistree");
+    }
+
+    async function generatePdf(reportId) {
+      const intervention = state.interventions.find(it => it.id === reportId);
+      if (!intervention) return;
+      if (!window.jspdf?.jsPDF) {
+        toast("jsPDF indisponible hors connexion au premier chargement");
+        return;
+      }
+      const pole = state.poles.find(p => p.id === intervention.poleId) || {};
+      const project = state.projects.find(p => p.id === intervention.projectId) || {};
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: "mm", format: "a4" });
+
+      doc.setFillColor(15, 118, 110);
+      doc.rect(0, 0, 210, 28, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.text("FICHE TECHNIQUE DE POSE ET D'IMPLANTATION DE POTEAU", 14, 12, { maxWidth: 160 });
+      doc.setFontSize(9);
+      doc.text(`Rapport: ${intervention.id}`, 14, 22);
+      doc.text(`Date: ${formatDate(intervention.date)}`, 150, 16);
+      doc.text(`Auteur: ${intervention.agent}`, 150, 22);
+
+      doc.setTextColor(30, 36, 34);
+      doc.setFontSize(11);
+      doc.text(`${project.name || "Chantier non renseigne"} - Client: ${project.client || "N/A"}`, 14, 38);
+
+      doc.autoTable({
+        startY: 44,
+        head: [["Caracteristique", "Valeur", "Caracteristique", "Valeur"]],
+        body: [
+          ["Code poteau", intervention.poleId, "Materiau", pole.type || "N/A"],
+          ["Hauteur", `${pole.height || "N/A"} m`, "Classe effort", pole.effort || "N/A"],
+          ["Coordonnees GPS", `${intervention.lat}, ${intervention.lng}`, "Type de sol", intervention.soil],
+          ["Profondeur fouille", `${intervention.depth} m`, "Validation", intervention.validation],
+          ["Constructeur / Lot", pole.maker || "N/A", "Zone", project.zone || "N/A"]
+        ],
+        theme: "grid",
+        styles: { fontSize: 8, cellPadding: 2.4 },
+        headStyles: { fillColor: [15, 118, 110] }
+      });
+
+      let y = doc.lastAutoTable.finalY + 10;
+      doc.setFontSize(13);
+      doc.text("Galerie des preuves photographiques", 14, y);
+      y += 6;
+      const slots = intervention.photos.length ? intervention.photos : PHOTO_STEPS.slice(0, 4).map(step => ({ step, data: null, date: intervention.date, lat: intervention.lat, lng: intervention.lng }));
+      for (let i = 0; i < Math.min(slots.length, 5); i++) {
+        const photo = slots[i];
+        const x = i % 2 === 0 ? 14 : 109;
+        const row = Math.floor(i / 2);
+        const photoY = y + row * 58;
+        if (photoY > 250) {
+          doc.addPage();
+          y = 16;
+        }
+        doc.setDrawColor(210, 218, 215);
+        doc.rect(x, photoY, 86, 42);
+        const photoData = photo.data || await photoUrlToDataUrl(photo.url);
+        if (photoData) {
+          try {
+            doc.addImage(photoData, "JPEG", x + 1, photoY + 1, 84, 40, undefined, "FAST");
+          } catch {
+            try { doc.addImage(photoData, "PNG", x + 1, photoY + 1, 84, 40, undefined, "FAST"); } catch {}
+          }
+        } else {
+          doc.setTextColor(120, 128, 125);
+          doc.setFontSize(9);
+          doc.text("Photo non jointe", x + 28, photoY + 23);
+        }
+        doc.setFillColor(0, 0, 0);
+        doc.setTextColor(255, 255, 255);
+        doc.rect(x, photoY + 34, 86, 8, "F");
+        doc.setFontSize(6.8);
+        doc.text(`${photo.step} | ${formatDate(photo.date)} | GPS ${photo.lat}, ${photo.lng}`, x + 2, photoY + 39, { maxWidth: 82 });
+        doc.setTextColor(30, 36, 34);
+      }
+
+      const signatureY = Math.min(250, y + Math.ceil(Math.min(slots.length, 5) / 2) * 58 + 8);
+      if (signatureY > 230) doc.addPage();
+      const sy = signatureY > 230 ? 24 : signatureY;
+      doc.setFontSize(13);
+      doc.text("Emargement / Validation", 14, sy);
+      doc.autoTable({
+        startY: sy + 5,
+        head: [["Role", "Nom / Signature", "Avis"]],
+        body: [
+          ["Chef d'equipe terrain", intervention.teamSignature || intervention.agent, "Pose realisee"],
+          ["Controleur / Client", intervention.clientSignature || "N/A", intervention.validation === "Valide" ? "Conforme" : "Non-Conforme / A verifier"]
+        ],
+        theme: "grid",
+        styles: { fontSize: 9, minCellHeight: 14 },
+        headStyles: { fillColor: [15, 118, 110] }
+      });
+      doc.setFontSize(9);
+      doc.text(`Observations: ${intervention.notes || "RAS"}`, 14, doc.lastAutoTable.finalY + 8, { maxWidth: 180 });
+      doc.save(`${intervention.id}-${intervention.poleId}.pdf`);
+    }
+
+    async function photoUrlToDataUrl(url) {
+      if (!url) return null;
+      try {
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const blob = await response.blob();
+        return await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        return null;
+      }
+    }
+
+    function formatDate(value) {
+      return new Intl.DateTimeFormat("fr-FR", {
+        dateStyle: "short",
+        timeStyle: "short"
+      }).format(new Date(value));
+    }
+
+    function updateNetwork() {
+      const online = navigator.onLine;
+      $("#networkDot").classList.toggle("offline", !online);
+      $("#networkText").textContent = online ? "En ligne" : "Mode offline";
+      const backend = apiToken ? "backend actif" : "stockage local";
+      $("#syncText").textContent = `${state.offlineQueue.length} operation(s) en file locale - ${backend}`;
+    }
+
+    async function syncQueue() {
+      if (!navigator.onLine) return toast("Synchronisation differee: reseau indisponible");
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch("/sync", {
+          method: "POST",
+          body: JSON.stringify({ operations: state.offlineQueue })
+        });
+        state.projects = payload.projects;
+        state.poles = payload.poles;
+        state.interventions = payload.interventions;
+        state.offlineQueue = [];
+        saveState();
+        renderCurrentView();
+        if (state.activeView === "map") renderMap();
+        toast("Synchronisation backend terminee");
+      } catch (error) {
+        toast(`Sync locale conservee: ${error.message}`);
+      } finally {
+        updateNetwork();
+      }
+    }
+
+    async function boot() {
+      renderNav();
+      document.body.classList.toggle("dark", state.theme === "dark");
+      $("#themeBtn").addEventListener("click", () => {
+        state.theme = state.theme === "dark" ? "light" : "dark";
+        document.body.classList.toggle("dark", state.theme === "dark");
+        saveState();
+      });
+      $("#seedBtn").addEventListener("click", () => {
+        state = structuredClone(seedData);
+        saveState();
+        if (map) {
+          map.remove();
+          map = null;
+        }
+        setView("dashboard");
+        toast("Donnees demo rechargees");
+      });
+      $("#newInterventionBtn").addEventListener("click", () => openDrawer());
+      $("#syncBtn").addEventListener("click", syncQueue);
+      $("#logoutBtn").addEventListener("click", logout);
+      $("#topLogoutBtn").addEventListener("click", logout);
+      $("#loginForm").addEventListener("submit", async event => {
+        event.preventDefault();
+        const button = event.submitter;
+        button.disabled = true;
+        button.textContent = "Connexion...";
+        try {
+          await loginWithCredentials($("#loginEmail").value.trim(), $("#loginPassword").value);
+        } catch (error) {
+          showLogin(error.message || "Connexion impossible");
+        } finally {
+          button.disabled = false;
+          button.innerHTML = `${icon("M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3")} Se connecter`;
+        }
+      });
+      $("#registerForm").addEventListener("submit", async event => {
+        event.preventDefault();
+        const button = event.submitter;
+        button.disabled = true;
+        button.textContent = "Creation...";
+        try {
+          await registerAccount();
+        } catch (error) {
+          showLogin(error.message || "Creation impossible");
+        } finally {
+          button.disabled = false;
+          button.innerHTML = `${icon("M12 5v14M5 12h14")} Creer le compte`;
+        }
+      });
+      $("#resetForm").addEventListener("submit", async event => {
+        event.preventDefault();
+        const button = event.submitter;
+        button.disabled = true;
+        button.textContent = "Reinitialisation...";
+        try {
+          await resetPassword();
+        } catch (error) {
+          showLogin(error.message || "Reinitialisation impossible");
+        } finally {
+          button.disabled = false;
+          button.innerHTML = `${icon("M21 12a9 9 0 1 1-3-6.7 M21 3v6h-6")} Reinitialiser`;
+        }
+      });
+      $all("[data-auth-mode]").forEach(button => {
+        button.addEventListener("click", () => setAuthMode(button.dataset.authMode));
+      });
+      $all("[data-toggle-password]").forEach(button => {
+        button.addEventListener("click", () => togglePassword(button.dataset.togglePassword, button));
+      });
+      $("#gpsBtn").addEventListener("click", captureGps);
+      $("#draftBtn").addEventListener("click", () => saveIntervention(true));
+      $("#interventionForm").addEventListener("submit", event => {
+        event.preventDefault();
+        saveIntervention(false);
+      });
+      $all("[data-close-drawer]").forEach(node => node.addEventListener("click", closeDrawer));
+      window.addEventListener("online", updateNetwork);
+      window.addEventListener("offline", updateNetwork);
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      }
+      renderPhotoInputs();
+      await loadBackendData();
+      updateCurrentUser();
+      setView(state.activeView || "dashboard");
+    }
+
+    window.openDrawer = openDrawer;
+    window.setView = setView;
+    window.assignPole = assignPole;
+    window.generatePdf = generatePdf;
+
+    boot();
+  </script>
+</body>
+</html>
