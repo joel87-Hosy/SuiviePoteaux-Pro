@@ -473,7 +473,19 @@ async function handle(req, res) {
 }
 
 ensureStorage();
-http.createServer(handle).listen(PORT, () => {
+const server = http.createServer(handle);
+
+server.on("error", error => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Le port ${PORT} est deja utilise.`);
+    console.error("Fermez l'autre serveur ou lancez celui-ci avec un autre port :");
+    console.error("PowerShell : $env:PORT=4175; npm start");
+    process.exit(1);
+  }
+  throw error;
+});
+
+server.listen(PORT, () => {
   console.log(`SuiviPoteaux Pro backend listening on http://localhost:${PORT}`);
   console.log("Comptes demo: admin@itc.local / depot@itc.local / terrain@itc.local / controle@itc.local");
   console.log("Mot de passe demo: demo123");

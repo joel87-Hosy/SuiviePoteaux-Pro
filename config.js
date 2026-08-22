@@ -1,0 +1,1 @@
+window.SUIVI_API_BASE = "https://suivi-poteaux-pro.onrender.com/api";

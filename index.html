@@ -1044,10 +1044,11 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="./config.js"></script>
   <script>
     const STORAGE_KEY = "suiviPoteauxPro:v1";
     const API_TOKEN_KEY = "suiviPoteauxPro:apiToken";
-    const API_BASE = `${window.location.origin}/api`;
+    const API_BASE = (window.SUIVI_API_BASE || `${window.location.origin}/api`).replace(/\/$/, "");
     const PHOTO_STEPS = [
       "Avant travaux - fouille",
       "Marquage constructeur",
@@ -1130,7 +1131,13 @@
         }
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || "Erreur API");
+      if (!response.ok) {
+        const missingBackend = response.status === 404 || response.status === 405;
+        const hint = missingBackend
+          ? `Backend introuvable sur ${API_BASE}. Configure config.js ou deploie server.js.`
+          : "Erreur API";
+        throw new Error(payload.error || hint);
+      }
       return payload;
     }
 
