@@ -1130,6 +1130,29 @@
       ["reports", "Rapports PDF", "Export des fiches avec photos, GPS et emargements.", "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z M14 2v6h6 M8 13h8 M8 17h8 M8 9h2"]
     ];
 
+    const roleUi = {
+      super_admin: {
+        home: "dashboard",
+        views: ["dashboard", "stock", "field", "map", "reports"],
+        permissions: ["read", "write_stock", "write_intervention", "validate", "admin"]
+      },
+      magasinier: {
+        home: "stock",
+        views: ["dashboard", "stock"],
+        permissions: ["read", "write_stock"]
+      },
+      terrain: {
+        home: "field",
+        views: ["field", "map", "reports"],
+        permissions: ["read", "write_intervention"]
+      },
+      controleur: {
+        home: "reports",
+        views: ["dashboard", "map", "reports"],
+        permissions: ["read", "validate"]
+      }
+    };
+
     const seedData = {
       theme: "light",
       activeView: "dashboard",
@@ -1172,6 +1195,7 @@
     let selectedPhotos = [];
     let apiToken = localStorage.getItem(API_TOKEN_KEY) || "";
     let apiUser = null;
+    let apiPermissions = [];
 
     function loadState() {
       try {
@@ -1215,11 +1239,35 @@
       }[role] || role || "offline";
     }
 
+    function currentRoleUi() {
+      return roleUi[apiUser?.role] || { home: "dashboard", views: ["dashboard"], permissions: ["read"] };
+    }
+
+    function visibleNavItems() {
+      const views = currentRoleUi().views;
+      return navItems.filter(([id]) => views.includes(id));
+    }
+
+    function can(permission) {
+      return apiPermissions.includes(permission) || currentRoleUi().permissions.includes(permission);
+    }
+
+    function defaultViewForRole() {
+      return currentRoleUi().home;
+    }
+
+    function firstAllowedView(view) {
+      const visible = visibleNavItems();
+      return visible.some(([id]) => id === view) ? view : (visible[0]?.[0] || "dashboard");
+    }
+
     function updateCurrentUser() {
       $("#currentUserName").textContent = apiUser?.name || "Non connecte";
       $("#currentUserEmail").textContent = apiUser?.email || "Session locale";
       $("#currentUserRole").textContent = roleLabel(apiUser?.role);
       $("#topCurrentUser").textContent = apiUser ? `${apiUser.name} - ${roleLabel(apiUser.role)}` : "Non connecte";
+      $("#seedBtn").classList.toggle("hidden", !can("admin"));
+      $("#newInterventionBtn").classList.toggle("hidden", !can("write_intervention"));
     }
 
     function showLogin(message = "") {
@@ -1246,10 +1294,12 @@
       });
       apiToken = payload.token;
       apiUser = payload.user;
+      apiPermissions = roleUi[apiUser.role]?.permissions || [];
       localStorage.setItem(API_TOKEN_KEY, apiToken);
       await loadBackendData();
       hideLogin();
-      setView(state.activeView || "dashboard");
+      renderNav();
+      setView(defaultViewForRole());
       toast(`Connecte: ${apiUser.name}`);
     }
 
@@ -1265,10 +1315,12 @@
       });
       apiToken = payload.token;
       apiUser = payload.user;
+      apiPermissions = roleUi[apiUser.role]?.permissions || [];
       localStorage.setItem(API_TOKEN_KEY, apiToken);
       await loadBackendData();
       hideLogin();
-      setView(state.activeView || "dashboard");
+      renderNav();
+      setView(defaultViewForRole());
       toast(`Compte cree: ${apiUser.name}`);
     }
 
@@ -1312,6 +1364,7 @@
       try {
         const payload = await apiFetch("/bootstrap");
         apiUser = payload.user;
+        apiPermissions = payload.permissions || roleUi[apiUser.role]?.permissions || [];
         state = {
           ...state,
           projects: payload.projects,
@@ -1325,6 +1378,7 @@
       } catch (error) {
         apiToken = "";
         apiUser = null;
+        apiPermissions = [];
         localStorage.removeItem(API_TOKEN_KEY);
         showLogin(error.message === "Authentification requise" ? "Session expiree" : "Connexion backend requise");
         return false;
@@ -1340,7 +1394,9 @@
       } finally {
         apiToken = "";
         apiUser = null;
+        apiPermissions = [];
         localStorage.removeItem(API_TOKEN_KEY);
+        renderNav();
         showLogin("Deconnecte");
         updateNetwork();
       }
@@ -1378,7 +1434,7 @@
       const mobile = $("#mobileNav");
       desktop.innerHTML = "";
       mobile.innerHTML = "";
-      navItems.forEach(([id, label, , path]) => {
+      visibleNavItems().forEach(([id, label, , path]) => {
         const button = document.createElement("button");
         button.type = "button";
         button.dataset.view = id;
@@ -1396,11 +1452,12 @@
     }
 
     function setView(view) {
+      view = firstAllowedView(view);
       state.activeView = view;
       saveState();
       $(".view:not(.hidden)")?.classList.add("hidden");
       $(`#${view}View`).classList.remove("hidden");
-      const item = navItems.find(([id]) => id === view);
+      const item = visibleNavItems().find(([id]) => id === view) || navItems.find(([id]) => id === view);
       $("#viewTitle").textContent = item[1];
       $("#viewSubtitle").textContent = item[2];
       $all("[data-view]").forEach(btn => btn.classList.toggle("active", btn.dataset.view === view));
@@ -1449,7 +1506,7 @@
           <div class="card">
             <div class="section-head">
               <h3>Dernieres operations</h3>
-              <button class="btn" type="button" onclick="setView('field')">Terrain</button>
+              ${can("write_intervention") ? `<button class="btn" type="button" onclick="setView('field')">Terrain</button>` : ""}
             </div>
             <div class="section-body timeline">
               ${state.interventions.slice().reverse().slice(0, 5).map((it, index) => `
@@ -1488,11 +1545,12 @@
     }
 
     function renderStock() {
+      const canWriteStock = can("write_stock");
       $("#stockView").innerHTML = `
         <div class="card">
           <div class="section-head">
             <h3>Inventaire depot et chantier</h3>
-            <div class="toolbar">
+            <div class="toolbar ${canWriteStock ? "" : "hidden"}">
               <button class="btn primary" type="button" id="stockEntryBtn">${icon("M12 5v14M5 12h14")} Entree stock</button>
               <button class="btn" type="button" id="requisitionBtn">${icon("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3")} Bon de sortie</button>
             </div>
@@ -1509,8 +1567,10 @@
         </div>
       `;
       ["stockSearch", "typeFilter", "statusFilter", "heightFilter"].forEach(id => $(`#${id}`).addEventListener("input", drawStockRows));
-      $("#stockEntryBtn").addEventListener("click", openStockEntryDrawer);
-      $("#requisitionBtn").addEventListener("click", createRequisition);
+      if (canWriteStock) {
+        $("#stockEntryBtn").addEventListener("click", openStockEntryDrawer);
+        $("#requisitionBtn").addEventListener("click", createRequisition);
+      }
       drawStockRows();
     }
 
@@ -1536,7 +1596,7 @@
               <td>${p.height} m - ${p.effort} - ${p.weight} kg</td>
               <td>${p.depot}</td>
               <td><span class="badge ${statusClass(p.status)}">${p.status}</span></td>
-              <td><button class="btn" type="button" onclick="assignPole('${p.id}')">Attribuer</button></td>
+              <td>${can("write_stock") ? `<button class="btn" type="button" onclick="assignPole('${p.id}')">Attribuer</button>` : `<span class="muted">Lecture</span>`}</td>
             </tr>
           `).join("") || `<tr><td colspan="6"><div class="empty">Aucun poteau ne correspond aux filtres.</div></td></tr>`}
         </tbody>
@@ -1592,6 +1652,10 @@
     }
 
     function renderField() {
+      if (!can("write_intervention")) {
+        $("#fieldView").innerHTML = `<div class="empty">Votre role ne permet pas de saisir une fiche terrain.</div>`;
+        return;
+      }
       const pending = state.poles.filter(p => p.status === "En Transit" || p.status === "En Stock");
       $("#fieldView").innerHTML = `
         <div class="grid content-grid">
@@ -1681,11 +1745,12 @@
     }
 
     function renderReports() {
+      const canCreateReport = can("write_intervention");
       $("#reportsView").innerHTML = `
         <div class="card">
           <div class="section-head">
             <h3>Fiches de pose et exports</h3>
-            <button class="btn primary" type="button" onclick="openDrawer()">${icon("M12 5v14M5 12h14")} Nouvelle fiche</button>
+            ${canCreateReport ? `<button class="btn primary" type="button" onclick="openDrawer()">${icon("M12 5v14M5 12h14")} Nouvelle fiche</button>` : ""}
           </div>
           <div class="section-body report-list">
             ${state.interventions.slice().reverse().map(it => {
@@ -2174,6 +2239,7 @@
       renderPhotoInputs();
       await loadBackendData();
       updateCurrentUser();
+      renderNav();
       setView(state.activeView || "dashboard");
     }
 

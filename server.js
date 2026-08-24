@@ -293,6 +293,7 @@ async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/bootstrap") {
     return sendJson(res, 200, {
       user: publicUser(actor),
+      permissions: rolePermissions[actor.role] || [],
       projects: db.projects,
       poles: db.poles,
       interventions: db.interventions,
