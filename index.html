@@ -1096,6 +1096,7 @@
       <section id="fieldView" class="view hidden"></section>
       <section id="mapView" class="view hidden"></section>
       <section id="reportsView" class="view hidden"></section>
+      <section id="adminView" class="view hidden"></section>
     </main>
   </div>
 
@@ -1286,13 +1287,14 @@
       ["stock", "Depot & Stock", "Inventaire filtrable, requisitions et bons de sortie terrain.", "M21 8a2 2 0 0 0-1-1.73L13 2.27a2 2 0 0 0-2 0L4 6.27A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z M3.3 7 12 12l8.7-5 M12 22V12"],
       ["field", "Operations terrain", "Interface mobile offline-first pour les equipes de pose.", "M12 2 19 21 12 17 5 21 12 2Z M12 8v5"],
       ["map", "Carte GPS", "Pins OpenStreetMap colores selon les statuts de pose.", "M9 18 3 21V6l6-3 6 3 6-3v15l-6 3-6-3Z M9 3v15 M15 6v15"],
-      ["reports", "Rapports PDF", "Export des fiches avec photos, GPS et emargements.", "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z M14 2v6h6 M8 13h8 M8 17h8 M8 9h2"]
+      ["reports", "Rapports PDF", "Export des fiches avec photos, GPS et emargements.", "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z M14 2v6h6 M8 13h8 M8 17h8 M8 9h2"],
+      ["admin", "Admin Utilisateurs", "Gestion des comptes, roles, approbations, depots et equipes.", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M22 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75"]
     ];
 
     const roleUi = {
       super_admin: {
         home: "dashboard",
-        views: ["dashboard", "stock", "field", "map", "reports"],
+        views: ["dashboard", "stock", "field", "map", "reports", "admin"],
         permissions: ["read", "write_stock", "write_intervention", "validate", "admin"]
       },
       magasinier: {
@@ -1320,6 +1322,7 @@
         { id: "CH-CIE-B4", name: "CIE - Extension reseau B4", client: "CIE", zone: "Bouake Est" },
         { id: "CH-ORG-T2", name: "Orange - Fibre rurale T2", client: "Orange", zone: "Daloa Sud" }
       ],
+      users: [],
       poles: [
         { id: "POT-2026-B9-001", type: "BETON", height: 12, effort: "400 daN", weight: 860, maker: "SIPREL / Lot B9", status: "En Stock", depot: "Depot Central" },
         { id: "POT-2026-B9-002", type: "BETON", height: 11, effort: "300 daN", weight: 790, maker: "SIPREL / Lot B9", status: "En Transit", depot: "Camion EQ-A" },
@@ -1498,6 +1501,12 @@
           password: $("#registerPassword").value
         })
       });
+      if (payload.pending) {
+        setAuthMode("login");
+        $("#loginEmail").value = $("#registerEmail").value.trim();
+        toast("Compte cree. En attente d'approbation administrateur.");
+        return;
+      }
       apiToken = payload.token;
       apiUser = payload.user;
       apiPermissions = roleUi[apiUser.role]?.permissions || [];
@@ -1555,6 +1564,7 @@
           projects: payload.projects,
           poles: payload.poles,
           interventions: payload.interventions,
+          users: payload.users || state.users || [],
           offlineQueue: state.offlineQueue || []
         };
         saveState();
@@ -1655,6 +1665,7 @@
       renderStock();
       renderField();
       renderReports();
+      renderAdmin();
       populateFormSelects();
       updateNetwork();
     }
@@ -1915,6 +1926,10 @@
         .replaceAll(">", "&gt;");
     }
 
+    function escapeHtml(value) {
+      return escapeAttr(value).replaceAll("'", "&#039;");
+    }
+
     function renderStock() {
       const canWriteStock = can("write_stock");
       $("#stockView").innerHTML = `
@@ -2144,6 +2159,122 @@
           </div>
         </div>
       `;
+    }
+
+    function renderAdmin() {
+      const node = $("#adminView");
+      if (!node) return;
+      if (!can("admin")) {
+        node.innerHTML = `<div class="empty">Votre role ne permet pas de gerer les utilisateurs.</div>`;
+        return;
+      }
+      const users = state.users || [];
+      const pending = users.filter(user => user.approved === false).length;
+      const active = users.filter(user => user.active !== false).length;
+      node.innerHTML = `
+        <div class="grid stats">
+          ${metric("Utilisateurs", users.length, "Comptes connus")}
+          ${metric("Actifs", active, "Peuvent se connecter")}
+          ${metric("En attente", pending, "A approuver")}
+          ${metric("Roles", new Set(users.map(user => user.role)).size, "Profils utilises")}
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Gestion des comptes</h3>
+            <button class="btn" type="button" onclick="refreshUsers()">Actualiser</button>
+          </div>
+          <div class="section-body">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Utilisateur</th>
+                    <th>Role</th>
+                    <th>Depot</th>
+                    <th>Equipe</th>
+                    <th>Etat</th>
+                    <th>Nouveau mot de passe</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${users.map(user => `
+                    <tr data-user-row="${user.id}">
+                      <td>
+                        <strong>${escapeHtml(user.name)}</strong><br>
+                        <span class="muted">${escapeHtml(user.email)}</span>
+                      </td>
+                      <td>
+                        <select data-user-field="role">
+                          ${["super_admin", "magasinier", "terrain", "controleur"].map(role => `<option value="${role}" ${user.role === role ? "selected" : ""}>${roleLabel(role)}</option>`).join("")}
+                        </select>
+                      </td>
+                      <td><input data-user-field="depot" value="${escapeAttr(user.depot || "")}" placeholder="Depot Central"></td>
+                      <td><input data-user-field="team" value="${escapeAttr(user.team || "")}" placeholder="Equipe Terrain A"></td>
+                      <td>
+                        <label style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                          <input data-user-field="active" type="checkbox" ${user.active !== false ? "checked" : ""} style="width:auto">
+                          Actif
+                        </label>
+                        <label style="display:flex;gap:8px;align-items:center">
+                          <input data-user-field="approved" type="checkbox" ${user.approved !== false ? "checked" : ""} style="width:auto">
+                          Approuve
+                        </label>
+                      </td>
+                      <td><input data-user-field="password" type="password" minlength="6" placeholder="Optionnel"></td>
+                      <td>
+                        <button class="btn primary" type="button" onclick="saveUserAdmin('${user.id}')">Sauver</button>
+                      </td>
+                    </tr>
+                  `).join("") || `<tr><td colspan="7"><div class="empty">Aucun utilisateur.</div></td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function refreshUsers() {
+      if (!can("admin")) return;
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch("/users");
+        state.users = payload.users;
+        saveState();
+        renderAdmin();
+        toast("Utilisateurs actualises");
+      } catch (error) {
+        toast(error.message || "Actualisation impossible");
+      }
+    }
+
+    async function saveUserAdmin(userId) {
+      const row = $(`[data-user-row="${userId}"]`);
+      if (!row) return;
+      const payload = {};
+      $all("[data-user-field]", row).forEach(input => {
+        const field = input.dataset.userField;
+        if (field === "active" || field === "approved") payload[field] = input.checked;
+        else if (field === "password") {
+          if (input.value) payload.password = input.value;
+        } else {
+          payload[field] = input.value;
+        }
+      });
+      try {
+        await ensureApiSession();
+        const response = await apiFetch(`/users/${encodeURIComponent(userId)}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+        state.users = response.users;
+        saveState();
+        renderAdmin();
+        toast("Utilisateur mis a jour");
+      } catch (error) {
+        toast(error.message || "Mise a jour impossible");
+      }
     }
 
     function populateFormSelects() {
@@ -2679,6 +2810,8 @@
     window.assignPole = assignPole;
     window.generatePdf = generatePdf;
     window.validateReport = validateReport;
+    window.refreshUsers = refreshUsers;
+    window.saveUserAdmin = saveUserAdmin;
 
     boot();
   </script>

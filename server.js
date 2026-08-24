@@ -292,6 +292,8 @@ async function upsertTable(table, rows) {
 
 function publicUser(userRecord) {
   const { passwordHash, ...safeUser } = userRecord;
+  safeUser.active = userRecord.active !== false;
+  safeUser.approved = userRecord.approved !== false;
   return safeUser;
 }
 
@@ -463,7 +465,13 @@ async function handleApi(req, res, url) {
     if (db.users.some(item => item.email === email)) {
       return sendError(res, 409, "Un compte existe deja avec cet email");
     }
-    const created = user(`USR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, email, password, name, role);
+    const created = {
+      ...user(`USR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, email, password, name, role),
+      active: true,
+      approved: false,
+      depot: "",
+      team: ""
+    };
     db.users.push(created);
     db.auditLog.push({
       id: crypto.randomUUID(),
@@ -473,9 +481,7 @@ async function handleApi(req, res, url) {
       date: new Date().toISOString()
     });
     await writeDb(db);
-    const token = crypto.randomBytes(32).toString("hex");
-    sessions.set(token, { userId: created.id, createdAt: Date.now() });
-    return sendJson(res, 201, { token, user: publicUser(created) });
+    return sendJson(res, 201, { pending: true, user: publicUser(created) });
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/reset-password") {
@@ -514,8 +520,36 @@ async function handleApi(req, res, url) {
       projects: db.projects,
       poles: db.poles,
       interventions: db.interventions,
+      users: hasPermission(actor, "admin") ? db.users.map(publicUser) : [],
       offlineQueue: []
     });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/users") {
+    if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
+    return sendJson(res, 200, { users: db.users.map(publicUser) });
+  }
+
+  const userMatch = /^\/api\/users\/([^/]+)$/.exec(url.pathname);
+  if (req.method === "PATCH" && userMatch) {
+    if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
+    const target = db.users.find(item => item.id === decodeURIComponent(userMatch[1]));
+    if (!target) return sendError(res, 404, "Utilisateur introuvable");
+    const body = await readBody(req);
+    const allowedRoles = ["super_admin", "magasinier", "terrain", "controleur"];
+    if (body.name !== undefined) target.name = String(body.name).trim();
+    if (body.role !== undefined && allowedRoles.includes(body.role)) target.role = body.role;
+    if (body.active !== undefined) target.active = Boolean(body.active);
+    if (body.approved !== undefined) target.approved = Boolean(body.approved);
+    if (body.depot !== undefined) target.depot = String(body.depot || "").trim();
+    if (body.team !== undefined) target.team = String(body.team || "").trim();
+    if (body.password) {
+      if (String(body.password).length < 6) return sendError(res, 400, "Mot de passe de 6 caracteres minimum requis");
+      target.passwordHash = hashPassword(body.password);
+    }
+    audit(db, actor, "user.update", { userId: target.id, fields: Object.keys(body).filter(key => key !== "password") });
+    await writeDb(db);
+    return sendJson(res, 200, { user: publicUser(target), users: db.users.map(publicUser) });
   }
 
   if (req.method === "GET" && url.pathname === "/api/poles") {
