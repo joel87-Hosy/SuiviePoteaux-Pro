@@ -604,6 +604,53 @@
       border-radius: var(--radius);
     }
 
+    [data-tooltip] {
+      position: relative;
+    }
+
+    [data-tooltip]::before,
+    [data-tooltip]::after {
+      position: absolute;
+      left: 50%;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .15s ease, transform .15s ease;
+      z-index: 90;
+    }
+
+    [data-tooltip]::before {
+      content: attr(data-tooltip);
+      bottom: calc(100% + 10px);
+      transform: translateX(-50%) translateY(4px);
+      width: max-content;
+      max-width: min(280px, 82vw);
+      padding: 9px 10px;
+      border-radius: 7px;
+      color: #fff;
+      background: #101514;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, .22);
+      font-size: 12px;
+      line-height: 1.35;
+      white-space: normal;
+      text-align: left;
+    }
+
+    [data-tooltip]::after {
+      content: "";
+      bottom: calc(100% + 4px);
+      transform: translateX(-50%) translateY(4px);
+      border: 6px solid transparent;
+      border-top-color: #101514;
+    }
+
+    [data-tooltip]:hover::before,
+    [data-tooltip]:hover::after,
+    [data-tooltip]:focus-visible::before,
+    [data-tooltip]:focus-visible::after {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
     #map {
       height: min(64vh, 620px);
       min-height: 420px;
@@ -1698,7 +1745,7 @@
     }
 
     function metric(label, value, hint) {
-      return `<div class="card metric"><span>${label}</span><strong>${value}</strong><small>${hint}</small></div>`;
+      return `<div class="card metric" data-tooltip="${escapeAttr(`${label}: ${value}. ${hint}`)}"><span>${label}</span><strong>${value}</strong><small>${hint}</small></div>`;
     }
 
     function countStatus(status) {
@@ -1742,12 +1789,15 @@
     function barChart(rows) {
       const normalized = rows.filter(row => row && row[0] !== undefined);
       const max = Math.max(...normalized.map(([, value]) => Number(value) || 0), 1);
+      const total = normalized.reduce((sum, [, value]) => sum + (Number(value) || 0), 0);
       return `
         <div class="bar-chart">
           ${normalized.map(([label, value, color]) => {
-            const percent = Math.round(((Number(value) || 0) / max) * 100);
+            const numericValue = Number(value) || 0;
+            const percent = Math.round((numericValue / max) * 100);
+            const share = total ? Math.round((numericValue / total) * 100) : 0;
             return `
-              <div class="bar-row">
+              <div class="bar-row" data-tooltip="${escapeAttr(`${label}: ${numericValue} element(s), ${share}% du total de ce graphique.`)}">
                 <span class="muted">${label}</span>
                 <div class="bar-track"><span class="bar-fill" style="--value:${percent}%;--bar-color:${color || "#0f766e"}"></span></div>
                 <strong>${value}</strong>
@@ -1769,14 +1819,17 @@
       }).join(", ") || "#dbe3df 0% 100%";
       return `
         <div class="donut-wrap">
-          <div class="donut" style="--segments:${segments}"><strong>${total}</strong></div>
+          <div class="donut" style="--segments:${segments}" data-tooltip="${escapeAttr(`Total analyse: ${total} element(s). Passez sur la legende pour le detail par categorie.`)}"><strong>${total}</strong></div>
           <div class="legend">
-            ${rows.map(([label, value, color]) => `
-              <div class="legend-item">
+            ${rows.map(([label, value, color]) => {
+              const share = total ? Math.round((Number(value || 0) / total) * 100) : 0;
+              return `
+              <div class="legend-item" data-tooltip="${escapeAttr(`${label}: ${value} element(s), ${share}% du total.`)}">
                 <span style="display:flex;align-items:center;gap:8px"><i class="legend-dot" style="--dot-color:${color}"></i>${label}</span>
                 <strong>${value}</strong>
               </div>
-            `).join("")}
+            `;
+            }).join("")}
           </div>
         </div>
       `;
@@ -1799,7 +1852,7 @@
     function insightCard(title, rows) {
       return chartCard(title, `
         <div class="insight-list">
-          ${rows.map(([label, value]) => `<div class="insight"><span>${label}</span><strong>${value}</strong></div>`).join("")}
+          ${rows.map(([label, value]) => `<div class="insight" data-tooltip="${escapeAttr(`${label}: ${value}`)}"><span>${label}</span><strong>${value}</strong></div>`).join("")}
         </div>
       `);
     }
@@ -1808,7 +1861,7 @@
       return chartCard(title, `
         <div class="timeline">
           ${interventions.slice().reverse().slice(0, 5).map((it, index) => `
-            <div class="timeline-item">
+            <div class="timeline-item" data-tooltip="${escapeAttr(`Rapport ${it.id || ""}: ${it.poleId}, ${it.validation}, saisi par ${it.agent} le ${formatDate(it.date)}.`)}">
               <div class="timeline-dot">${index + 1}</div>
               <div>
                 <strong>${it.poleId}</strong>
@@ -1826,6 +1879,14 @@
       return date.getFullYear() === today.getFullYear() &&
         date.getMonth() === today.getMonth() &&
         date.getDate() === today.getDate();
+    }
+
+    function escapeAttr(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
     }
 
     function renderStock() {
