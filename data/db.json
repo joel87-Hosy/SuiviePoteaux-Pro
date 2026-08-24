@@ -3,7 +3,7 @@
     {
       "id": "USR-001",
       "email": "admin@itc.local",
-      "passwordHash": "d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791",
+      "passwordHash": "pbkdf2$120000$1e8ec471583af8ecdc54a139487e0c97$68e6155aaa6ecdf5ab3d9dcacfb484ad9d627b95f9c629d07d214f22279bc7a3",
       "name": "Aminata Kone",
       "role": "super_admin"
     },

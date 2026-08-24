@@ -38,6 +38,18 @@ PORT
 
 Le backend sert aussi le frontend, donc l'URL publique du service Node suffit.
 
+## Activation Supabase
+
+Pour utiliser une vraie base de donnees et un stockage photo persistant, suivre `SUPABASE.md`.
+
+Variables Render a ajouter :
+
+```text
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_STORAGE_BUCKET
+```
+
 ## Option separee : frontend statique + backend ailleurs
 
 1. Deployer `server.js` sur un hebergeur Node.

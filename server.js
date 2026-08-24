@@ -4,6 +4,12 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+let createClient;
+try {
+  ({ createClient } = require("@supabase/supabase-js"));
+} catch {
+  createClient = null;
+}
 
 const PORT = Number(process.env.PORT || 4174);
 const ROOT = __dirname;
@@ -11,6 +17,16 @@ const DATA_DIR = path.join(ROOT, "data");
 const UPLOAD_DIR = path.join(ROOT, "uploads");
 const DB_FILE = path.join(DATA_DIR, "db.json");
 const MAX_BODY_BYTES = 18 * 1024 * 1024;
+const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
+const SUPABASE_URL = process.env.SUPABASE_URL || "";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "pole-photos";
+const SUPABASE_ENABLED = Boolean(createClient && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+const supabase = SUPABASE_ENABLED
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false }
+    })
+  : null;
 
 const sessions = new Map();
 
@@ -37,7 +53,7 @@ function ensureStorage() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
   if (!fs.existsSync(DB_FILE)) {
-    writeDb(seedDb());
+    fs.writeFileSync(DB_FILE, JSON.stringify(seedDb(), null, 2));
   }
 }
 
@@ -90,16 +106,188 @@ function user(id, email, password, name, role) {
 }
 
 function hashPassword(password) {
-  return crypto.createHash("sha256").update(String(password)).digest("hex");
+  const salt = crypto.randomBytes(16).toString("hex");
+  const iterations = 120000;
+  const digest = crypto.pbkdf2Sync(String(password), salt, iterations, 32, "sha256").toString("hex");
+  return `pbkdf2$${iterations}$${salt}$${digest}`;
 }
 
-function readDb() {
+function verifyPassword(password, storedHash) {
+  if (!storedHash) return false;
+  if (!storedHash.startsWith("pbkdf2$")) {
+    return crypto.createHash("sha256").update(String(password)).digest("hex") === storedHash;
+  }
+  const [, iterations, salt, digest] = storedHash.split("$");
+  const candidate = crypto.pbkdf2Sync(String(password), salt, Number(iterations), 32, "sha256").toString("hex");
+  return crypto.timingSafeEqual(Buffer.from(candidate, "hex"), Buffer.from(digest, "hex"));
+}
+
+async function readDb() {
+  if (SUPABASE_ENABLED) return readSupabaseDb();
   ensureStorage();
   return JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
 }
 
-function writeDb(db) {
+async function writeDb(db) {
+  if (SUPABASE_ENABLED) return writeSupabaseDb(db);
+  ensureStorage();
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+}
+
+async function readSupabaseDb() {
+  const [users, projects, poles, interventions, photos, auditLog] = await Promise.all([
+    selectTable("app_users"),
+    selectTable("projects"),
+    selectTable("poles"),
+    selectTable("interventions"),
+    selectTable("intervention_photos"),
+    selectTable("audit_log")
+  ]);
+  return {
+    users: users.map(row => ({
+      id: row.id,
+      email: row.email,
+      passwordHash: row.password_hash,
+      name: row.name,
+      role: row.role,
+      active: row.active !== false,
+      approved: row.approved !== false,
+      depot: row.depot || "",
+      team: row.team || ""
+    })),
+    projects,
+    poles: poles.map(row => ({
+      id: row.id,
+      type: row.type,
+      height: Number(row.height),
+      effort: row.effort,
+      weight: Number(row.weight || 0),
+      maker: row.maker,
+      status: row.status,
+      depot: row.depot,
+      lat: row.lat,
+      lng: row.lng
+    })),
+    interventions: interventions.map(row => ({
+      id: row.id,
+      poleId: row.pole_id,
+      projectId: row.project_id,
+      agent: row.agent,
+      agentId: row.agent_id,
+      date: row.date,
+      lat: row.lat,
+      lng: row.lng,
+      gpsAccuracy: row.gps_accuracy,
+      soil: row.soil,
+      depth: Number(row.depth || 0),
+      validation: row.validation,
+      notes: row.notes,
+      teamSignature: row.team_signature,
+      clientSignature: row.client_signature,
+      validatedBy: row.validated_by,
+      validatedAt: row.validated_at,
+      draft: row.draft,
+      photos: photos
+        .filter(photo => photo.intervention_id === row.id)
+        .sort((a, b) => a.position - b.position)
+        .map(photo => ({
+          step: photo.step,
+          date: photo.date,
+          lat: photo.lat,
+          lng: photo.lng,
+          url: photo.url
+        }))
+    })),
+    auditLog: auditLog.map(row => ({
+      id: row.id,
+      actorId: row.actor_id,
+      action: row.action,
+      payload: row.payload || {},
+      date: row.date
+    }))
+  };
+}
+
+async function selectTable(table) {
+  const { data, error } = await supabase.from(table).select("*");
+  if (error && error.code === "42P01") return [];
+  if (error) throw error;
+  return data || [];
+}
+
+async function writeSupabaseDb(db) {
+  await Promise.all([
+    upsertTable("app_users", db.users.map(row => ({
+      id: row.id,
+      email: row.email,
+      password_hash: row.passwordHash,
+      name: row.name,
+      role: row.role,
+      active: row.active !== false,
+      approved: row.approved !== false,
+      depot: row.depot || null,
+      team: row.team || null
+    }))),
+    upsertTable("projects", db.projects),
+    upsertTable("poles", db.poles.map(row => ({
+      id: row.id,
+      type: row.type,
+      height: row.height,
+      effort: row.effort,
+      weight: row.weight,
+      maker: row.maker,
+      status: row.status,
+      depot: row.depot,
+      lat: row.lat || null,
+      lng: row.lng || null
+    }))),
+    upsertTable("interventions", db.interventions.map(row => ({
+      id: row.id,
+      pole_id: row.poleId,
+      project_id: row.projectId,
+      agent: row.agent,
+      agent_id: row.agentId,
+      date: row.date,
+      lat: row.lat,
+      lng: row.lng,
+      gps_accuracy: row.gpsAccuracy || null,
+      soil: row.soil,
+      depth: row.depth,
+      validation: row.validation,
+      notes: row.notes,
+      team_signature: row.teamSignature,
+      client_signature: row.clientSignature,
+      validated_by: row.validatedBy || null,
+      validated_at: row.validatedAt || null,
+      draft: Boolean(row.draft)
+    }))),
+    upsertTable("audit_log", db.auditLog.map(row => ({
+      id: row.id,
+      actor_id: row.actorId,
+      action: row.action,
+      payload: row.payload || {},
+      date: row.date
+    })))
+  ]);
+  const photoRows = db.interventions.flatMap(row => (row.photos || [])
+    .filter(photo => photo.url)
+    .map((photo, index) => ({
+      id: `${row.id}-${index + 1}`,
+      intervention_id: row.id,
+      position: index + 1,
+      step: photo.step,
+      date: photo.date,
+      lat: String(photo.lat || ""),
+      lng: String(photo.lng || ""),
+      url: photo.url
+    })));
+  await upsertTable("intervention_photos", photoRows);
+}
+
+async function upsertTable(table, rows) {
+  if (!rows.length) return;
+  const { error } = await supabase.from(table).upsert(rows, { onConflict: "id" });
+  if (error) throw error;
 }
 
 function publicUser(userRecord) {
@@ -158,7 +346,11 @@ function authenticate(req, db) {
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
   const session = sessions.get(token);
   if (!session) return null;
-  return db.users.find(userRecord => userRecord.id === session.userId) || null;
+  if (Date.now() - session.createdAt > SESSION_TTL_MS) {
+    sessions.delete(token);
+    return null;
+  }
+  return db.users.find(userRecord => userRecord.id === session.userId && userRecord.active !== false && userRecord.approved !== false) || null;
 }
 
 function nextReportId(db) {
@@ -181,24 +373,45 @@ function audit(db, actor, action, payload = {}) {
   });
 }
 
-function savePhotos(reportId, photos = []) {
+async function savePhotos(reportId, photos = []) {
   const reportDir = path.join(UPLOAD_DIR, reportId);
-  fs.mkdirSync(reportDir, { recursive: true });
-  return photos.map((photo, index) => {
-    if (!photo?.data?.startsWith("data:image/")) return photo;
+  if (!SUPABASE_ENABLED) fs.mkdirSync(reportDir, { recursive: true });
+  const saved = [];
+  for (let index = 0; index < photos.length; index++) {
+    const photo = photos[index];
+    if (!photo?.data?.startsWith("data:image/")) {
+      saved.push(photo);
+      continue;
+    }
     const match = /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/i.exec(photo.data);
-    if (!match) return { ...photo, data: null };
+    if (!match) {
+      saved.push({ ...photo, data: null });
+      continue;
+    }
     const ext = match[1].includes("png") ? "png" : match[1].includes("webp") ? "webp" : "jpg";
     const filename = `${String(index + 1).padStart(2, "0")}-${slug(photo.step || "photo")}.${ext}`;
-    fs.writeFileSync(path.join(reportDir, filename), Buffer.from(match[2], "base64"));
-    return {
+    const buffer = Buffer.from(match[2], "base64");
+    let url = `/uploads/${reportId}/${filename}`;
+    if (SUPABASE_ENABLED) {
+      const storagePath = `${reportId}/${filename}`;
+      const { error } = await supabase.storage
+        .from(SUPABASE_STORAGE_BUCKET)
+        .upload(storagePath, buffer, { contentType: match[1], upsert: true });
+      if (error) throw error;
+      const { data } = supabase.storage.from(SUPABASE_STORAGE_BUCKET).getPublicUrl(storagePath);
+      url = data.publicUrl;
+    } else {
+      fs.writeFileSync(path.join(reportDir, filename), buffer);
+    }
+    saved.push({
       step: photo.step,
       date: photo.date,
       lat: photo.lat,
       lng: photo.lng,
-      url: `/uploads/${reportId}/${filename}`
-    };
-  });
+      url
+    });
+  }
+  return saved;
 }
 
 function slug(value) {
@@ -216,7 +429,7 @@ function parseUrl(req) {
 }
 
 async function handleApi(req, res, url) {
-  const db = readDb();
+  const db = await readDb();
 
   if (req.method === "OPTIONS") return sendJson(res, 204, {});
   if (req.method === "GET" && url.pathname === "/api/health") {
@@ -226,8 +439,12 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/auth/login") {
     const body = await readBody(req);
     const email = String(body.email || "").trim().toLowerCase();
-    const found = db.users.find(item => item.email === email && item.passwordHash === hashPassword(body.password));
+    const found = db.users.find(item => item.email === email && item.active !== false && item.approved !== false && verifyPassword(body.password, item.passwordHash));
     if (!found) return sendError(res, 401, "Identifiants invalides");
+    if (!found.passwordHash.startsWith("pbkdf2$")) {
+      found.passwordHash = hashPassword(body.password);
+      await writeDb(db);
+    }
     const token = crypto.randomBytes(32).toString("hex");
     sessions.set(token, { userId: found.id, createdAt: Date.now() });
     return sendJson(res, 200, { token, user: publicUser(found) });
@@ -255,7 +472,7 @@ async function handleApi(req, res, url) {
       payload: { email, role },
       date: new Date().toISOString()
     });
-    writeDb(db);
+    await writeDb(db);
     const token = crypto.randomBytes(32).toString("hex");
     sessions.set(token, { userId: created.id, createdAt: Date.now() });
     return sendJson(res, 201, { token, user: publicUser(created) });
@@ -272,7 +489,7 @@ async function handleApi(req, res, url) {
     if (!found) return sendError(res, 404, "Aucun compte trouve avec cet email");
     found.passwordHash = hashPassword(password);
     audit(db, found, "auth.password_reset", { email });
-    writeDb(db);
+    await writeDb(db);
     return sendJson(res, 200, { ok: true });
   }
 
@@ -322,7 +539,7 @@ async function handleApi(req, res, url) {
     };
     db.poles.push(pole);
     audit(db, actor, "pole.create", { poleId: pole.id });
-    writeDb(db);
+    await writeDb(db);
     return sendJson(res, 201, { pole });
   }
 
@@ -333,7 +550,7 @@ async function handleApi(req, res, url) {
     if (!pole) return sendError(res, 404, "Poteau introuvable");
     Object.assign(pole, await readBody(req));
     audit(db, actor, "pole.update", { poleId: pole.id });
-    writeDb(db);
+    await writeDb(db);
     return sendJson(res, 200, { pole });
   }
 
@@ -350,7 +567,7 @@ async function handleApi(req, res, url) {
       }
     }
     audit(db, actor, "requisition.create", { poleIds: moved });
-    writeDb(db);
+    await writeDb(db);
     return sendJson(res, 201, { moved, poles: db.poles });
   }
 
@@ -364,7 +581,7 @@ async function handleApi(req, res, url) {
     if (!body.id || !body.name) return sendError(res, 400, "Champs chantier incomplets");
     db.projects.push({ id: body.id, name: body.name, client: body.client || "", zone: body.zone || "" });
     audit(db, actor, "project.create", { projectId: body.id });
-    writeDb(db);
+    await writeDb(db);
     return sendJson(res, 201, { projects: db.projects });
   }
 
@@ -377,7 +594,7 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     if (!body.poleId || !body.projectId || !body.lat || !body.lng) return sendError(res, 400, "Fiche de pose incomplete");
     const id = body.id && !db.interventions.some(item => item.id === body.id) ? body.id : nextReportId(db);
-    const photos = savePhotos(id, body.photos || []);
+    const photos = await savePhotos(id, body.photos || []);
     const intervention = {
       id,
       poleId: body.poleId,
@@ -405,7 +622,7 @@ async function handleApi(req, res, url) {
       pole.depot = "Implante terrain";
     }
     audit(db, actor, "intervention.create", { reportId: id, poleId: body.poleId });
-    writeDb(db);
+    await writeDb(db);
     return sendJson(res, 201, { intervention, poles: db.poles });
   }
 
@@ -422,7 +639,7 @@ async function handleApi(req, res, url) {
     const pole = db.poles.find(item => item.id === intervention.poleId);
     if (pole) pole.status = intervention.validation;
     audit(db, actor, "intervention.validate", { reportId: intervention.id, validation: intervention.validation });
-    writeDb(db);
+    await writeDb(db);
     return sendJson(res, 200, { intervention, poles: db.poles });
   }
 
@@ -430,7 +647,7 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     const operations = Array.isArray(body.operations) ? body.operations : [];
     audit(db, actor, "sync.client", { count: operations.length });
-    writeDb(db);
+    await writeDb(db);
     return sendJson(res, 200, {
       accepted: operations.length,
       projects: db.projects,

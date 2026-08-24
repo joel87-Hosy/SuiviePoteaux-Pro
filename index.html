@@ -2108,6 +2108,8 @@
                   </div>
                   <div class="toolbar">
                     <span class="badge ${statusClass(it.validation.replace("Pose - En attente validation", "Pose - En attente validation"))}">${it.photos.length}/5 photos</span>
+                    ${can("validate") && it.validation !== "Valide" ? `<button class="btn primary" type="button" onclick="validateReport('${it.id}', 'Valide')">Valider</button>` : ""}
+                    ${can("validate") && it.validation !== "Anomalie" ? `<button class="btn" type="button" onclick="validateReport('${it.id}', 'Anomalie')">Non conforme</button>` : ""}
                     <button class="btn" type="button" onclick="generatePdf('${it.id}')">${icon("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3")} PDF</button>
                   </div>
                 </div>
@@ -2421,6 +2423,26 @@
       doc.save(`${intervention.id}-${intervention.poleId}.pdf`);
     }
 
+    async function validateReport(reportId, validation) {
+      if (!can("validate")) return toast("Permission validation requise");
+      const clientSignature = apiUser?.name || "Controle Qualite";
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch(`/interventions/${encodeURIComponent(reportId)}/validate`, {
+          method: "PATCH",
+          body: JSON.stringify({ validation, clientSignature })
+        });
+        state.interventions = state.interventions.map(item => item.id === reportId ? payload.intervention : item);
+        state.poles = payload.poles;
+        saveState();
+        renderCurrentView();
+        if (state.activeView === "map") renderMap();
+        toast(validation === "Valide" ? "Rapport valide" : "Rapport marque non conforme");
+      } catch (error) {
+        toast(error.message || "Validation impossible");
+      }
+    }
+
     async function photoUrlToDataUrl(url) {
       if (!url) return null;
       try {
@@ -2592,6 +2614,7 @@
     window.setView = setView;
     window.assignPole = assignPole;
     window.generatePdf = generatePdf;
+    window.validateReport = validateReport;
 
     boot();
   </script>
