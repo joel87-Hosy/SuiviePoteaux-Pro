@@ -1366,7 +1366,33 @@
     }
 
     function saveState() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (error) {
+        const slimState = stripPhotoData(structuredClone(state));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(slimState));
+        state = slimState;
+        toast("Stockage local allege: photos conservees cote serveur apres synchronisation");
+      }
+    }
+
+    function stripPhotoData(value) {
+      (value.interventions || []).forEach(intervention => {
+        intervention.photos = (intervention.photos || []).map(photo => {
+          const { data, ...rest } = photo;
+          return rest;
+        });
+      });
+      value.offlineQueue = (value.offlineQueue || []).map(operation => {
+        if (operation.payload?.photos) {
+          operation.payload.photos = operation.payload.photos.map(photo => {
+            const { data, ...rest } = photo;
+            return rest;
+          });
+        }
+        return operation;
+      });
+      return value;
     }
 
     async function apiFetch(path, options = {}) {
@@ -2234,18 +2260,39 @@
       const file = event.target.files[0];
       const index = Number(event.target.dataset.photoIndex);
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
+      compressImage(file).then(dataUrl => {
         selectedPhotos[index] = {
           step: PHOTO_STEPS[index],
-          data: reader.result,
+          data: dataUrl,
           date: new Date().toISOString(),
           lat: $("#latitude").value || "N/A",
           lng: $("#longitude").value || "N/A"
         };
         renderPhotoInputs();
-      };
-      reader.readAsDataURL(file);
+      }).catch(() => toast("Impossible de lire cette photo"));
+    }
+
+    function compressImage(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = reject;
+          img.onload = () => {
+            const maxSize = 1280;
+            const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL("image/jpeg", 0.72));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
     }
 
     function fillFallbackGps() {
@@ -2271,10 +2318,19 @@
 
     async function saveIntervention(isDraft = false) {
       const form = $("#interventionForm");
-      if (!isDraft && !form.reportValidity()) return;
+      if (!isDraft && !form.reportValidity()) {
+        toast("Completez les champs obligatoires");
+        return;
+      }
       if (!isDraft && selectedPhotos.filter(Boolean).length < 4) {
         toast("Ajoutez au moins les 4 photos obligatoires");
         return;
+      }
+      const submitButton = form.querySelector("button[type='submit']");
+      const originalSubmit = submitButton?.innerHTML;
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Enregistrement...";
       }
       const poleId = $("#poleId").value;
       const date = new Date().toISOString();
@@ -2295,34 +2351,42 @@
         photos: selectedPhotos.filter(Boolean),
         draft: isDraft
       };
-      state.interventions.push(intervention);
-      const pole = state.poles.find(p => p.id === poleId);
-      if (pole) {
-        pole.status = isDraft ? "En Transit" : intervention.validation;
-        pole.lat = intervention.lat;
-        pole.lng = intervention.lng;
-        pole.depot = "Implante terrain";
-      }
       const operation = { type: isDraft ? "draft" : "intervention", id: intervention.id, date, payload: intervention };
-      state.offlineQueue.push(operation);
-      saveState();
       try {
         await ensureApiSession();
         const payload = await apiFetch("/interventions", {
           method: "POST",
           body: JSON.stringify(intervention)
         });
-        state.interventions = state.interventions.map(item => item.id === intervention.id ? payload.intervention : item);
+        state.interventions.push(payload.intervention);
         state.poles = payload.poles;
-        state.offlineQueue = state.offlineQueue.filter(item => item !== operation);
         saveState();
+        closeDrawer();
+        renderCurrentView();
+        if (map) renderMap();
+        toast(isDraft ? "Brouillon enregistre" : "Fiche de pose enregistree");
       } catch (error) {
         console.info("Fiche conservee offline:", error.message);
+        state.interventions.push(intervention);
+        const pole = state.poles.find(p => p.id === poleId);
+        if (pole) {
+          pole.status = isDraft ? "En Transit" : intervention.validation;
+          pole.lat = intervention.lat;
+          pole.lng = intervention.lng;
+          pole.depot = "Implante terrain";
+        }
+        state.offlineQueue.push(operation);
+        saveState();
+        closeDrawer();
+        renderCurrentView();
+        if (map) renderMap();
+        toast(`Fiche conservee offline: ${error.message}`);
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.innerHTML = originalSubmit;
+        }
       }
-      closeDrawer();
-      renderCurrentView();
-      if (map) renderMap();
-      toast(isDraft ? "Brouillon offline enregistre" : "Fiche de pose enregistree");
     }
 
     async function generatePdf(reportId) {
