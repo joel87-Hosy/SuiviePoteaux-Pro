@@ -1844,7 +1844,7 @@
               <input id="stockSearch" placeholder="Code, depot, lot...">
               <select id="typeFilter"><option value="">Tous materiaux</option><option>BETON</option><option>METALLIQUE</option></select>
               <select id="statusFilter"><option value="">Tous statuts</option><option>En Stock</option><option>En Transit</option><option>Pose - En attente validation</option><option>Valide</option><option>Anomalie</option></select>
-              <select id="heightFilter"><option value="">Toutes hauteurs</option>${[9,10,11,12].map(h => `<option value="${h}">${h} m</option>`).join("")}</select>
+              <select id="heightFilter"><option value="">Toutes hauteurs</option>${[7,9,10,11,12].map(h => `<option value="${h}">${h} m</option>`).join("")}</select>
             </div>
             <div class="table-wrap"><table id="stockTable"></table></div>
           </div>
@@ -2093,7 +2093,7 @@
       $("#stockEntryDrawer").setAttribute("aria-hidden", "false");
       $("#stockEntryForm").reset();
       $("#entryType").value = "BETON";
-      $("#entryHeight").value = "12";
+      $("#entryHeight").value = "7";
       $("#entryEffort").value = "400 daN";
       $("#entryWeight").value = "850";
       $("#entryDepot").value = "Depot Central";
