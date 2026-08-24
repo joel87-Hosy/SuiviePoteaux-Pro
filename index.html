@@ -498,6 +498,112 @@
       background: linear-gradient(90deg, var(--primary), var(--accent));
     }
 
+    .chart-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, .85fr);
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .bar-chart {
+      display: grid;
+      gap: 12px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: minmax(110px, 160px) minmax(0, 1fr) 48px;
+      gap: 10px;
+      align-items: center;
+      min-height: 28px;
+    }
+
+    .bar-track {
+      height: 14px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+    }
+
+    .bar-fill {
+      display: block;
+      width: var(--value);
+      height: 100%;
+      background: var(--bar-color, var(--primary));
+      border-radius: inherit;
+    }
+
+    .donut-wrap {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr);
+      gap: 16px;
+      align-items: center;
+    }
+
+    .donut {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: conic-gradient(var(--segments));
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+
+    .donut::after {
+      content: "";
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      position: absolute;
+    }
+
+    .donut strong {
+      position: relative;
+      z-index: 1;
+      font-size: 24px;
+    }
+
+    .legend {
+      display: grid;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--dot-color);
+      flex: 0 0 auto;
+    }
+
+    .insight-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .insight {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
     #map {
       height: min(64vh, 620px);
       min-height: 420px;
@@ -772,6 +878,7 @@
         background: var(--primary);
       }
       .content-grid, .stats { grid-template-columns: 1fr 1fr; }
+      .chart-grid { grid-template-columns: 1fr; }
       .login-screen { grid-template-columns: 1fr; }
       .login-visual { display: none; }
     }
@@ -784,6 +891,8 @@
       table { min-width: 680px; }
       #map { min-height: 360px; }
       .btn { white-space: normal; }
+      .bar-row { grid-template-columns: 1fr; }
+      .donut-wrap { grid-template-columns: 1fr; justify-items: center; }
     }
   </style>
 </head>
@@ -1140,17 +1249,17 @@
         permissions: ["read", "write_stock", "write_intervention", "validate", "admin"]
       },
       magasinier: {
-        home: "stock",
+        home: "dashboard",
         views: ["dashboard", "stock"],
         permissions: ["read", "write_stock"]
       },
       terrain: {
-        home: "field",
-        views: ["field", "map", "reports"],
+        home: "dashboard",
+        views: ["dashboard", "field", "map", "reports"],
         permissions: ["read", "write_intervention"]
       },
       controleur: {
-        home: "reports",
+        home: "dashboard",
         views: ["dashboard", "map", "reports"],
         permissions: ["read", "validate"]
       }
@@ -1478,51 +1587,112 @@
     }
 
     function renderDashboard() {
+      const role = apiUser?.role || "super_admin";
       const total = state.poles.length;
       const installed = state.poles.filter(p => ["Pose - En attente validation", "Valide", "Anomalie"].includes(p.status)).length;
       const beton = state.poles.filter(p => p.type === "BETON").length;
       const metal = state.poles.filter(p => p.type === "METALLIQUE").length;
       const validated = state.poles.filter(p => p.status === "Valide").length;
       const validationRate = installed ? Math.round(validated / installed * 100) : 0;
+      const waiting = countStatus("Pose - En attente validation");
+      const anomaly = countStatus("Anomalie");
+      const stock = countStatus("En Stock");
+      const transit = countStatus("En Transit");
+      const myInterventions = apiUser?.role === "terrain"
+        ? state.interventions.filter(it => it.agentId === apiUser.id || it.agent === apiUser.name)
+        : state.interventions;
+      const todayCount = myInterventions.filter(it => isToday(it.date)).length;
+
+      const dashboards = {
+        super_admin: {
+          metrics: [
+            ["Total poteaux", total, "Inventaire consolide"],
+            ["Poses tracees", installed, `${state.interventions.length} fiches terrain`],
+            ["Beton / Metal", `${beton}/${metal}`, "Repartition materiaux"],
+            ["Validation", `${validationRate}%`, "Conformite terrain"]
+          ],
+          body: `
+            ${chartCard("Progression par statut", statusBarChart(), `${installed}/${total} implantes`)}
+            ${chartCard("Repartition materiaux", donutChart([
+              ["BETON", beton, "#0f766e"],
+              ["METALLIQUE", metal, "#d89f2b"]
+            ], total), "Stock technique")}
+            ${chartCard("Validation qualite", donutChart([
+              ["Valide", validated, "#127a43"],
+              ["En attente", waiting, "#d89f2b"],
+              ["Anomalie", anomaly, "#b42318"]
+            ], Math.max(installed, 1)), `${validationRate}% conforme`)}
+            ${activityCard("Dernieres operations", state.interventions)}
+          `
+        },
+        magasinier: {
+          metrics: [
+            ["En Stock", stock, "Disponible depot"],
+            ["En Transit", transit, "Attribue terrain"],
+            ["Beton / Metal", `${beton}/${metal}`, "Composition depot"],
+            ["Alertes", anomaly, "Poteaux a controler"]
+          ],
+          body: `
+            ${chartCard("Stock par statut", barChart([
+              ["En Stock", stock, "#127a43"],
+              ["En Transit", transit, "#d89f2b"],
+              ["Anomalie", anomaly, "#b42318"]
+            ]), "Flux depot")}
+            ${chartCard("Stock par depot", barChart(groupByCount(state.poles, "depot")), "Emplacements")}
+            ${chartCard("Repartition hauteurs", barChart(groupByCount(state.poles, "height", value => `${value} m`)), "Specifications")}
+            ${insightCard("Actions magasinier", [
+              ["Entrees possibles", `${stock} poteaux disponibles apres reception`],
+              ["Sorties terrain", `${transit} poteaux deja en mouvement`],
+              ["Controle depot", `${anomaly} anomalie(s) a isoler`]
+            ])}
+          `
+        },
+        terrain: {
+          metrics: [
+            ["Mes fiches", myInterventions.length, "Interventions enregistrees"],
+            ["Aujourd'hui", todayCount, "Saisies du jour"],
+            ["A poser", transit + stock, "Poteaux accessibles"],
+            ["Photos", myInterventions.reduce((sum, it) => sum + (it.photos?.length || 0), 0), "Preuves capturees"]
+          ],
+          body: `
+            ${chartCard("Mes validations", donutChart([
+              ["Valide", myInterventions.filter(it => it.validation === "Valide").length, "#127a43"],
+              ["En attente", myInterventions.filter(it => it.validation.includes("attente")).length, "#d89f2b"],
+              ["Anomalie", myInterventions.filter(it => it.validation === "Anomalie").length, "#b42318"]
+            ], Math.max(myInterventions.length, 1)), "Qualite terrain")}
+            ${chartCard("Preuves photo par fiche", barChart(myInterventions.slice(-6).map(it => [it.poleId, it.photos?.length || 0, "#2563a6"])), "Objectif 4 minimum")}
+            ${chartCard("Types de sol rencontres", barChart(groupByCount(myInterventions, "soil")), "Conditions terrain")}
+            ${activityCard("Mes dernieres fiches", myInterventions)}
+          `
+        },
+        controleur: {
+          metrics: [
+            ["A valider", waiting, "Rapports en attente"],
+            ["Valides", validated, "Conformes"],
+            ["Anomalies", anomaly, "Non-conformites"],
+            ["Taux conforme", `${validationRate}%`, "Validation terrain"]
+          ],
+          body: `
+            ${chartCard("File de validation", donutChart([
+              ["A valider", waiting, "#d89f2b"],
+              ["Valide", validated, "#127a43"],
+              ["Anomalie", anomaly, "#b42318"]
+            ], Math.max(installed, 1)), "Controle qualite")}
+            ${chartCard("Rapports par statut", barChart(groupByCount(state.interventions, "validation")), "Fiches de pose")}
+            ${chartCard("Anomalies par zone", barChart(groupByCount(state.poles.filter(p => p.status === "Anomalie"), "depot")), "Points sensibles")}
+            ${activityCard("Derniers rapports a consulter", state.interventions)}
+          `
+        }
+      };
+
+      const dashboard = dashboards[role] || dashboards.super_admin;
 
       $("#dashboardView").innerHTML = `
         <div class="grid stats">
-          ${metric("Total poteaux", total, "Inventaire consolide")}
-          ${metric("Poses tracees", installed, `${state.interventions.length} fiches terrain`)}
-          ${metric("Beton / Metal", `${beton}/${metal}`, "Repartition materiaux")}
-          ${metric("Validation", `${validationRate}%`, "Conformite terrain")}
+          ${dashboard.metrics.map(([label, value, hint]) => metric(label, value, hint)).join("")}
         </div>
-        <div class="grid content-grid">
-          <div class="card">
-            <div class="section-head">
-              <h3>Progression par statut</h3>
-              <span class="badge info">${installed}/${total} implantes</span>
-            </div>
-            <div class="section-body grid">
-              ${progressLine("En Stock", countStatus("En Stock"), total)}
-              ${progressLine("En Transit", countStatus("En Transit"), total)}
-              ${progressLine("En attente validation", countStatus("Pose - En attente validation"), total)}
-              ${progressLine("Valide", countStatus("Valide"), total)}
-              ${progressLine("Anomalie", countStatus("Anomalie"), total)}
-            </div>
-          </div>
-          <div class="card">
-            <div class="section-head">
-              <h3>Dernieres operations</h3>
-              ${can("write_intervention") ? `<button class="btn" type="button" onclick="setView('field')">Terrain</button>` : ""}
-            </div>
-            <div class="section-body timeline">
-              ${state.interventions.slice().reverse().slice(0, 5).map((it, index) => `
-                <div class="timeline-item">
-                  <div class="timeline-dot">${index + 1}</div>
-                  <div>
-                    <strong>${it.poleId}</strong>
-                    <p>${formatDate(it.date)} - ${it.agent} - ${it.validation}</p>
-                  </div>
-                </div>
-              `).join("") || `<div class="empty">Aucune fiche terrain enregistree.</div>`}
-            </div>
-          </div>
+        <div class="chart-grid">
+          ${dashboard.body}
         </div>
       `;
     }
@@ -1545,6 +1715,117 @@
           <div class="progress" style="--value:${percent}%"><span></span></div>
         </div>
       `;
+    }
+
+    function chartCard(title, content, badge = "") {
+      return `
+        <div class="card">
+          <div class="section-head">
+            <h3>${title}</h3>
+            ${badge ? `<span class="badge info">${badge}</span>` : ""}
+          </div>
+          <div class="section-body">${content}</div>
+        </div>
+      `;
+    }
+
+    function statusBarChart() {
+      return barChart([
+        ["En Stock", countStatus("En Stock"), "#127a43"],
+        ["En Transit", countStatus("En Transit"), "#d89f2b"],
+        ["En attente", countStatus("Pose - En attente validation"), "#2563a6"],
+        ["Valide", countStatus("Valide"), "#0f766e"],
+        ["Anomalie", countStatus("Anomalie"), "#b42318"]
+      ]);
+    }
+
+    function barChart(rows) {
+      const normalized = rows.filter(row => row && row[0] !== undefined);
+      const max = Math.max(...normalized.map(([, value]) => Number(value) || 0), 1);
+      return `
+        <div class="bar-chart">
+          ${normalized.map(([label, value, color]) => {
+            const percent = Math.round(((Number(value) || 0) / max) * 100);
+            return `
+              <div class="bar-row">
+                <span class="muted">${label}</span>
+                <div class="bar-track"><span class="bar-fill" style="--value:${percent}%;--bar-color:${color || "#0f766e"}"></span></div>
+                <strong>${value}</strong>
+              </div>
+            `;
+          }).join("") || `<div class="empty">Aucune donnee disponible.</div>`}
+        </div>
+      `;
+    }
+
+    function donutChart(rows, totalValue) {
+      const total = totalValue || rows.reduce((sum, [, value]) => sum + Number(value || 0), 0) || 1;
+      let cursor = 0;
+      const segments = rows.map(([label, value, color]) => {
+        const start = cursor;
+        const size = (Number(value || 0) / total) * 100;
+        cursor += size;
+        return `${color} ${start}% ${cursor}%`;
+      }).join(", ") || "#dbe3df 0% 100%";
+      return `
+        <div class="donut-wrap">
+          <div class="donut" style="--segments:${segments}"><strong>${total}</strong></div>
+          <div class="legend">
+            ${rows.map(([label, value, color]) => `
+              <div class="legend-item">
+                <span style="display:flex;align-items:center;gap:8px"><i class="legend-dot" style="--dot-color:${color}"></i>${label}</span>
+                <strong>${value}</strong>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function groupByCount(items, key, labeler = value => value || "Non renseigne") {
+      const groups = new Map();
+      items.forEach(item => {
+        const raw = item[key] ?? "Non renseigne";
+        const label = labeler(raw);
+        groups.set(label, (groups.get(label) || 0) + 1);
+      });
+      return [...groups.entries()].map(([label, value], index) => [label, value, chartColor(index)]);
+    }
+
+    function chartColor(index) {
+      return ["#0f766e", "#d89f2b", "#2563a6", "#127a43", "#b42318", "#7c3aed"][index % 6];
+    }
+
+    function insightCard(title, rows) {
+      return chartCard(title, `
+        <div class="insight-list">
+          ${rows.map(([label, value]) => `<div class="insight"><span>${label}</span><strong>${value}</strong></div>`).join("")}
+        </div>
+      `);
+    }
+
+    function activityCard(title, interventions) {
+      return chartCard(title, `
+        <div class="timeline">
+          ${interventions.slice().reverse().slice(0, 5).map((it, index) => `
+            <div class="timeline-item">
+              <div class="timeline-dot">${index + 1}</div>
+              <div>
+                <strong>${it.poleId}</strong>
+                <p>${formatDate(it.date)} - ${it.agent} - ${it.validation}</p>
+              </div>
+            </div>
+          `).join("") || `<div class="empty">Aucune fiche terrain enregistree.</div>`}
+        </div>
+      `);
+    }
+
+    function isToday(value) {
+      const date = new Date(value);
+      const today = new Date();
+      return date.getFullYear() === today.getFullYear() &&
+        date.getMonth() === today.getMonth() &&
+        date.getDate() === today.getDate();
     }
 
     function renderStock() {
