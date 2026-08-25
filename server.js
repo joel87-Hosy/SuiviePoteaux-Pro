@@ -98,6 +98,7 @@ function seedDb() {
         photos: []
       }
     ],
+    stockMovements: [],
     auditLog: []
   };
 }
@@ -136,12 +137,13 @@ async function writeDb(db) {
 }
 
 async function readSupabaseDb() {
-  const [users, projects, poles, interventions, photos, auditLog] = await Promise.all([
+  const [users, projects, poles, interventions, photos, stockMovements, auditLog] = await Promise.all([
     selectTable("app_users"),
     selectTable("projects"),
     selectTable("poles"),
     selectTable("interventions"),
     selectTable("intervention_photos"),
+    selectTable("stock_movements"),
     selectTable("audit_log")
   ]);
   return {
@@ -202,6 +204,8 @@ async function readSupabaseDb() {
       clientSignature: row.client_signature,
       validatedBy: row.validated_by,
       validatedAt: row.validated_at,
+      anomalyReason: row.anomaly_reason || "",
+      anomalyStatus: row.anomaly_status || "",
       draft: row.draft,
       photos: photos
         .filter(photo => photo.intervention_id === row.id)
@@ -213,6 +217,16 @@ async function readSupabaseDb() {
           lng: photo.lng,
           url: photo.url
         }))
+    })),
+    stockMovements: stockMovements.map(row => ({
+      id: row.id,
+      poleId: row.pole_id,
+      movementType: row.movement_type,
+      fromDepot: row.from_depot,
+      toDepot: row.to_depot,
+      actorId: row.actor_id,
+      payload: row.payload || {},
+      date: row.date
     })),
     auditLog: auditLog.map(row => ({
       id: row.id,
@@ -300,7 +314,19 @@ async function writeSupabaseDb(db) {
       client_signature: row.clientSignature,
       validated_by: row.validatedBy || null,
       validated_at: row.validatedAt || null,
+      anomaly_reason: row.anomalyReason || null,
+      anomaly_status: row.anomalyStatus || null,
       draft: Boolean(row.draft)
+    }))),
+    upsertTable("stock_movements", (db.stockMovements || []).map(row => ({
+      id: row.id,
+      pole_id: row.poleId || null,
+      movement_type: row.movementType,
+      from_depot: row.fromDepot || null,
+      to_depot: row.toDepot || null,
+      actor_id: row.actorId || null,
+      payload: row.payload || {},
+      date: row.date
     }))),
     upsertTable("audit_log", db.auditLog.map(row => ({
       id: row.id,
@@ -460,6 +486,20 @@ function audit(db, actor, action, payload = {}) {
   });
 }
 
+function stockMovement(db, actor, poleId, movementType, fromDepot, toDepot, payload = {}) {
+  db.stockMovements = db.stockMovements || [];
+  db.stockMovements.push({
+    id: crypto.randomUUID(),
+    poleId,
+    movementType,
+    fromDepot: fromDepot || "",
+    toDepot: toDepot || "",
+    actorId: actor.id,
+    payload,
+    date: new Date().toISOString()
+  });
+}
+
 async function savePhotos(reportId, photos = []) {
   const reportDir = path.join(UPLOAD_DIR, reportId);
   if (!SUPABASE_ENABLED) fs.mkdirSync(reportDir, { recursive: true });
@@ -606,6 +646,8 @@ async function handleApi(req, res, url) {
       projects: db.projects,
       poles: db.poles,
       interventions: db.interventions,
+      stockMovements: db.stockMovements || [],
+      auditLog: hasPermission(actor, "admin") ? db.auditLog : [],
       users: hasPermission(actor, "admin") ? db.users.map(publicUser) : [],
       terrainUsers: hasPermission(actor, "write_stock") || actor.role === "terrain" ? terrainUsers : [],
       offlineQueue: []
@@ -660,6 +702,7 @@ async function handleApi(req, res, url) {
       assignedTeam: body.assignedTeam || ""
     };
     db.poles.push(pole);
+    stockMovement(db, actor, pole.id, "Entree stock", "", pole.depot, { status: pole.status, maker: pole.maker });
     audit(db, actor, "pole.create", { poleId: pole.id });
     await writeDb(db);
     return sendJson(res, 201, { pole });
@@ -670,7 +713,13 @@ async function handleApi(req, res, url) {
     if (!hasPermission(actor, "write_stock")) return sendError(res, 403, "Permission stock requise");
     const pole = db.poles.find(item => item.id === decodeURIComponent(poleMatch[1]));
     if (!pole) return sendError(res, 404, "Poteau introuvable");
-    Object.assign(pole, await readBody(req));
+    const beforeDepot = pole.depot;
+    const beforeStatus = pole.status;
+    const body = await readBody(req);
+    Object.assign(pole, body);
+    if (beforeDepot !== pole.depot || beforeStatus !== pole.status || body.assignedTeam !== undefined) {
+      stockMovement(db, actor, pole.id, "Mouvement stock", beforeDepot, pole.depot, { status: pole.status, assignedTeam: pole.assignedTeam || "" });
+    }
     audit(db, actor, "pole.update", { poleId: pole.id });
     await writeDb(db);
     return sendJson(res, 200, { pole });
@@ -684,10 +733,12 @@ async function handleApi(req, res, url) {
     for (const pole of db.poles) {
       if (poleIds.includes(pole.id)) {
         const assignedTeam = String(body.assignedTeam || "").trim();
+        const fromDepot = pole.depot;
         pole.status = "En Transit";
         pole.depot = body.destination || (assignedTeam ? `Terrain - ${assignedTeam}` : "Camion equipe terrain");
         pole.assignedTeam = assignedTeam;
         moved.push(pole.id);
+        stockMovement(db, actor, pole.id, "Sortie terrain", fromDepot, pole.depot, { assignedTeam });
       }
     }
     audit(db, actor, "requisition.create", { poleIds: moved });
@@ -735,6 +786,7 @@ async function handleApi(req, res, url) {
     if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
     const project = db.projects.find(item => item.id === decodeURIComponent(projectMatch[1]));
     if (!project) return sendError(res, 404, "Projet introuvable");
+    if (project.status === "Cloture") return sendError(res, 409, "Impossible de modifier un projet cloture");
     const body = await readBody(req);
     const requirements = normalizeRequirements(body.requirements);
     if (!body.name || !body.client || !body.zone || !body.assignedTeam || !body.startDate || !body.endDate || !requirements.length) return sendError(res, 400, "Projet, operateur, planning, zone, equipe et poteaux demandes requis");
@@ -762,6 +814,8 @@ async function handleApi(req, res, url) {
   if (projectMatch && req.method === "DELETE") {
     if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
     const projectId = decodeURIComponent(projectMatch[1]);
+    const project = db.projects.find(item => item.id === projectId);
+    if (project?.status === "Cloture") return sendError(res, 409, "Impossible de supprimer un projet cloture");
     const hasReports = db.interventions.some(item => item.projectId === projectId);
     if (hasReports) return sendError(res, 409, "Impossible de supprimer un projet avec des fiches de pose");
     db.projects = db.projects.filter(item => item.id !== projectId);
@@ -800,10 +854,12 @@ async function handleApi(req, res, url) {
       selected.forEach(id => {
         const pole = db.poles.find(item => item.id === id);
         if (pole) {
+          const fromDepot = pole.depot;
           pole.status = "En Transit";
           pole.depot = `Terrain - ${project.assignedTeam}`;
           pole.assignedTeam = project.assignedTeam;
           pole.projectId = project.id;
+          stockMovement(db, actor, pole.id, "Validation stock projet", fromDepot, pole.depot, { projectId: project.id, assignedTeam: project.assignedTeam });
         }
       });
       project.assignedPoleIds = selected;
@@ -887,10 +943,12 @@ async function handleApi(req, res, url) {
     };
     db.interventions.push(intervention);
     if (pole) {
+      const fromDepot = pole.depot;
       pole.status = intervention.draft ? "En Transit" : intervention.validation;
       pole.lat = intervention.lat;
       pole.lng = intervention.lng;
       pole.depot = "Implante terrain";
+      if (!intervention.draft) stockMovement(db, actor, pole.id, "Implantation terrain", fromDepot, pole.depot, { projectId: intervention.projectId, reportId: intervention.id, validation: intervention.validation });
     }
     const project = db.projects.find(item => item.id === body.projectId);
     if (project && !intervention.draft && !["Cloture demandee", "Cloture"].includes(project.status)) project.status = "En implantation";
@@ -909,9 +967,33 @@ async function handleApi(req, res, url) {
     intervention.clientSignature = body.clientSignature || actor.name;
     intervention.validatedBy = actor.id;
     intervention.validatedAt = new Date().toISOString();
+    if (intervention.validation === "Anomalie") {
+      intervention.anomalyReason = body.anomalyReason || intervention.notes || "";
+      intervention.anomalyStatus = "Ouverte";
+    }
     const pole = db.poles.find(item => item.id === intervention.poleId);
-    if (pole) pole.status = intervention.validation;
+    if (pole) {
+      const beforeStatus = pole.status;
+      pole.status = intervention.validation;
+      stockMovement(db, actor, pole.id, "Validation controle", pole.depot, pole.depot, { reportId: intervention.id, fromStatus: beforeStatus, validation: intervention.validation });
+    }
     audit(db, actor, "intervention.validate", { reportId: intervention.id, validation: intervention.validation });
+    await writeDb(db);
+    return sendJson(res, 200, { intervention, poles: db.poles });
+  }
+
+  const anomalyMatch = /^\/api\/interventions\/([^/]+)\/anomaly$/.exec(url.pathname);
+  if (req.method === "PATCH" && anomalyMatch) {
+    if (!hasPermission(actor, "validate") && !hasPermission(actor, "admin")) return sendError(res, 403, "Permission controle requise");
+    const intervention = db.interventions.find(item => item.id === decodeURIComponent(anomalyMatch[1]));
+    if (!intervention) return sendError(res, 404, "Rapport introuvable");
+    const body = await readBody(req);
+    intervention.anomalyStatus = body.anomalyStatus || "Ouverte";
+    intervention.anomalyReason = body.anomalyReason || "";
+    if (intervention.anomalyStatus === "Corrigee") intervention.validation = "Pose - En attente validation";
+    const pole = db.poles.find(item => item.id === intervention.poleId);
+    if (pole && intervention.anomalyStatus === "Corrigee") pole.status = "Pose - En attente validation";
+    audit(db, actor, "intervention.anomaly_update", { reportId: intervention.id, anomalyStatus: intervention.anomalyStatus });
     await writeDb(db);
     return sendJson(res, 200, { intervention, poles: db.poles });
   }
@@ -926,6 +1008,8 @@ async function handleApi(req, res, url) {
       projects: db.projects,
       poles: db.poles,
       interventions: db.interventions,
+      stockMovements: db.stockMovements || [],
+      auditLog: hasPermission(actor, "admin") ? db.auditLog : [],
       offlineQueue: []
     });
   }

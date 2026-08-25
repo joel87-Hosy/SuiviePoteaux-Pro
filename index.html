@@ -1233,6 +1233,8 @@
         </div>
         <div class="toolbar">
           <span class="badge info" id="topCurrentUser">Non connecte</span>
+          <input id="globalSearch" placeholder="Recherche code/projet..." style="max-width:220px">
+          <button class="btn" id="globalSearchBtn" type="button">Rechercher</button>
           <button class="btn" id="seedBtn" type="button" title="Recharger les donnees exemple">
             <svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/></svg>
             Demo
@@ -1498,6 +1500,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script src="./config.js"></script>
   <script>
     const STORAGE_KEY = "suiviPoteauxPro:v1";
@@ -1581,7 +1584,9 @@
           photos: []
         }
       ],
-      offlineQueue: []
+      offlineQueue: [],
+      stockMovements: [],
+      auditLog: []
     };
 
     let state = loadState();
@@ -1799,6 +1804,8 @@
           projects: payload.projects,
           poles: payload.poles,
           interventions: payload.interventions,
+          stockMovements: payload.stockMovements || state.stockMovements || [],
+          auditLog: payload.auditLog || state.auditLog || [],
           users: payload.users || state.users || [],
           terrainUsers: payload.terrainUsers || payload.users?.filter(user => user.role === "terrain") || state.terrainUsers || [],
           offlineQueue: state.offlineQueue || []
@@ -2014,6 +2021,8 @@
         <div class="grid stats">
           ${dashboard.metrics.map(([label, value, hint]) => metric(label, value, hint)).join("")}
         </div>
+        ${notificationsCard()}
+        ${offlineQueueCard()}
         <div class="chart-grid">
           ${dashboard.body}
         </div>
@@ -2129,6 +2138,60 @@
       return chartCard(title, `
         <div class="insight-list">
           ${rows.map(([label, value]) => `<div class="insight" data-tooltip="${escapeAttr(`${label}: ${value}`)}"><span>${label}</span><strong>${value}</strong></div>`).join("")}
+        </div>
+      `);
+    }
+
+    function appNotifications() {
+      const notices = [];
+      const pendingStock = state.projects.filter(project => project.requestStatus === "En attente gestionnaire");
+      const closing = state.projects.filter(project => project.status === "Cloture demandee");
+      const anomalies = state.interventions.filter(item => item.validation === "Anomalie" || item.anomalyStatus);
+      const lateProjects = state.projects.filter(project => projectTiming(project).badge === "danger" && project.status !== "Cloture");
+      if (can("write_stock") && pendingStock.length) notices.push(["Demande stock", `${pendingStock.length} projet(s) attendent une validation magasinier`, "warn"]);
+      if (can("admin") && closing.length) notices.push(["Cloture", `${closing.length} projet(s) sont a valider`, "warn"]);
+      if ((can("validate") || can("admin")) && anomalies.length) notices.push(["Anomalies", `${anomalies.length} anomalie(s) a traiter`, "danger"]);
+      if ((can("write_intervention") || can("admin")) && lateProjects.length) notices.push(["Planning", `${lateProjects.length} projet(s) en retard`, "danger"]);
+      if (state.offlineQueue?.length) notices.push(["Synchronisation", `${state.offlineQueue.length} operation(s) hors ligne`, "info"]);
+      return notices;
+    }
+
+    function notificationsCard() {
+      const notices = appNotifications();
+      if (!notices.length) return "";
+      return chartCard("Notifications", `
+        <div class="insight-list">
+          ${notices.map(([title, message, badge]) => `
+            <div class="insight">
+              <span><span class="badge ${badge}">${title}</span></span>
+              <strong style="font-size:14px">${message}</strong>
+            </div>
+          `).join("")}
+        </div>
+      `, `${notices.length} alerte(s)`);
+    }
+
+    function offlineQueueCard() {
+      const queue = state.offlineQueue || [];
+      if (!queue.length) return "";
+      return chartCard("File de synchronisation", `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Type</th><th>Objet</th><th>Date</th><th>Etat</th></tr></thead>
+            <tbody>${queue.map(item => `<tr><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.poleId || item.reportId || (item.poles || []).join(", ") || "-")}</td><td>${formatDate(item.date || new Date().toISOString())}</td><td><span class="badge warn">En attente</span></td></tr>`).join("")}</tbody>
+          </table>
+        </div>
+      `);
+    }
+
+    function stockMovementsCard(limit = 8) {
+      const movements = (state.stockMovements || []).slice().reverse().slice(0, limit);
+      return chartCard("Historique mouvements", `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Poteau</th><th>Mouvement</th><th>De</th><th>Vers</th></tr></thead>
+            <tbody>${movements.map(item => `<tr><td>${formatDate(item.date)}</td><td><strong>${escapeHtml(item.poleId || "-")}</strong></td><td>${escapeHtml(item.movementType || "-")}</td><td>${escapeHtml(item.fromDepot || "-")}</td><td>${escapeHtml(item.toDepot || "-")}</td></tr>`).join("") || `<tr><td colspan="5"><div class="empty">Aucun mouvement enregistre.</div></td></tr>`}</tbody>
+          </table>
         </div>
       `);
     }
@@ -2387,6 +2450,58 @@
             `).join("") || `<div class="empty">Aucun projet cloture pour le moment.</div>`}
           </div>
         </div>
+        ${renderAdminAudit()}
+        ${renderAnomalyCenter()}
+      `;
+    }
+
+    function renderAdminAudit() {
+      const logs = (state.auditLog || []).slice().reverse().slice(0, 12);
+      return `
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Journal d'audit</h3>
+            <button class="btn" type="button" onclick="exportAuditCsv()">Export audit</button>
+          </div>
+          <div class="section-body">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Date</th><th>Acteur</th><th>Action</th><th>Detail</th></tr></thead>
+                <tbody>${logs.map(log => `<tr><td>${formatDate(log.date)}</td><td>${escapeHtml(log.actorId || "-")}</td><td>${escapeHtml(log.action || "-")}</td><td>${escapeHtml(JSON.stringify(log.payload || {}))}</td></tr>`).join("") || `<tr><td colspan="4"><div class="empty">Aucun audit disponible.</div></td></tr>`}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAnomalyCenter() {
+      const anomalies = state.interventions.filter(item => item.validation === "Anomalie" || item.anomalyStatus);
+      return `
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Centre anomalies</h3>
+            <span class="badge ${anomalies.length ? "danger" : "ok"}">${anomalies.length} anomalie(s)</span>
+          </div>
+          <div class="section-body">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Fiche</th><th>Poteau</th><th>Projet</th><th>Motif</th><th>Etat</th><th>Action</th></tr></thead>
+                <tbody>${anomalies.map(item => {
+                  const project = state.projects.find(project => project.id === item.projectId);
+                  return `<tr>
+                    <td>${escapeHtml(item.id)}</td>
+                    <td><strong>${escapeHtml(item.poleId)}</strong></td>
+                    <td>${escapeHtml(project?.name || "N/A")}</td>
+                    <td>${escapeHtml(item.anomalyReason || item.notes || "A renseigner")}</td>
+                    <td><span class="badge ${item.anomalyStatus === "Corrigee" ? "ok" : "warn"}">${escapeHtml(item.anomalyStatus || "Ouverte")}</span></td>
+                    <td><button class="btn" type="button" onclick="updateAnomaly('${item.id}')">Traiter</button></td>
+                  </tr>`;
+                }).join("") || `<tr><td colspan="6"><div class="empty">Aucune anomalie en cours.</div></td></tr>`}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       `;
     }
 
@@ -2494,6 +2609,9 @@
             <div class="toolbar ${canWriteStock ? "" : "hidden"}">
               <button class="btn primary" type="button" id="stockEntryBtn">${icon("M12 5v14M5 12h14")} Entree stock</button>
               <button class="btn" type="button" id="requisitionBtn">${icon("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3")} Bon de sortie</button>
+              <button class="btn" type="button" id="stockExportBtn">Export CSV</button>
+              <label class="btn" for="stockImportInput">Import CSV</label>
+              <input id="stockImportInput" type="file" accept=".csv,text/csv" class="hidden">
             </div>
           </div>
           <div class="section-body">
@@ -2506,11 +2624,14 @@
             <div class="table-wrap"><table id="stockTable"></table></div>
           </div>
         </div>
+        ${stockMovementsCard(12)}
       `;
       ["stockSearch", "typeFilter", "statusFilter", "heightFilter"].forEach(id => $(`#${id}`).addEventListener("input", drawStockRows));
       if (canWriteStock) {
         $("#stockEntryBtn").addEventListener("click", openStockEntryDrawer);
         $("#requisitionBtn").addEventListener("click", createRequisition);
+        $("#stockExportBtn").addEventListener("click", exportStockCsv);
+        $("#stockImportInput").addEventListener("change", importStockCsv);
       }
       drawStockRows();
     }
@@ -2616,7 +2737,91 @@
         console.info("Bon de sortie conserve offline:", error.message);
       }
       renderCurrentView();
+      generateRequisitionPdf(available, assignedTeam);
       toast(`${available.length} poteaux attribues a ${assignedTeam}`);
+    }
+
+    function generateRequisitionPdf(poles, assignedTeam) {
+      if (!window.jspdf?.jsPDF) return toast("jsPDF indisponible");
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: "mm", format: "a4" });
+      doc.setFillColor(15, 118, 110);
+      doc.rect(0, 0, 210, 28, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.text("BON DE SORTIE POTEAUX", 14, 13);
+      doc.setFontSize(9);
+      doc.text(`Equipe: ${assignedTeam}`, 14, 23);
+      doc.text(`Date: ${formatDate(new Date().toISOString())}`, 150, 23);
+      doc.setTextColor(30, 36, 34);
+      doc.autoTable({
+        startY: 38,
+        head: [["Code", "Type", "Hauteur", "Effort", "Lot", "Depot destination"]],
+        body: poles.map(pole => [pole.id, pole.type, `${pole.height} m`, pole.effort || "N/A", pole.maker || "N/A", pole.depot || `Terrain - ${assignedTeam}`]),
+        theme: "grid",
+        styles: { fontSize: 8, cellPadding: 2.2 },
+        headStyles: { fillColor: [15, 118, 110] }
+      });
+      const y = doc.lastAutoTable.finalY + 12;
+      doc.autoTable({
+        startY: y,
+        head: [["Role", "Nom / Signature", "Date"]],
+        body: [
+          ["Gestionnaire stock", apiUser?.name || "N/A", ""],
+          ["Equipe terrain", assignedTeam, ""]
+        ],
+        theme: "grid",
+        styles: { fontSize: 9, minCellHeight: 16 },
+        headStyles: { fillColor: [15, 118, 110] }
+      });
+      doc.save(`bon-sortie-${new Date().toISOString().slice(0, 10)}.pdf`);
+    }
+
+    function downloadText(filename, content, type = "text/plain") {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function localId(prefix = "ID") {
+      return window.crypto?.randomUUID?.() || `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    function exportStockCsv() {
+      const header = ["id", "type", "height", "effort", "weight", "maker", "status", "depot", "assignedTeam", "projectId", "lat", "lng"];
+      const rows = state.poles.map(pole => header.map(key => `"${String(pole[key] ?? "").replaceAll('"', '""')}"`).join(","));
+      downloadText(`stock-poteaux-${new Date().toISOString().slice(0, 10)}.csv`, [header.join(","), ...rows].join("\n"), "text/csv");
+    }
+
+    function importStockCsv(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const lines = String(reader.result || "").split(/\r?\n/).filter(Boolean);
+        const header = lines.shift()?.split(",").map(item => item.replaceAll('"', "").trim()) || [];
+        let added = 0;
+        lines.forEach(line => {
+          const values = line.match(/("([^"]|"")*"|[^,]+)/g)?.map(value => value.replace(/^"|"$/g, "").replaceAll('""', '"')) || [];
+          const pole = Object.fromEntries(header.map((key, index) => [key, values[index] || ""]));
+          if (!pole.id || state.poles.some(item => item.id === pole.id)) return;
+          pole.height = Number(pole.height || 0);
+          pole.weight = Number(pole.weight || 0);
+          state.poles.push({ status: "En Stock", depot: "Depot Central", ...pole });
+          state.stockMovements = state.stockMovements || [];
+          state.stockMovements.push({ id: localId("MOV"), poleId: pole.id, movementType: "Import CSV", fromDepot: "", toDepot: pole.depot || "Depot Central", actorId: apiUser?.id || "", payload: {}, date: new Date().toISOString() });
+          added++;
+        });
+        saveState();
+        renderCurrentView();
+        toast(`${added} poteau(x) importe(s)`);
+      };
+      reader.readAsText(file);
+      event.target.value = "";
     }
 
     function renderField() {
@@ -2862,7 +3067,11 @@
         <div class="card">
           <div class="section-head">
             <h3>Fiches de pose et exports</h3>
-            ${canCreateReport ? `<button class="btn primary" type="button" onclick="openDrawer()">${icon("M12 5v14M5 12h14")} Nouvelle fiche</button>` : ""}
+            <div class="toolbar">
+              ${canCreateReport ? `<button class="btn primary" type="button" onclick="openDrawer()">${icon("M12 5v14M5 12h14")} Nouvelle fiche</button>` : ""}
+              <button class="btn" type="button" onclick="exportInterventionsCsv()">Export fiches CSV</button>
+              <button class="btn" type="button" onclick="exportProjectsCsv()">Export projets CSV</button>
+            </div>
           </div>
           <div class="section-body report-list">
             ${state.interventions.slice().reverse().map(it => {
@@ -3051,12 +3260,14 @@
 
     function editProject(projectId) {
       const project = state.projects.find(item => item.id === projectId);
+      if (project?.status === "Cloture") return toast("Impossible de modifier un projet cloture");
       if (project) fillProjectForm(project);
     }
 
     async function deleteProject(projectId) {
       const project = state.projects.find(item => item.id === projectId);
       if (!project || !confirm(`Supprimer le projet ${project.name} ?`)) return;
+      if (project.status === "Cloture") return toast("Impossible de supprimer un projet cloture");
       try {
         await ensureApiSession();
         const payload = await apiFetch(`/projects/${encodeURIComponent(projectId)}`, { method: "DELETE" });
@@ -3075,6 +3286,8 @@
       const requirements = projectFormRequirements();
       if (!requirements.length) return toast("Ajoutez au moins un type de poteau demande");
       const projectId = $("#projectEditId").value;
+      const existingProject = state.projects.find(item => item.id === projectId);
+      if (existingProject?.status === "Cloture") return toast("Impossible de modifier un projet cloture");
       const project = {
         name: $("#projectName").value.trim(),
         client: $("#projectClient").value,
@@ -3332,24 +3545,35 @@
     }
 
     async function startQrScanner() {
-      if (!("BarcodeDetector" in window)) {
+      if (!("BarcodeDetector" in window) && !window.jsQR) {
         $("#qrScanStatus").textContent = "Saisie manuelle";
         toast("Scan camera non supporte ici, utilisez la saisie manuelle");
         return;
       }
       try {
         stopQrScanner();
-        const detector = new BarcodeDetector({ formats: ["qr_code"] });
+        const detector = "BarcodeDetector" in window ? new BarcodeDetector({ formats: ["qr_code"] }) : null;
         qrScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         const video = $("#qrVideo");
         video.srcObject = qrScanStream;
         await video.play();
         $("#qrScanStatus").textContent = "Scan actif";
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d", { willReadFrequently: true });
         qrScanTimer = window.setInterval(async () => {
           try {
-            const codes = await detector.detect(video);
-            if (!codes.length) return;
-            const value = codes[0].rawValue || "";
+            let value = "";
+            if (detector) {
+              const codes = await detector.detect(video);
+              value = codes[0]?.rawValue || "";
+            } else if (video.videoWidth && video.videoHeight && context) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              context.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+              value = window.jsQR(imageData.data, canvas.width, canvas.height)?.data || "";
+            }
+            if (!value) return;
             stopQrScanner();
             verifyQrPole(value);
           } catch {}
@@ -3420,6 +3644,35 @@
         </div>
       `;
       toast(poleOptionExists ? "Poteau selectionne via QR" : formMatch ? "Verification QR conforme" : "Attention: QR different du poteau selectionne");
+    }
+
+    function globalSearch() {
+      const query = ($("#globalSearch")?.value || "").trim().toLowerCase();
+      if (!query) return toast("Saisissez un code poteau ou un nom de projet");
+      const pole = state.poles.find(item => `${item.id} ${item.maker} ${item.depot}`.toLowerCase().includes(query));
+      if (pole) {
+        setView("stock");
+        setTimeout(() => {
+          $("#stockSearch").value = pole.id;
+          drawStockRows();
+          openQrScanDrawer();
+          verifyQrPole(pole.id);
+        }, 100);
+        return;
+      }
+      const project = state.projects.find(item => `${item.id} ${item.name} ${item.zone} ${item.client}`.toLowerCase().includes(query));
+      if (project) {
+        setView("projects");
+        viewProject(project.id);
+        return;
+      }
+      const report = state.interventions.find(item => `${item.id} ${item.poleId}`.toLowerCase().includes(query));
+      if (report) {
+        setView("reports");
+        toast(`Rapport trouve: ${report.id}`);
+        return;
+      }
+      toast("Aucun resultat trouve");
     }
 
     async function saveStockEntry() {
@@ -3934,11 +4187,12 @@
     async function validateReport(reportId, validation) {
       if (!can("validate")) return toast("Permission validation requise");
       const clientSignature = apiUser?.name || "Controle Qualite";
+      const anomalyReason = validation === "Anomalie" ? prompt("Motif de l'anomalie ?") : "";
       try {
         await ensureApiSession();
         const payload = await apiFetch(`/interventions/${encodeURIComponent(reportId)}/validate`, {
           method: "PATCH",
-          body: JSON.stringify({ validation, clientSignature })
+          body: JSON.stringify({ validation, clientSignature, anomalyReason })
         });
         state.interventions = state.interventions.map(item => item.id === reportId ? payload.intervention : item);
         state.poles = payload.poles;
@@ -3949,6 +4203,55 @@
       } catch (error) {
         toast(error.message || "Validation impossible");
       }
+    }
+
+    async function updateAnomaly(reportId) {
+      const intervention = state.interventions.find(item => item.id === reportId);
+      if (!intervention) return;
+      const status = prompt("Etat anomalie: Ouverte, Correction demandee, Corrigee", intervention.anomalyStatus || "Ouverte");
+      if (!status) return;
+      const reason = prompt("Motif / action corrective", intervention.anomalyReason || intervention.notes || "");
+      intervention.anomalyStatus = status;
+      intervention.anomalyReason = reason || "";
+      if (status === "Corrigee") intervention.validation = "Pose - En attente validation";
+      const pole = state.poles.find(item => item.id === intervention.poleId);
+      if (pole && status === "Corrigee") pole.status = "Pose - En attente validation";
+      saveState();
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch(`/interventions/${encodeURIComponent(reportId)}/anomaly`, {
+          method: "PATCH",
+          body: JSON.stringify({ anomalyStatus: status, anomalyReason: reason })
+        });
+        state.interventions = state.interventions.map(item => item.id === reportId ? payload.intervention : item);
+        if (payload.poles) state.poles = payload.poles;
+        saveState();
+      } catch (error) {
+        console.info("Anomalie conservee localement:", error.message);
+      }
+      renderCurrentView();
+      toast("Anomalie mise a jour");
+    }
+
+    function exportAuditCsv() {
+      const header = ["date", "actorId", "action", "payload"];
+      const rows = (state.auditLog || []).map(log => header.map(key => `"${String(key === "payload" ? JSON.stringify(log.payload || {}) : log[key] || "").replaceAll('"', '""')}"`).join(","));
+      downloadText(`audit-${new Date().toISOString().slice(0, 10)}.csv`, [header.join(","), ...rows].join("\n"), "text/csv");
+    }
+
+    function exportProjectsCsv() {
+      const header = ["id", "name", "client", "zone", "assignedTeam", "startDate", "endDate", "poleCount", "progress", "status", "requestStatus"];
+      const rows = state.projects.map(project => header.map(key => {
+        const value = key === "progress" ? `${projectProgress(project)}%` : project[key];
+        return `"${String(value ?? "").replaceAll('"', '""')}"`;
+      }).join(","));
+      downloadText(`projets-${new Date().toISOString().slice(0, 10)}.csv`, [header.join(","), ...rows].join("\n"), "text/csv");
+    }
+
+    function exportInterventionsCsv() {
+      const header = ["id", "poleId", "projectId", "agent", "date", "lat", "lng", "soil", "depth", "validation", "anomalyStatus", "anomalyReason", "notes"];
+      const rows = state.interventions.map(item => header.map(key => `"${String(item[key] ?? "").replaceAll('"', '""')}"`).join(","));
+      downloadText(`fiches-pose-${new Date().toISOString().slice(0, 10)}.csv`, [header.join(","), ...rows].join("\n"), "text/csv");
     }
 
     async function photoUrlToDataUrl(url) {
@@ -4004,6 +4307,8 @@
         state.projects = payload.projects;
         state.poles = payload.poles;
         state.interventions = payload.interventions;
+        state.stockMovements = payload.stockMovements || state.stockMovements || [];
+        state.auditLog = payload.auditLog || state.auditLog || [];
         state.offlineQueue = [];
         saveState();
         renderCurrentView();
@@ -4036,6 +4341,13 @@
       });
       $("#newInterventionBtn").addEventListener("click", () => openDrawer());
       $("#scanQrBtn").addEventListener("click", openQrScanDrawer);
+      $("#globalSearchBtn").addEventListener("click", globalSearch);
+      $("#globalSearch").addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          globalSearch();
+        }
+      });
       $("#syncBtn").addEventListener("click", syncQueue);
       $("#logoutBtn").addEventListener("click", logout);
       $("#topLogoutBtn").addEventListener("click", logout);
@@ -4157,6 +4469,11 @@
     window.printEntryQrLabel = printEntryQrLabel;
     window.openQrScanDrawer = openQrScanDrawer;
     window.verifyQrPole = verifyQrPole;
+    window.updateAnomaly = updateAnomaly;
+    window.exportAuditCsv = exportAuditCsv;
+    window.exportProjectsCsv = exportProjectsCsv;
+    window.exportInterventionsCsv = exportInterventionsCsv;
+    window.globalSearch = globalSearch;
 
     boot();
   </script>

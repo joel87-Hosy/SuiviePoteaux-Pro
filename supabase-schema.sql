@@ -77,6 +77,8 @@ create table if not exists public.interventions (
   client_signature text,
   validated_by text references public.app_users(id) on update cascade,
   validated_at timestamptz,
+  anomaly_reason text,
+  anomaly_status text,
   draft boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -132,6 +134,8 @@ alter table public.projects add column if not exists closure_requested_by text;
 alter table public.projects add column if not exists closure_requested_at timestamptz;
 alter table public.projects add column if not exists closed_by text;
 alter table public.projects add column if not exists closed_at timestamptz;
+alter table public.interventions add column if not exists anomaly_reason text;
+alter table public.interventions add column if not exists anomaly_status text;
 
 create index if not exists idx_poles_status on public.poles(status);
 create index if not exists idx_poles_depot on public.poles(depot);
