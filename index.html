@@ -659,6 +659,34 @@
       overflow: hidden;
     }
 
+    .pole-tooltip {
+      color: var(--text);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .pole-tooltip .leaflet-tooltip-content {
+      margin: 0;
+    }
+
+    .map-pole-details {
+      min-width: 220px;
+      line-height: 1.45;
+    }
+
+    .map-pole-details strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--primary);
+      font-size: 13px;
+    }
+
+    .map-pole-details span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
     .report-list {
       display: grid;
       gap: 10px;
@@ -2087,13 +2115,36 @@
       `;
     }
 
+    function hasPoleCoordinates(pole) {
+      return Number.isFinite(Number(pole.lat)) && Number.isFinite(Number(pole.lng));
+    }
+
+    function mapPoleDetails(pole) {
+      const intervention = state.interventions
+        .filter(item => item.poleId === pole.id)
+        .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+      const project = intervention ? state.projects.find(item => item.id === intervention.projectId) : null;
+      return `
+        <div class="map-pole-details">
+          <strong>${escapeHtml(pole.id)}</strong>
+          <span>Type: ${escapeHtml(pole.type)} - ${escapeHtml(pole.height)} m</span>
+          <span>Effort: ${escapeHtml(pole.effort || "N/A")}</span>
+          <span>Depot: ${escapeHtml(pole.depot || "N/A")}</span>
+          <span>Statut: ${escapeHtml(pole.status || "N/A")}</span>
+          <span>GPS: ${escapeHtml(pole.lat)}, ${escapeHtml(pole.lng)}</span>
+          ${intervention ? `<span>Derniere fiche: ${escapeHtml(intervention.id)} - ${formatDate(intervention.date)}</span>` : ""}
+          ${project ? `<span>Chantier: ${escapeHtml(project.name)}</span>` : ""}
+        </div>
+      `;
+    }
+
     function renderMap() {
       if (!$("#map")) {
         $("#mapView").innerHTML = `
           <div class="card">
             <div class="section-head">
               <h3>Carte interactive GPS</h3>
-              <span class="badge info">${state.poles.filter(p => p.lat && p.lng).length} positions</span>
+              <span class="badge info">${state.poles.filter(hasPoleCoordinates).length} positions</span>
             </div>
             <div class="section-body"><div id="map"></div></div>
           </div>
@@ -2113,19 +2164,23 @@
       map.eachLayer(layer => {
         if (layer instanceof L.Marker || layer instanceof L.CircleMarker) map.removeLayer(layer);
       });
-      const located = state.poles.filter(p => p.lat && p.lng);
+      const located = state.poles.filter(hasPoleCoordinates);
       located.forEach(p => {
         const color = p.status === "Valide" ? "#127a43" : p.status === "Anomalie" ? "#b42318" : "#d89f2b";
-        L.circleMarker([p.lat, p.lng], {
+        const details = mapPoleDetails(p);
+        L.circleMarker([Number(p.lat), Number(p.lng)], {
           radius: 9,
           color,
           weight: 3,
           fillColor: color,
           fillOpacity: .75
-        }).addTo(map).bindPopup(`<strong>${p.id}</strong><br>${p.type} - ${p.height} m<br>${p.status}`);
+        })
+          .addTo(map)
+          .bindTooltip(details, { sticky: true, direction: "top", opacity: .96, className: "pole-tooltip" })
+          .bindPopup(details);
       });
       if (located.length) {
-        map.fitBounds(located.map(p => [p.lat, p.lng]), { padding: [28, 28], maxZoom: 14 });
+        map.fitBounds(located.map(p => [Number(p.lat), Number(p.lng)]), { padding: [28, 28], maxZoom: 14 });
       }
       setTimeout(() => map.invalidateSize(), 120);
     }
