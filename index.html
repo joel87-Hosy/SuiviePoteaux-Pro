@@ -931,7 +931,7 @@
         bottom: 10px;
         z-index: 40;
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
         gap: 6px;
         padding: 8px;
         background: color-mix(in srgb, var(--panel) 94%, transparent);
@@ -1120,6 +1120,8 @@
       </header>
 
       <section id="dashboardView" class="view"></section>
+      <section id="projectsView" class="view hidden"></section>
+      <section id="projectClosureView" class="view hidden"></section>
       <section id="stockView" class="view hidden"></section>
       <section id="fieldView" class="view hidden"></section>
       <section id="mapView" class="view hidden"></section>
@@ -1307,11 +1309,13 @@
       "Marquage constructeur",
       "Levage et aplomb",
       "Massif beton / calage",
-      "Armement / tete de poteau"
+      "Apres implantation"
     ];
 
     const navItems = [
       ["dashboard", "Tableau de bord", "Pilotage global des stocks, poses, validations et preuves terrain.", "M4 13h6V4H4v9Zm10 7h6V4h-6v16ZM4 20h6v-4H4v4Z"],
+      ["projects", "Projets", "Creation, planning et evolution des projets d'implantation.", "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z"],
+      ["projectClosure", "Cloture projets", "Validation finale des projets termines par les equipes terrain.", "M9 12l2 2 4-4 M21 12a9 9 0 1 1-9-9"],
       ["stock", "Depot & Stock", "Inventaire filtrable, requisitions et bons de sortie terrain.", "M21 8a2 2 0 0 0-1-1.73L13 2.27a2 2 0 0 0-2 0L4 6.27A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z M3.3 7 12 12l8.7-5 M12 22V12"],
       ["field", "Operations terrain", "Interface mobile offline-first pour les equipes de pose.", "M12 2 19 21 12 17 5 21 12 2Z M12 8v5"],
       ["map", "Carte GPS", "Pins OpenStreetMap colores selon les statuts de pose.", "M9 18 3 21V6l6-3 6 3 6-3v15l-6 3-6-3Z M9 3v15 M15 6v15"],
@@ -1322,17 +1326,17 @@
     const roleUi = {
       super_admin: {
         home: "dashboard",
-        views: ["dashboard", "stock", "field", "map", "reports", "admin"],
+        views: ["dashboard", "projects", "projectClosure", "stock", "field", "map", "reports", "admin"],
         permissions: ["read", "write_stock", "write_intervention", "validate", "admin"]
       },
       magasinier: {
         home: "dashboard",
-        views: ["dashboard", "stock"],
+        views: ["dashboard", "projects", "stock"],
         permissions: ["read", "write_stock"]
       },
       terrain: {
         home: "dashboard",
-        views: ["dashboard", "field", "map", "reports"],
+        views: ["dashboard", "projects", "field", "map", "reports"],
         permissions: ["read", "write_intervention"]
       },
       controleur: {
@@ -1346,9 +1350,9 @@
       theme: "light",
       activeView: "dashboard",
       projects: [
-        { id: "CH-MOOV-A1", name: "MOOV - Axe Yopougon PK12", client: "MOOV", zone: "Abidjan Nord", poleCount: 2, assignedTeam: "Equipe Terrain A", status: "Pris en main", requestStatus: "Validee", requirements: [{ type: "METALLIQUE", height: 9, quantity: 2 }], assignedPoleIds: ["POT-2026-M4-018", "POT-2026-M4-019"] },
-        { id: "CH-CIE-B4", name: "CIE - Extension reseau B4", client: "CIE", zone: "Bouake Est", poleCount: 1, assignedTeam: "Equipe Terrain A", status: "En implantation", requestStatus: "Validee", requirements: [{ type: "BETON", height: 12, quantity: 1 }], assignedPoleIds: ["POT-2026-B10-021"] },
-        { id: "CH-ORG-T2", name: "Orange - Fibre rurale T2", client: "Orange", zone: "Daloa Sud", poleCount: 0, assignedTeam: "", status: "Planifie", requestStatus: "Brouillon", requirements: [], assignedPoleIds: [] }
+        { id: "CH-MOOV-A1", name: "MOOV - Axe Yopougon PK12", client: "MOOV CI", zone: "Abidjan Nord", startDate: "2026-08-20", endDate: "2026-09-05", poleCount: 2, assignedTeam: "Equipe Terrain A", status: "Pris en main", requestStatus: "Validee", requirements: [{ type: "METALLIQUE", height: 9, quantity: 2 }], assignedPoleIds: ["POT-2026-M4-018", "POT-2026-M4-019"] },
+        { id: "CH-CIE-B4", name: "CIE - Extension reseau B4", client: "CIE", zone: "Bouake Est", startDate: "2026-08-22", endDate: "2026-08-30", poleCount: 1, assignedTeam: "Equipe Terrain A", status: "En implantation", requestStatus: "Validee", requirements: [{ type: "BETON", height: 12, quantity: 1 }], assignedPoleIds: ["POT-2026-B10-021"] },
+        { id: "CH-ORG-T2", name: "Orange - Fibre rurale T2", client: "Orange CI", zone: "Daloa Sud", poleCount: 0, assignedTeam: "", status: "Planifie", requestStatus: "Brouillon", requirements: [], assignedPoleIds: [] }
       ],
       users: [],
       terrainUsers: [],
@@ -1648,9 +1652,9 @@
     }
 
     function statusClass(status) {
-      if (status === "Valide") return "ok";
+      if (status === "Valide" || status === "Cloture") return "ok";
       if (status === "Anomalie") return "danger";
-      if (status.includes("attente") || status === "En Transit") return "warn";
+      if (status.includes("attente") || status === "En Transit" || status === "Cloture demandee") return "warn";
       return "info";
     }
 
@@ -1692,6 +1696,8 @@
 
     function renderCurrentView() {
       renderDashboard();
+      renderProjects();
+      renderProjectClosure();
       renderStock();
       renderField();
       renderReports();
@@ -1961,6 +1967,237 @@
       return escapeAttr(value).replaceAll("'", "&#039;");
     }
 
+    function projectTotal(project) {
+      return Number(project.poleCount || (project.requirements || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0));
+    }
+
+    function projectDone(project) {
+      const ids = new Set(state.interventions.filter(item => item.projectId === project.id && !item.draft).map(item => item.poleId));
+      return ids.size;
+    }
+
+    function projectProgress(project) {
+      const total = projectTotal(project);
+      return total ? Math.min(100, Math.round(projectDone(project) / total * 100)) : 0;
+    }
+
+    function projectInterventions(project) {
+      return state.interventions.filter(item => item.projectId === project.id && !item.draft);
+    }
+
+    function projectValidationStats(project) {
+      const interventions = projectInterventions(project);
+      const valid = interventions.filter(item => item.validation === "Valide").length;
+      const anomalies = interventions.filter(item => item.validation === "Anomalie").length;
+      const pending = Math.max(0, interventions.length - valid - anomalies);
+      return { interventions, valid, anomalies, pending };
+    }
+
+    function canRequestProjectClosure(project) {
+      return apiUser?.role === "terrain" &&
+        project.assignedTeam === currentTerrainTeam() &&
+        projectProgress(project) >= 100 &&
+        !["Cloture demandee", "Cloture"].includes(project.status);
+    }
+
+    function canValidateProjectClosure(project) {
+      const stats = projectValidationStats(project);
+      return project.status === "Cloture demandee" &&
+        projectProgress(project) >= 100 &&
+        stats.interventions.length >= projectTotal(project) &&
+        stats.anomalies === 0 &&
+        stats.pending === 0;
+    }
+
+    function projectTiming(project) {
+      if (!project.endDate) return { label: "Sans planning", badge: "info" };
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const end = new Date(`${project.endDate}T00:00:00`);
+      const days = Math.ceil((end - today) / 86400000);
+      if (projectProgress(project) >= 100) return { label: "Termine", badge: "ok" };
+      if (days < 0) return { label: `Retard ${Math.abs(days)} j`, badge: "danger" };
+      if (days <= 3) return { label: `Urgent ${days} j`, badge: "warn" };
+      return { label: `${days} j restants`, badge: "info" };
+    }
+
+    function projectRow(project) {
+      const progress = projectProgress(project);
+      const timing = projectTiming(project);
+      return `
+        <tr>
+          <td><strong>${escapeHtml(project.name)}</strong><br><span class="muted">${escapeHtml(project.client || "Client non renseigne")}</span></td>
+          <td>${escapeHtml(project.zone || "N/A")}</td>
+          <td>${projectTotal(project)}</td>
+          <td>
+            <div style="display:grid;gap:6px;min-width:140px">
+              <div class="progress" style="--value:${progress}%"><span></span></div>
+              <strong>${progress}%</strong>
+            </div>
+          </td>
+          <td><span class="badge ${timing.badge}">${timing.label}</span></td>
+          <td><span class="badge ${statusClass(project.status || "")}">${escapeHtml(project.status || "Planifie")}</span></td>
+          <td>
+            <div class="toolbar" style="justify-content:flex-start">
+              <button class="btn" type="button" onclick="viewProject('${project.id}')">Voir</button>
+              ${canRequestProjectClosure(project) ? `<button class="btn primary" type="button" onclick="requestProjectClosure('${project.id}')">Cloturer</button>` : ""}
+              ${can("admin") ? `<button class="btn" type="button" onclick="editProject('${project.id}')">Modifier</button><button class="btn" type="button" onclick="deleteProject('${project.id}')">Supprimer</button>` : ""}
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function renderProjects() {
+      const node = $("#projectsView");
+      if (!node) return;
+      const teams = terrainUsersForAssignment();
+      const visibleProjects = apiUser?.role === "terrain"
+        ? terrainProjects()
+        : state.projects;
+      node.innerHTML = `
+        ${can("admin") ? `
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-head">
+              <h3 id="projectFormTitle">Nouveau projet</h3>
+              <button class="btn" type="button" onclick="resetProjectForm()">Nouveau</button>
+            </div>
+            <div class="section-body">
+              <form id="projectForm" class="grid">
+                <input id="projectEditId" type="hidden">
+                <div class="form-grid">
+                  <div class="field"><label for="projectName">Nom du projet</label><input id="projectName" required></div>
+                  <div class="field">
+                    <label for="projectClient">Operateur</label>
+                    <select id="projectClient" required>
+                      <option value="">Selectionner</option>
+                      <option value="MOOV CI">MOOV CI</option>
+                      <option value="Orange CI">Orange CI</option>
+                      <option value="MTN CI">MTN CI</option>
+                      <option value="CIE">CIE</option>
+                    </select>
+                  </div>
+                  <div class="field"><label for="projectZone">Zone d'intervention</label><input id="projectZone" required></div>
+                  <div class="field"><label for="projectTeam">Equipe terrain</label><select id="projectTeam" required>${teams.map(user => `<option value="${escapeAttr(user.team)}">${escapeHtml(user.team)}</option>`).join("")}</select></div>
+                  <div class="field"><label for="projectStart">Date de debut</label><input id="projectStart" type="date" required></div>
+                  <div class="field"><label for="projectEnd">Date de fin</label><input id="projectEnd" type="date" required></div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Type</th><th>Hauteur</th><th>Nombre</th></tr></thead>
+                    <tbody>
+                      ${[0, 1, 2, 3].map(index => `
+                        <tr data-project-need="${index}">
+                          <td><select data-project-field="type"><option value="">--</option><option value="BETON">BETON</option><option value="METALLIQUE">METALLIQUE</option></select></td>
+                          <td><input data-project-field="height" type="number" min="3" max="30" step="0.5" placeholder="12"></td>
+                          <td><input data-project-field="quantity" type="number" min="1" step="1" placeholder="10"></td>
+                        </tr>
+                      `).join("")}
+                    </tbody>
+                  </table>
+                </div>
+                <div class="toolbar" style="justify-content:flex-start">
+                  <button class="btn primary" type="submit">${icon("M12 5v14M5 12h14")} Enregistrer le projet</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ` : ""}
+        <div class="card">
+          <div class="section-head">
+            <h3>Projets en cours</h3>
+            <span class="badge info">${visibleProjects.length} projet(s)</span>
+          </div>
+          <div class="section-body">
+            ${apiUser?.role === "terrain" ? projectTimingAlerts(visibleProjects) : ""}
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Nom</th><th>Zone</th><th>Poteaux</th><th>Evolution</th><th>Timing</th><th>Statut</th><th>Actions</th></tr></thead>
+                <tbody>${visibleProjects.map(projectRow).join("") || `<tr><td colspan="7"><div class="empty">Aucun projet en cours.</div></td></tr>`}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+      $("#projectForm")?.addEventListener("submit", saveProject);
+    }
+
+    function renderProjectClosure() {
+      const node = $("#projectClosureView");
+      if (!node) return;
+      if (!can("admin")) {
+        node.innerHTML = `<div class="empty">Votre role ne permet pas de valider la cloture des projets.</div>`;
+        return;
+      }
+      const closing = state.projects.filter(project => project.status === "Cloture demandee");
+      const closed = state.projects.filter(project => project.status === "Cloture");
+      node.innerHTML = `
+        <div class="card">
+          <div class="section-head">
+            <h3>Projets a cloturer</h3>
+            <span class="badge ${closing.length ? "warn" : "info"}">${closing.length} demande(s)</span>
+          </div>
+          <div class="section-body">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Projet</th><th>Zone</th><th>Equipe</th><th>Evolution</th><th>Controle</th><th>Actions</th></tr></thead>
+                <tbody>
+                  ${closing.map(project => {
+                    const stats = projectValidationStats(project);
+                    const ready = canValidateProjectClosure(project);
+                    return `
+                      <tr>
+                        <td><strong>${escapeHtml(project.name)}</strong><br><span class="muted">${escapeHtml(project.client || "Client non renseigne")}</span></td>
+                        <td>${escapeHtml(project.zone || "N/A")}</td>
+                        <td>${escapeHtml(project.assignedTeam || "N/A")}</td>
+                        <td><strong>${projectProgress(project)}%</strong><br><span class="muted">${projectDone(project)}/${projectTotal(project)} poteaux</span></td>
+                        <td>
+                          <span class="badge ok">${stats.valid} valide(s)</span>
+                          <span class="badge warn">${stats.pending} attente</span>
+                          <span class="badge danger">${stats.anomalies} anomalie(s)</span>
+                        </td>
+                        <td>
+                          <div class="toolbar" style="justify-content:flex-start">
+                            <button class="btn" type="button" onclick="viewProject('${project.id}')">Voir</button>
+                            <button class="btn primary" type="button" ${ready ? "" : "disabled"} onclick="validateProjectClosure('${project.id}')">Valider cloture</button>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join("") || `<tr><td colspan="6"><div class="empty">Aucun projet en attente de cloture.</div></td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Projets clotures</h3>
+            <span class="badge ok">${closed.length} cloture(s)</span>
+          </div>
+          <div class="section-body report-list">
+            ${closed.map(project => `
+              <div class="report-row">
+                <div>
+                  <strong>${escapeHtml(project.name)}</strong>
+                  <p class="muted" style="margin:4px 0 0">${escapeHtml(project.zone || "N/A")} - cloture le ${project.closedAt ? formatDate(project.closedAt) : "N/A"}</p>
+                </div>
+                <div class="toolbar">
+                  <button class="btn" type="button" onclick="generateProjectPdf('${project.id}')">${icon("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3")} Rapport PDF</button>
+                  <button class="btn" type="button" onclick="generateProjectPdf('${project.id}', 'print')">Imprimer</button>
+                </div>
+              </div>
+            `).join("") || `<div class="empty">Aucun projet cloture pour le moment.</div>`}
+          </div>
+        </div>
+      `;
+    }
+
+    function projectTimingAlerts(projects) {
+      const alerts = projects.filter(project => ["warn", "danger"].includes(projectTiming(project).badge));
+      return alerts.map(project => `<div class="empty" style="margin-bottom:10px;border-color:var(--warn)">${escapeHtml(project.name)} - ${projectTiming(project).label}</div>`).join("");
+    }
+
     function terrainTeamOf(user) {
       return String(user?.team || user?.name || "").trim();
     }
@@ -2005,6 +2242,14 @@
         const available = state.poles.filter(p => p.status === "En Stock" && p.type === item.type && Number(p.height) === Number(item.height)).length;
         return `${item.type} ${item.height}m: ${available}/${item.quantity}`;
       }).join(" | ") || "Aucun besoin";
+    }
+
+    function normalizeOperator(value) {
+      return {
+        MOOV: "MOOV CI",
+        Orange: "Orange CI",
+        MTN: "MTN CI"
+      }[value] || value || "";
     }
 
     function terrainProjects() {
@@ -2192,6 +2437,7 @@
               <span class="badge info">${projects.length} projet(s)</span>
             </div>
             <div class="section-body">
+              ${projectTimingAlerts(projects)}
               <div class="table-wrap">
                 <table>
                   <thead><tr><th>Projet</th><th>Zone</th><th>Besoin</th><th>Statut</th><th>Action</th></tr></thead>
@@ -2202,7 +2448,13 @@
                         <td>${escapeHtml(project.zone || "")}</td>
                         <td>${escapeHtml(projectRequirementsSummary(project))}</td>
                         <td><span class="badge ${statusClass(project.status || "")}">${escapeHtml(project.status || "Envoye terrain")}</span></td>
-                        <td>${project.status === "Envoye terrain" ? `<button class="btn primary" type="button" onclick="takeOverProject('${project.id}')">Prendre en main</button>` : `<span class="muted">Pris</span>`}</td>
+                        <td>
+                          ${project.status === "Envoye terrain" ? `<button class="btn primary" type="button" onclick="takeOverProject('${project.id}')">Prendre en main</button>` : ""}
+                          ${canRequestProjectClosure(project) ? `<button class="btn primary" type="button" onclick="requestProjectClosure('${project.id}')">Demander cloture</button>` : ""}
+                          ${project.status === "Cloture demandee" ? `<span class="muted">Envoye admin</span>` : ""}
+                          ${project.status === "Cloture" ? `<span class="badge ok">Cloture</span>` : ""}
+                          ${!["Envoye terrain", "Cloture demandee", "Cloture"].includes(project.status) && !canRequestProjectClosure(project) ? `<span class="muted">En cours</span>` : ""}
+                        </td>
                       </tr>
                     `).join("") || `<tr><td colspan="5"><div class="empty">Aucun projet envoye a votre equipe.</div></td></tr>`}
                   </tbody>
@@ -2264,6 +2516,46 @@
       } catch (error) {
         toast(error.message || "Prise en main impossible");
       }
+    }
+
+    async function requestProjectClosure(projectId) {
+      const project = state.projects.find(item => item.id === projectId);
+      if (!project) return;
+      if (!canRequestProjectClosure(project)) return toast("Le projet doit etre termine a 100% avant cloture");
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch(`/projects/${encodeURIComponent(projectId)}/request-close`, { method: "POST" });
+        state.projects = payload.projects;
+      } catch (error) {
+        project.status = "Cloture demandee";
+        project.closureRequestedBy = apiUser?.id || "offline";
+        project.closureRequestedAt = new Date().toISOString();
+        toast(`Demande conservee localement: ${error.message}`);
+      }
+      saveState();
+      renderCurrentView();
+      toast("Demande de cloture envoyee a l'admin");
+    }
+
+    async function validateProjectClosure(projectId) {
+      if (!can("admin")) return toast("Permission administrateur requise");
+      const project = state.projects.find(item => item.id === projectId);
+      if (!project) return;
+      if (!canValidateProjectClosure(project)) return toast("Toutes les fiches doivent etre validees avant cloture");
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch(`/projects/${encodeURIComponent(projectId)}/validate-close`, { method: "POST" });
+        state.projects = payload.projects;
+      } catch (error) {
+        project.status = "Cloture";
+        project.closedBy = apiUser?.id || "offline";
+        project.closedAt = new Date().toISOString();
+        toast(`Cloture locale appliquee: ${error.message}`);
+      }
+      saveState();
+      renderCurrentView();
+      await generateProjectPdf(projectId);
+      toast("Projet cloture et rapport PDF genere");
     }
 
     function hasPoleCoordinates(pole) {
@@ -2346,7 +2638,30 @@
 
     function renderReports() {
       const canCreateReport = can("write_intervention");
+      const closedProjects = state.projects.filter(project => project.status === "Cloture");
       $("#reportsView").innerHTML = `
+        ${can("admin") ? `
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-head">
+              <h3>Rapports projets clotures</h3>
+              <span class="badge ok">${closedProjects.length} projet(s)</span>
+            </div>
+            <div class="section-body report-list">
+              ${closedProjects.map(project => `
+                <div class="report-row">
+                  <div>
+                    <strong>${escapeHtml(project.name)}</strong>
+                    <p class="muted" style="margin:4px 0 0">${escapeHtml(project.zone || "N/A")} - ${projectDone(project)}/${projectTotal(project)} poteaux</p>
+                  </div>
+                  <div class="toolbar">
+                    <button class="btn primary" type="button" onclick="generateProjectPdf('${project.id}')">${icon("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3")} Telecharger</button>
+                    <button class="btn" type="button" onclick="generateProjectPdf('${project.id}', 'print')">Imprimer</button>
+                  </div>
+                </div>
+              `).join("") || `<div class="empty">Aucun projet cloture disponible.</div>`}
+            </div>
+          </div>
+        ` : ""}
         <div class="card">
           <div class="section-head">
             <h3>Fiches de pose et exports</h3>
@@ -2383,7 +2698,6 @@
         return;
       }
       const users = state.users || [];
-      const teams = terrainUsersForAssignment();
       const pending = users.filter(user => user.approved === false).length;
       const active = users.filter(user => user.active !== false).length;
       node.innerHTML = `
@@ -2392,82 +2706,6 @@
           ${metric("Actifs", active, "Peuvent se connecter")}
           ${metric("En attente", pending, "A approuver")}
           ${metric("Roles", new Set(users.map(user => user.role)).size, "Profils utilises")}
-        </div>
-        <div class="card" style="margin-top:16px">
-          <div class="section-head">
-            <h3>Projet d'implantation</h3>
-            <span class="badge info">${state.projects.length} projet(s)</span>
-          </div>
-          <div class="section-body">
-            <form id="projectForm" class="grid">
-              <div class="form-grid">
-                <div class="field">
-                  <label for="projectName">Nom du projet</label>
-                  <input id="projectName" placeholder="Extension reseau PK12" required>
-                </div>
-                <div class="field">
-                  <label for="projectClient">Client</label>
-                  <input id="projectClient" placeholder="MOOV, CIE, Orange...">
-                </div>
-                <div class="field">
-                  <label for="projectZone">Zone d'intervention</label>
-                  <input id="projectZone" placeholder="Yopougon PK12" required>
-                </div>
-                <div class="field">
-                  <label for="projectTeam">Equipe terrain</label>
-                  <select id="projectTeam" required>
-                    ${teams.map(user => `<option value="${escapeAttr(user.team)}">${escapeHtml(user.team)}</option>`).join("")}
-                  </select>
-                </div>
-              </div>
-              <div class="table-wrap">
-                <table>
-                  <thead><tr><th>Type</th><th>Hauteur</th><th>Nombre</th></tr></thead>
-                  <tbody>
-                    ${[0, 1, 2].map(index => `
-                      <tr data-project-need="${index}">
-                        <td>
-                          <select data-project-field="type">
-                            <option value="">--</option>
-                            <option value="BETON">BETON</option>
-                            <option value="METALLIQUE">METALLIQUE</option>
-                          </select>
-                        </td>
-                        <td><input data-project-field="height" type="number" min="3" max="30" step="0.5" placeholder="12"></td>
-                        <td><input data-project-field="quantity" type="number" min="1" step="1" placeholder="10"></td>
-                      </tr>
-                    `).join("")}
-                  </tbody>
-                </table>
-              </div>
-              <div class="toolbar" style="justify-content:flex-start">
-                <button class="btn primary" type="submit">${icon("M12 5v14M5 12h14")} Creer et demander les poteaux</button>
-              </div>
-            </form>
-          </div>
-        </div>
-        <div class="card" style="margin-top:16px">
-          <div class="section-head">
-            <h3>Suivi des projets</h3>
-          </div>
-          <div class="section-body">
-            <div class="table-wrap">
-              <table>
-                <thead><tr><th>Projet</th><th>Equipe</th><th>Besoin</th><th>Demande</th><th>Statut</th></tr></thead>
-                <tbody>
-                  ${state.projects.map(project => `
-                    <tr>
-                      <td><strong>${escapeHtml(project.name)}</strong><br><span class="muted">${escapeHtml(project.zone || "")}</span></td>
-                      <td>${escapeHtml(project.assignedTeam || "Non assignee")}</td>
-                      <td>${escapeHtml(projectRequirementsSummary(project))}</td>
-                      <td><span class="badge ${statusClass(project.requestStatus || "")}">${escapeHtml(project.requestStatus || "Brouillon")}</span></td>
-                      <td><span class="badge ${statusClass(project.status || "")}">${escapeHtml(project.status || "Planifie")}</span></td>
-                    </tr>
-                  `).join("") || `<tr><td colspan="5"><div class="empty">Aucun projet.</div></td></tr>`}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
         <div class="card" style="margin-top:16px">
           <div class="section-head">
@@ -2524,7 +2762,6 @@
           </div>
         </div>
       `;
-      $("#projectForm")?.addEventListener("submit", createProjectFromAdmin);
     }
 
     function projectFormRequirements() {
@@ -2535,13 +2772,105 @@
       })).filter(item => item.type && Number.isFinite(item.height) && item.quantity > 0);
     }
 
+    function resetProjectForm() {
+      $("#projectForm")?.reset();
+      if ($("#projectEditId")) $("#projectEditId").value = "";
+      if ($("#projectFormTitle")) $("#projectFormTitle").textContent = "Nouveau projet";
+    }
+
+    function fillProjectForm(project) {
+      setView("projects");
+      $("#projectEditId").value = project.id;
+      $("#projectFormTitle").textContent = `Modifier ${project.id}`;
+      $("#projectName").value = project.name || "";
+      $("#projectClient").value = normalizeOperator(project.client);
+      $("#projectZone").value = project.zone || "";
+      $("#projectTeam").value = project.assignedTeam || "";
+      $("#projectStart").value = project.startDate || "";
+      $("#projectEnd").value = project.endDate || "";
+      $all("[data-project-need]").forEach((row, index) => {
+        const need = (project.requirements || [])[index] || {};
+        $('[data-project-field="type"]', row).value = need.type || "";
+        $('[data-project-field="height"]', row).value = need.height || "";
+        $('[data-project-field="quantity"]', row).value = need.quantity || "";
+      });
+    }
+
+    function viewProject(projectId) {
+      const project = state.projects.find(item => item.id === projectId);
+      if (!project) return;
+      const poles = state.poles.filter(pole => pole.projectId === project.id || (project.assignedPoleIds || []).includes(pole.id));
+      const details = [
+        project.name,
+        `Zone: ${project.zone || "N/A"}`,
+        `Planning: ${project.startDate || "N/A"} au ${project.endDate || "N/A"}`,
+        `Equipe: ${project.assignedTeam || "N/A"}`,
+        `Besoin: ${projectRequirementsSummary(project)}`,
+        `Evolution: ${projectProgress(project)}% (${projectDone(project)}/${projectTotal(project)})`,
+        `Poteaux: ${poles.map(pole => pole.id).join(", ") || "Aucun poteau affecte"}`
+      ].join("\n");
+      alert(details);
+    }
+
+    function editProject(projectId) {
+      const project = state.projects.find(item => item.id === projectId);
+      if (project) fillProjectForm(project);
+    }
+
+    async function deleteProject(projectId) {
+      const project = state.projects.find(item => item.id === projectId);
+      if (!project || !confirm(`Supprimer le projet ${project.name} ?`)) return;
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch(`/projects/${encodeURIComponent(projectId)}`, { method: "DELETE" });
+        state.projects = payload.projects;
+        state.poles = payload.poles;
+        saveState();
+        renderCurrentView();
+        toast("Projet supprime");
+      } catch (error) {
+        toast(error.message || "Suppression impossible");
+      }
+    }
+
+    async function saveProject(event) {
+      event.preventDefault();
+      const requirements = projectFormRequirements();
+      if (!requirements.length) return toast("Ajoutez au moins un type de poteau demande");
+      const projectId = $("#projectEditId").value;
+      const project = {
+        name: $("#projectName").value.trim(),
+        client: $("#projectClient").value,
+        zone: $("#projectZone").value.trim(),
+        assignedTeam: $("#projectTeam").value,
+        startDate: $("#projectStart").value,
+        endDate: $("#projectEnd").value,
+        requirements
+      };
+      if (new Date(project.endDate) < new Date(project.startDate)) return toast("La date de fin doit etre apres le debut");
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch(projectId ? `/projects/${encodeURIComponent(projectId)}` : "/projects", {
+          method: projectId ? "PATCH" : "POST",
+          body: JSON.stringify(project)
+        });
+        state.projects = payload.projects;
+        if (payload.poles) state.poles = payload.poles;
+        saveState();
+        renderCurrentView();
+        toast(projectId ? "Projet modifie" : "Projet cree et demande envoyee");
+      } catch (error) {
+        toast(error.message || "Enregistrement projet impossible");
+      }
+    }
+
     async function createProjectFromAdmin(event) {
       event.preventDefault();
       const requirements = projectFormRequirements();
       if (!requirements.length) return toast("Ajoutez au moins un type de poteau demande");
       const project = {
         name: $("#projectName").value.trim(),
-        client: $("#projectClient").value.trim(),
+        client: $("#projectClient").value,
         zone: $("#projectZone").value.trim(),
         assignedTeam: $("#projectTeam").value,
         requirements
@@ -2824,6 +3153,7 @@
         });
         state.interventions.push(payload.intervention);
         state.poles = payload.poles;
+        if (payload.projects) state.projects = payload.projects;
         saveState();
         closeDrawer();
         renderCurrentView();
@@ -2840,7 +3170,7 @@
           pole.depot = "Implante terrain";
         }
         const project = state.projects.find(item => item.id === intervention.projectId);
-        if (project && !isDraft) project.status = "En implantation";
+        if (project && !isDraft && !["Cloture demandee", "Cloture"].includes(project.status)) project.status = "En implantation";
         state.offlineQueue.push(operation);
         saveState();
         closeDrawer();
@@ -2852,6 +3182,228 @@
           submitButton.disabled = false;
           submitButton.innerHTML = originalSubmit;
         }
+      }
+    }
+
+    async function generateProjectPdf(projectId, mode = "download") {
+      const project = state.projects.find(item => item.id === projectId);
+      if (!project) return;
+      if (!window.jspdf?.jsPDF) {
+        toast("jsPDF indisponible hors connexion au premier chargement");
+        return;
+      }
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: "mm", format: "a4" });
+      const stats = projectValidationStats(project);
+      const poles = state.poles.filter(pole => pole.projectId === project.id || (project.assignedPoleIds || []).includes(pole.id));
+      const interventions = projectInterventions(project);
+      const dark = [30, 58, 95];
+      const blue = [59, 130, 246];
+      const light = [248, 250, 252];
+      const text = [31, 41, 55];
+      const createdBy = state.users.find(user => user.id === project.createdBy)?.name || "N/A";
+      const takenBy = state.users.find(user => user.id === project.takenBy)?.name || project.assignedTeam || "N/A";
+      const closedBy = state.users.find(user => user.id === project.closedBy)?.name || apiUser?.name || "N/A";
+      const dateOnly = value => value ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "short" }).format(new Date(value)) : "N/A";
+      const poleIntervention = pole => interventions.find(item => item.poleId === pole.id) || {};
+      const poleType = pole => `${pole.type === "BETON" ? "Beton" : pole.type === "METALLIQUE" ? "Metallique" : pole.type || "N/A"} - ${pole.height || "N/A"}${pole.effort ? `/${pole.effort}` : "m"}`;
+      const footer = () => {
+        doc.setTextColor(107, 114, 128);
+        doc.setFontSize(8);
+        doc.text("Document genere automatiquement - ITC_Insuite Suivi Poteau", 14, 287);
+        doc.text(String(doc.internal.getNumberOfPages()), 196, 287, { align: "right" });
+      };
+      const framedPage = () => {
+        doc.setDrawColor(229, 231, 235);
+        doc.setLineWidth(0.4);
+        doc.roundedRect(12, 12, 186, 268, 3, 3);
+        footer();
+      };
+
+      doc.setFillColor(...dark);
+      doc.rect(0, 0, 210, 297, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      doc.text("REALISATION DES TRAVAUX - RAPPORT PHOTO IMPLANTATION", 18, 34);
+      doc.setFontSize(24);
+      doc.text("RAPPORT PHOTO IMPLANTATIONS", 18, 60, { maxWidth: 174 });
+      doc.setFontSize(19);
+      doc.text("DE POTEAUX BETONS / METALLIQUES", 18, 74, { maxWidth: 174 });
+      doc.setFontSize(9);
+      doc.text(`ITC_Insuite Suivi Poteau - Genere le ${formatDate(new Date().toISOString())}`, 18, 88);
+
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(18, 108, 174, 64, 4, 4, "F");
+      doc.setTextColor(...dark);
+      doc.setFontSize(15);
+      doc.text(`${project.id} - ${project.name || "Projet non renseigne"}`, 26, 124, { maxWidth: 158 });
+      doc.setFontSize(11);
+      doc.text(`${project.zone || "Zone non renseignee"} //// ${project.client || "Client non renseigne"}`, 26, 139, { maxWidth: 158 });
+      doc.setTextColor(75, 85, 99);
+      doc.setFontSize(9);
+      doc.text(`${projectDone(project)}/${projectTotal(project)} poteaux implantes - Progression : ${projectProgress(project)}%`, 26, 154);
+
+      const cards = [
+        ["1", "PROJET"],
+        [String(projectTotal(project)), "POTEAUX"],
+        [`${projectDone(project)}/${projectTotal(project)}`, "IMPLANTES"],
+        [`${projectProgress(project)}%`, "AVANCEMENT GLOBAL"]
+      ];
+      cards.forEach((card, index) => {
+        const x = 18 + index * 43.5;
+        doc.setFillColor(...light);
+        doc.roundedRect(x, 188, 38, 32, 3, 3, "F");
+        doc.setTextColor(...dark);
+        doc.setFontSize(17);
+        doc.text(card[0], x + 19, 201, { align: "center" });
+        doc.setFontSize(7);
+        doc.text(card[1], x + 19, 213, { align: "center" });
+      });
+
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(18, 236, 174, 34, 4, 4, "F");
+      doc.setTextColor(...dark);
+      doc.setFontSize(8);
+      doc.text("DEMANDEUR", 26, 248);
+      doc.text("STATUT", 72, 248);
+      doc.text("PRESTATAIRE", 112, 248);
+      doc.text("OPERATEUR", 158, 248);
+      doc.setFontSize(10);
+      doc.text(createdBy, 26, 260, { maxWidth: 38 });
+      doc.text(project.status || "N/A", 72, 260, { maxWidth: 34 });
+      doc.text("ALL SERVICE", 112, 260, { maxWidth: 38 });
+      doc.text(project.client || "N/A", 158, 260, { maxWidth: 28 });
+
+      doc.addPage();
+      framedPage();
+      doc.setFillColor(...dark);
+      doc.roundedRect(12, 12, 186, 49, 3, 3, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(15);
+      doc.text(`${project.id} - ${project.name || "Projet"}`, 20, 28, { maxWidth: 168 });
+      doc.setFontSize(9);
+      doc.text(`${projectDone(project)}/${projectTotal(project)} poteaux implantes - Progression : ${projectProgress(project)}%`, 20, 47);
+      doc.setTextColor(...dark);
+      doc.setFontSize(13);
+      doc.text("Liste des poteaux", 20, 76);
+      doc.autoTable({
+        startY: 84,
+        head: [["N.", "TYPE", "STATUT", "EQUIPE", "COORDONNEES GPS", "DATE D'IMPLANTATION"]],
+        body: poles.map((pole, index) => {
+          const intervention = poleIntervention(pole);
+          return [
+            String(index + 1),
+            poleType(pole),
+            intervention.validation === "Valide" || pole.status === "Valide" ? "IMPLANTE" : (intervention.validation || pole.status || "N/A"),
+            intervention.agent || project.assignedTeam || "N/A",
+            intervention.lat && intervention.lng ? `${intervention.lat}, ${intervention.lng}` : "N/A",
+            dateOnly(intervention.date)
+          ];
+        }),
+        theme: "grid",
+        margin: { left: 20, right: 20, top: 18, bottom: 18 },
+        styles: { fontSize: 7.4, cellPadding: 2.1, textColor: text },
+        alternateRowStyles: { fillColor: light },
+        headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 7.5 },
+        didDrawPage: data => {
+          if (data.pageNumber > 1) framedPage();
+        }
+      });
+
+      for (let index = 0; index < poles.length; index++) {
+        const pole = poles[index];
+        const intervention = poleIntervention(pole);
+        if (index % 3 === 0) {
+          doc.addPage();
+          framedPage();
+          if (index === 0) {
+            doc.setTextColor(...dark);
+            doc.setFontSize(13);
+            doc.text("Detail et photos", 20, 28);
+          }
+        }
+        const y = 42 + (index % 3) * 78;
+        doc.setDrawColor(229, 231, 235);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(20, y, 170, 66, 3, 3, "FD");
+        doc.setTextColor(...dark);
+        doc.setFontSize(11);
+        doc.text(pole.id, 28, y + 10);
+        doc.setTextColor(255, 255, 255);
+        doc.setFillColor(...blue);
+        doc.roundedRect(150, y + 5, 30, 8, 3, 3, "F");
+        doc.setFontSize(7);
+        doc.text((intervention.validation === "Valide" || pole.status === "Valide") ? "IMPLANTE" : (intervention.validation || pole.status || "N/A"), 165, y + 10.5, { align: "center" });
+        doc.setTextColor(75, 85, 99);
+        doc.setFontSize(8);
+        doc.text(`${poleType(pole)} - GPS : ${intervention.lat && intervention.lng ? `${intervention.lat}, ${intervention.lng}` : "N/A"} - Implante le ${dateOnly(intervention.date)}`, 28, y + 20, { maxWidth: 120 });
+
+        const photo = (intervention.photos || []).find(item => /apres/i.test(item.step || "")) || (intervention.photos || [])[0];
+        doc.setDrawColor(203, 213, 225);
+        doc.rect(28, y + 27, 64, 34);
+        const photoData = photo?.data || await photoUrlToDataUrl(photo?.url);
+        if (photoData) {
+          try {
+            doc.addImage(photoData, "JPEG", 29, y + 28, 62, 32, undefined, "FAST");
+          } catch {
+            try { doc.addImage(photoData, "PNG", 29, y + 28, 62, 32, undefined, "FAST"); } catch {}
+          }
+        } else {
+          doc.setTextColor(148, 163, 184);
+          doc.setFontSize(8);
+          doc.text("Photo non jointe", 60, y + 45, { align: "center" });
+        }
+        doc.setFillColor(0, 0, 0);
+        doc.rect(28, y + 54, 64, 7, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(7);
+        doc.text(photo?.step || "Apres", 60, y + 59, { align: "center" });
+        doc.setTextColor(...text);
+        doc.setFontSize(8);
+        doc.text(`Fiche: ${intervention.id || "N/A"}`, 100, y + 34);
+        doc.text(`Equipe: ${intervention.agent || project.assignedTeam || "N/A"}`, 100, y + 43, { maxWidth: 78 });
+        doc.text(`Notes: ${intervention.notes || "RAS"}`, 100, y + 52, { maxWidth: 78 });
+      }
+
+      doc.addPage();
+      framedPage();
+      doc.setTextColor(...dark);
+      doc.setFontSize(13);
+      doc.text("Validation finale", 20, 30);
+      doc.autoTable({
+        startY: 40,
+        head: [["Controle", "Valeur"]],
+        body: [
+          ["Fiches conformes", String(stats.valid)],
+          ["Fiches en attente", String(stats.pending)],
+          ["Anomalies", String(stats.anomalies)],
+          ["Besoin initial", projectRequirementsSummary(project)],
+          ["Planning", `${project.startDate || "N/A"} au ${project.endDate || "N/A"}`]
+        ],
+        theme: "grid",
+        margin: { left: 20, right: 20 },
+        styles: { fontSize: 8.5, cellPadding: 2.5 },
+        headStyles: { fillColor: dark }
+      });
+      doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 10,
+        head: [["Role", "Nom / Signature", "Date"]],
+        body: [
+          ["Equipe terrain", takenBy, project.closureRequestedAt ? formatDate(project.closureRequestedAt) : "N/A"],
+          ["Administrateur", closedBy, project.closedAt ? formatDate(project.closedAt) : formatDate(new Date().toISOString())]
+        ],
+        theme: "grid",
+        margin: { left: 20, right: 20 },
+        styles: { fontSize: 9, minCellHeight: 16 },
+        headStyles: { fillColor: dark }
+      });
+
+      const filename = `${project.id}-rapport-cloture.pdf`;
+      if (mode === "print") {
+        doc.autoPrint();
+        window.open(doc.output("bloburl"), "_blank");
+      } else {
+        doc.save(filename);
       }
     }
 
@@ -3145,6 +3697,13 @@
     window.assignPole = assignPole;
     window.validateProjectStock = validateProjectStock;
     window.takeOverProject = takeOverProject;
+    window.requestProjectClosure = requestProjectClosure;
+    window.validateProjectClosure = validateProjectClosure;
+    window.viewProject = viewProject;
+    window.editProject = editProject;
+    window.deleteProject = deleteProject;
+    window.resetProjectForm = resetProjectForm;
+    window.generateProjectPdf = generateProjectPdf;
     window.generatePdf = generatePdf;
     window.validateReport = validateReport;
     window.refreshUsers = refreshUsers;

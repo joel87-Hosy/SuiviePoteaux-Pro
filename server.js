@@ -36,6 +36,7 @@ const rolePermissions = {
   terrain: ["read", "write_intervention"],
   controleur: ["read", "validate"]
 };
+const OPERATORS = ["MOOV CI", "Orange CI", "MTN CI", "CIE"];
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -66,16 +67,16 @@ function seedDb() {
       user("USR-004", "controle@itc.local", "demo123", "Controle Qualite", "controleur", { depot: "Controle", team: "" })
     ],
     projects: [
-      { id: "CH-MOOV-A1", name: "MOOV - Axe Yopougon PK12", client: "MOOV", zone: "Abidjan Nord", poleCount: 2, assignedTeam: "Equipe Terrain A", status: "Pris en main", requestStatus: "Validee", requirements: [{ type: "METALLIQUE", height: 9, quantity: 2 }], assignedPoleIds: ["POT-2026-M4-018", "POT-2026-M4-019"] },
-      { id: "CH-CIE-B4", name: "CIE - Extension reseau B4", client: "CIE", zone: "Bouake Est", poleCount: 1, assignedTeam: "Equipe Terrain A", status: "En implantation", requestStatus: "Validee", requirements: [{ type: "BETON", height: 12, quantity: 1 }], assignedPoleIds: ["POT-2026-B10-021"] },
-      { id: "CH-ORG-T2", name: "Orange - Fibre rurale T2", client: "Orange", zone: "Daloa Sud", poleCount: 0, assignedTeam: "", status: "Planifie", requestStatus: "Brouillon", requirements: [], assignedPoleIds: [] }
+      { id: "CH-MOOV-A1", name: "MOOV - Axe Yopougon PK12", client: "MOOV CI", zone: "Abidjan Nord", startDate: "2026-08-20", endDate: "2026-09-05", poleCount: 2, assignedTeam: "Equipe Terrain A", status: "Pris en main", requestStatus: "Validee", requirements: [{ type: "METALLIQUE", height: 9, quantity: 2 }], assignedPoleIds: ["POT-2026-M4-018", "POT-2026-M4-019"] },
+      { id: "CH-CIE-B4", name: "CIE - Extension reseau B4", client: "CIE", zone: "Bouake Est", startDate: "2026-08-22", endDate: "2026-08-30", poleCount: 1, assignedTeam: "Equipe Terrain A", status: "En implantation", requestStatus: "Validee", requirements: [{ type: "BETON", height: 12, quantity: 1 }], assignedPoleIds: ["POT-2026-B10-021"] },
+      { id: "CH-ORG-T2", name: "Orange - Fibre rurale T2", client: "Orange CI", zone: "Daloa Sud", poleCount: 0, assignedTeam: "", status: "Planifie", requestStatus: "Brouillon", requirements: [], assignedPoleIds: [] }
     ],
     poles: [
       { id: "POT-2026-B9-001", type: "BETON", height: 12, effort: "400 daN", weight: 860, maker: "SIPREL / Lot B9", status: "En Stock", depot: "Depot Central" },
       { id: "POT-2026-B9-002", type: "BETON", height: 11, effort: "300 daN", weight: 790, maker: "SIPREL / Lot B9", status: "En Transit", depot: "Terrain - Equipe Terrain A", assignedTeam: "Equipe Terrain A" },
-      { id: "POT-2026-M4-018", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 235, maker: "METALCI / Lot M4", status: "Pose - En attente validation", depot: "Chantier MOOV", lat: 5.39231, lng: -4.03221 },
-      { id: "POT-2026-M4-019", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 236, maker: "METALCI / Lot M4", status: "Valide", depot: "Chantier MOOV", lat: 5.38875, lng: -4.02684 },
-      { id: "POT-2026-B10-021", type: "BETON", height: 12, effort: "500 daN", weight: 920, maker: "SIPREL / Lot B10", status: "Anomalie", depot: "Chantier CIE", lat: 7.69592, lng: -5.03012 },
+      { id: "POT-2026-M4-018", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 235, maker: "METALCI / Lot M4", status: "Pose - En attente validation", depot: "Chantier MOOV", assignedTeam: "Equipe Terrain A", projectId: "CH-MOOV-A1", lat: 5.39231, lng: -4.03221 },
+      { id: "POT-2026-M4-019", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 236, maker: "METALCI / Lot M4", status: "Valide", depot: "Chantier MOOV", assignedTeam: "Equipe Terrain A", projectId: "CH-MOOV-A1", lat: 5.38875, lng: -4.02684 },
+      { id: "POT-2026-B10-021", type: "BETON", height: 12, effort: "500 daN", weight: 920, maker: "SIPREL / Lot B10", status: "Anomalie", depot: "Chantier CIE", assignedTeam: "Equipe Terrain A", projectId: "CH-CIE-B4", lat: 7.69592, lng: -5.03012 },
       { id: "POT-2026-M5-030", type: "METALLIQUE", height: 10, effort: "300 daN", weight: 280, maker: "METALCI / Lot M5", status: "En Stock", depot: "Depot Bouake" }
     ],
     interventions: [
@@ -159,9 +160,15 @@ async function readSupabaseDb() {
       ...row,
       poleCount: Number(row.pole_count || row.poleCount || 0),
       assignedTeam: row.assigned_team || row.assignedTeam || "",
+      startDate: row.start_date || row.startDate || "",
+      endDate: row.end_date || row.endDate || "",
       requestStatus: row.request_status || row.requestStatus || "",
       requirements: row.requirements || [],
-      assignedPoleIds: row.assigned_pole_ids || row.assignedPoleIds || []
+      assignedPoleIds: row.assigned_pole_ids || row.assignedPoleIds || [],
+      closureRequestedBy: row.closure_requested_by || row.closureRequestedBy || "",
+      closureRequestedAt: row.closure_requested_at || row.closureRequestedAt || "",
+      closedBy: row.closed_by || row.closedBy || "",
+      closedAt: row.closed_at || row.closedAt || ""
     })),
     poles: poles.map(row => ({
       id: row.id,
@@ -242,6 +249,8 @@ async function writeSupabaseDb(db) {
       name: row.name,
       client: row.client || "",
       zone: row.zone || "",
+      start_date: row.startDate || null,
+      end_date: row.endDate || null,
       pole_count: row.poleCount || 0,
       assigned_team: row.assignedTeam || null,
       status: row.status || "Planifie",
@@ -253,7 +262,11 @@ async function writeSupabaseDb(db) {
       validated_by: row.validatedBy || null,
       validated_at: row.validatedAt || null,
       taken_by: row.takenBy || null,
-      taken_at: row.takenAt || null
+      taken_at: row.takenAt || null,
+      closure_requested_by: row.closureRequestedBy || null,
+      closure_requested_at: row.closureRequestedAt || null,
+      closed_by: row.closedBy || null,
+      closed_at: row.closedAt || null
     }))),
     upsertTable("poles", db.poles.map(row => ({
       id: row.id,
@@ -415,6 +428,26 @@ function normalizeRequirements(requirements = []) {
       quantity: Number(item.quantity || 0)
     }))
     .filter(item => ["BETON", "METALLIQUE"].includes(item.type) && Number.isFinite(item.height) && item.quantity > 0);
+}
+
+function projectTotal(project) {
+  return Number(project.poleCount || normalizeRequirements(project.requirements).reduce((sum, item) => sum + item.quantity, 0));
+}
+
+function projectInterventions(db, projectId) {
+  return db.interventions.filter(item => item.projectId === projectId && !item.draft);
+}
+
+function projectDone(db, projectId) {
+  return new Set(projectInterventions(db, projectId).map(item => item.poleId)).size;
+}
+
+function projectValidationStats(db, projectId) {
+  const interventions = projectInterventions(db, projectId);
+  const valid = interventions.filter(item => item.validation === "Valide").length;
+  const anomalies = interventions.filter(item => item.validation === "Anomalie").length;
+  const pending = Math.max(0, interventions.length - valid - anomalies);
+  return { interventions, valid, anomalies, pending };
 }
 
 function audit(db, actor, action, payload = {}) {
@@ -670,13 +703,17 @@ async function handleApi(req, res, url) {
     if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
     const body = await readBody(req);
     const requirements = normalizeRequirements(body.requirements);
-    if (!body.name || !body.zone || !body.assignedTeam || !requirements.length) return sendError(res, 400, "Projet, zone, equipe et poteaux demandes requis");
+    if (!body.name || !body.client || !body.zone || !body.assignedTeam || !body.startDate || !body.endDate || !requirements.length) return sendError(res, 400, "Projet, operateur, planning, zone, equipe et poteaux demandes requis");
+    if (!OPERATORS.includes(body.client)) return sendError(res, 400, "Operateur invalide");
+    if (new Date(body.endDate) < new Date(body.startDate)) return sendError(res, 400, "La date de fin doit etre apres le debut");
     const poleCount = requirements.reduce((sum, item) => sum + item.quantity, 0);
     const project = {
       id: body.id || nextProjectId(db),
       name: String(body.name).trim(),
-      client: body.client || "",
+      client: body.client,
       zone: String(body.zone).trim(),
+      startDate: body.startDate,
+      endDate: body.endDate,
       poleCount,
       assignedTeam: String(body.assignedTeam).trim(),
       status: "Demande stock",
@@ -693,7 +730,56 @@ async function handleApi(req, res, url) {
     return sendJson(res, 201, { project, projects: db.projects });
   }
 
-  const projectActionMatch = /^\/api\/projects\/([^/]+)\/(validate-stock|takeover)$/.exec(url.pathname);
+  const projectMatch = /^\/api\/projects\/([^/]+)$/.exec(url.pathname);
+  if (projectMatch && req.method === "PATCH") {
+    if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
+    const project = db.projects.find(item => item.id === decodeURIComponent(projectMatch[1]));
+    if (!project) return sendError(res, 404, "Projet introuvable");
+    const body = await readBody(req);
+    const requirements = normalizeRequirements(body.requirements);
+    if (!body.name || !body.client || !body.zone || !body.assignedTeam || !body.startDate || !body.endDate || !requirements.length) return sendError(res, 400, "Projet, operateur, planning, zone, equipe et poteaux demandes requis");
+    if (!OPERATORS.includes(body.client)) return sendError(res, 400, "Operateur invalide");
+    if (new Date(body.endDate) < new Date(body.startDate)) return sendError(res, 400, "La date de fin doit etre apres le debut");
+    Object.assign(project, {
+      name: String(body.name).trim(),
+      client: body.client,
+      zone: String(body.zone).trim(),
+      startDate: body.startDate,
+      endDate: body.endDate,
+      assignedTeam: String(body.assignedTeam).trim(),
+      poleCount: requirements.reduce((sum, item) => sum + item.quantity, 0),
+      requirements
+    });
+    if (!project.assignedPoleIds?.length) {
+      project.status = "Demande stock";
+      project.requestStatus = "En attente gestionnaire";
+    }
+    audit(db, actor, "project.update", { projectId: project.id });
+    await writeDb(db);
+    return sendJson(res, 200, { project, projects: db.projects, poles: db.poles });
+  }
+
+  if (projectMatch && req.method === "DELETE") {
+    if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
+    const projectId = decodeURIComponent(projectMatch[1]);
+    const hasReports = db.interventions.some(item => item.projectId === projectId);
+    if (hasReports) return sendError(res, 409, "Impossible de supprimer un projet avec des fiches de pose");
+    db.projects = db.projects.filter(item => item.id !== projectId);
+    db.poles.forEach(pole => {
+      if (pole.projectId === projectId) {
+        pole.projectId = "";
+        pole.assignedTeam = "";
+        pole.status = "En Stock";
+        pole.depot = "Depot Central";
+      }
+    });
+    audit(db, actor, "project.delete", { projectId });
+    await writeDb(db);
+    if (SUPABASE_ENABLED) await supabase.from("projects").delete().eq("id", projectId);
+    return sendJson(res, 200, { projects: db.projects, poles: db.poles });
+  }
+
+  const projectActionMatch = /^\/api\/projects\/([^/]+)\/(validate-stock|takeover|request-close|validate-close)$/.exec(url.pathname);
   if (req.method === "POST" && projectActionMatch) {
     const project = db.projects.find(item => item.id === decodeURIComponent(projectActionMatch[1]));
     if (!project) return sendError(res, 404, "Projet introuvable");
@@ -736,6 +822,31 @@ async function handleApi(req, res, url) {
       project.takenBy = actor.id;
       project.takenAt = new Date().toISOString();
       audit(db, actor, "project.takeover", { projectId: project.id });
+      await writeDb(db);
+      return sendJson(res, 200, { project, projects: db.projects });
+    }
+    if (action === "request-close") {
+      if (actor.role === "terrain" && project.assignedTeam !== terrainTeamOf(actor)) return sendError(res, 403, "Projet non attribue a votre equipe");
+      if (!hasPermission(actor, "write_intervention")) return sendError(res, 403, "Permission terrain requise");
+      if (projectDone(db, project.id) < projectTotal(project)) return sendError(res, 409, "Tous les poteaux du projet doivent etre implantes avant cloture");
+      if (project.status === "Cloture") return sendError(res, 409, "Projet deja cloture");
+      project.status = "Cloture demandee";
+      project.closureRequestedBy = actor.id;
+      project.closureRequestedAt = new Date().toISOString();
+      audit(db, actor, "project.close_request", { projectId: project.id });
+      await writeDb(db);
+      return sendJson(res, 200, { project, projects: db.projects });
+    }
+    if (action === "validate-close") {
+      if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
+      if (project.status !== "Cloture demandee") return sendError(res, 409, "Le projet n'est pas en attente de cloture");
+      const stats = projectValidationStats(db, project.id);
+      if (projectDone(db, project.id) < projectTotal(project)) return sendError(res, 409, "Projet incomplet");
+      if (stats.pending > 0 || stats.anomalies > 0) return sendError(res, 409, "Toutes les fiches doivent etre validees sans anomalie");
+      project.status = "Cloture";
+      project.closedBy = actor.id;
+      project.closedAt = new Date().toISOString();
+      audit(db, actor, "project.close_validate", { projectId: project.id });
       await writeDb(db);
       return sendJson(res, 200, { project, projects: db.projects });
     }
@@ -782,10 +893,10 @@ async function handleApi(req, res, url) {
       pole.depot = "Implante terrain";
     }
     const project = db.projects.find(item => item.id === body.projectId);
-    if (project && !intervention.draft) project.status = "En implantation";
+    if (project && !intervention.draft && !["Cloture demandee", "Cloture"].includes(project.status)) project.status = "En implantation";
     audit(db, actor, "intervention.create", { reportId: id, poleId: body.poleId });
     await writeDb(db);
-    return sendJson(res, 201, { intervention, poles: db.poles });
+    return sendJson(res, 201, { intervention, poles: db.poles, projects: db.projects });
   }
 
   const validationMatch = /^\/api\/interventions\/([^/]+)\/validate$/.exec(url.pathname);

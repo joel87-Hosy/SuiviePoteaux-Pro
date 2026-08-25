@@ -22,6 +22,8 @@ create table if not exists public.projects (
   name text not null,
   client text,
   zone text,
+  start_date date,
+  end_date date,
   pole_count int not null default 0,
   assigned_team text,
   status text not null default 'Planifie',
@@ -33,6 +35,10 @@ create table if not exists public.projects (
   validated_at timestamptz,
   taken_by text,
   taken_at timestamptz,
+  closure_requested_by text,
+  closure_requested_at timestamptz,
+  closed_by text,
+  closed_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -109,6 +115,8 @@ create table if not exists public.audit_log (
 
 alter table public.poles add column if not exists assigned_team text;
 alter table public.poles add column if not exists project_id text;
+alter table public.projects add column if not exists start_date date;
+alter table public.projects add column if not exists end_date date;
 alter table public.projects add column if not exists pole_count int not null default 0;
 alter table public.projects add column if not exists assigned_team text;
 alter table public.projects add column if not exists status text not null default 'Planifie';
@@ -120,6 +128,10 @@ alter table public.projects add column if not exists validated_by text;
 alter table public.projects add column if not exists validated_at timestamptz;
 alter table public.projects add column if not exists taken_by text;
 alter table public.projects add column if not exists taken_at timestamptz;
+alter table public.projects add column if not exists closure_requested_by text;
+alter table public.projects add column if not exists closure_requested_at timestamptz;
+alter table public.projects add column if not exists closed_by text;
+alter table public.projects add column if not exists closed_at timestamptz;
 
 create index if not exists idx_poles_status on public.poles(status);
 create index if not exists idx_poles_depot on public.poles(depot);
@@ -157,11 +169,11 @@ values
   ('USR-004', 'controle@itc.local', 'pbkdf2$120000$7e8b36af6f9ff43f7b95c72c70bd9559$2516bae429b4f1a8413a83014c8d29c95d44fc9bda435e921817a5fab37ee3e9', 'Controle Qualite', 'controleur', true, true, 'Controle', null)
 on conflict (id) do nothing;
 
-insert into public.projects (id, name, client, zone, pole_count, assigned_team, status, request_status, requirements, assigned_pole_ids)
+insert into public.projects (id, name, client, zone, start_date, end_date, pole_count, assigned_team, status, request_status, requirements, assigned_pole_ids)
 values
-  ('CH-MOOV-A1', 'MOOV - Axe Yopougon PK12', 'MOOV', 'Abidjan Nord', 2, 'Equipe Terrain A', 'Pris en main', 'Validee', '[{"type":"METALLIQUE","height":9,"quantity":2}]', '["POT-2026-M4-018","POT-2026-M4-019"]'),
-  ('CH-CIE-B4', 'CIE - Extension reseau B4', 'CIE', 'Bouake Est', 1, 'Equipe Terrain A', 'En implantation', 'Validee', '[{"type":"BETON","height":12,"quantity":1}]', '["POT-2026-B10-021"]'),
-  ('CH-ORG-T2', 'Orange - Fibre rurale T2', 'Orange', 'Daloa Sud', 0, null, 'Planifie', 'Brouillon', '[]', '[]')
+  ('CH-MOOV-A1', 'MOOV - Axe Yopougon PK12', 'MOOV', 'Abidjan Nord', '2026-08-20', '2026-09-05', 2, 'Equipe Terrain A', 'Pris en main', 'Validee', '[{"type":"METALLIQUE","height":9,"quantity":2}]', '["POT-2026-M4-018","POT-2026-M4-019"]'),
+  ('CH-CIE-B4', 'CIE - Extension reseau B4', 'CIE', 'Bouake Est', '2026-08-22', '2026-08-30', 1, 'Equipe Terrain A', 'En implantation', 'Validee', '[{"type":"BETON","height":12,"quantity":1}]', '["POT-2026-B10-021"]'),
+  ('CH-ORG-T2', 'Orange - Fibre rurale T2', 'Orange', 'Daloa Sud', null, null, 0, null, 'Planifie', 'Brouillon', '[]', '[]')
 on conflict (id) do nothing;
 
 insert into public.poles (id, type, height, effort, weight, maker, status, depot, assigned_team, project_id, lat, lng)
