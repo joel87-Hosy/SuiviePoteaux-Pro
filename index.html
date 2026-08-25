@@ -1346,17 +1346,18 @@
       theme: "light",
       activeView: "dashboard",
       projects: [
-        { id: "CH-MOOV-A1", name: "MOOV - Axe Yopougon PK12", client: "MOOV", zone: "Abidjan Nord" },
-        { id: "CH-CIE-B4", name: "CIE - Extension reseau B4", client: "CIE", zone: "Bouake Est" },
-        { id: "CH-ORG-T2", name: "Orange - Fibre rurale T2", client: "Orange", zone: "Daloa Sud" }
+        { id: "CH-MOOV-A1", name: "MOOV - Axe Yopougon PK12", client: "MOOV", zone: "Abidjan Nord", poleCount: 2, assignedTeam: "Equipe Terrain A", status: "Pris en main", requestStatus: "Validee", requirements: [{ type: "METALLIQUE", height: 9, quantity: 2 }], assignedPoleIds: ["POT-2026-M4-018", "POT-2026-M4-019"] },
+        { id: "CH-CIE-B4", name: "CIE - Extension reseau B4", client: "CIE", zone: "Bouake Est", poleCount: 1, assignedTeam: "Equipe Terrain A", status: "En implantation", requestStatus: "Validee", requirements: [{ type: "BETON", height: 12, quantity: 1 }], assignedPoleIds: ["POT-2026-B10-021"] },
+        { id: "CH-ORG-T2", name: "Orange - Fibre rurale T2", client: "Orange", zone: "Daloa Sud", poleCount: 0, assignedTeam: "", status: "Planifie", requestStatus: "Brouillon", requirements: [], assignedPoleIds: [] }
       ],
       users: [],
+      terrainUsers: [],
       poles: [
         { id: "POT-2026-B9-001", type: "BETON", height: 12, effort: "400 daN", weight: 860, maker: "SIPREL / Lot B9", status: "En Stock", depot: "Depot Central" },
-        { id: "POT-2026-B9-002", type: "BETON", height: 11, effort: "300 daN", weight: 790, maker: "SIPREL / Lot B9", status: "En Transit", depot: "Camion EQ-A" },
-        { id: "POT-2026-M4-018", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 235, maker: "METALCI / Lot M4", status: "Pose - En attente validation", depot: "Chantier MOOV", lat: 5.39231, lng: -4.03221 },
-        { id: "POT-2026-M4-019", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 236, maker: "METALCI / Lot M4", status: "Valide", depot: "Chantier MOOV", lat: 5.38875, lng: -4.02684 },
-        { id: "POT-2026-B10-021", type: "BETON", height: 12, effort: "500 daN", weight: 920, maker: "SIPREL / Lot B10", status: "Anomalie", depot: "Chantier CIE", lat: 7.69592, lng: -5.03012 },
+        { id: "POT-2026-B9-002", type: "BETON", height: 11, effort: "300 daN", weight: 790, maker: "SIPREL / Lot B9", status: "En Transit", depot: "Camion EQ-A", assignedTeam: "Equipe Terrain A" },
+        { id: "POT-2026-M4-018", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 235, maker: "METALCI / Lot M4", status: "Pose - En attente validation", depot: "Chantier MOOV", assignedTeam: "Equipe Terrain A", projectId: "CH-MOOV-A1", lat: 5.39231, lng: -4.03221 },
+        { id: "POT-2026-M4-019", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 236, maker: "METALCI / Lot M4", status: "Valide", depot: "Chantier MOOV", assignedTeam: "Equipe Terrain A", projectId: "CH-MOOV-A1", lat: 5.38875, lng: -4.02684 },
+        { id: "POT-2026-B10-021", type: "BETON", height: 12, effort: "500 daN", weight: 920, maker: "SIPREL / Lot B10", status: "Anomalie", depot: "Chantier CIE", assignedTeam: "Equipe Terrain A", projectId: "CH-CIE-B4", lat: 7.69592, lng: -5.03012 },
         { id: "POT-2026-M5-030", type: "METALLIQUE", height: 10, effort: "300 daN", weight: 280, maker: "METALCI / Lot M5", status: "En Stock", depot: "Depot Bouake" }
       ],
       interventions: [
@@ -1593,6 +1594,7 @@
           poles: payload.poles,
           interventions: payload.interventions,
           users: payload.users || state.users || [],
+          terrainUsers: payload.terrainUsers || payload.users?.filter(user => user.role === "terrain") || state.terrainUsers || [],
           offlineQueue: state.offlineQueue || []
         };
         saveState();
@@ -1710,6 +1712,7 @@
       const anomaly = countStatus("Anomalie");
       const stock = countStatus("En Stock");
       const transit = countStatus("En Transit");
+      const fieldAssigned = terrainAssignablePoles();
       const myInterventions = apiUser?.role === "terrain"
         ? state.interventions.filter(it => it.agentId === apiUser.id || it.agent === apiUser.name)
         : state.interventions;
@@ -1763,7 +1766,7 @@
           metrics: [
             ["Mes fiches", myInterventions.length, "Interventions enregistrees"],
             ["Aujourd'hui", todayCount, "Saisies du jour"],
-            ["A poser", transit + stock, "Poteaux accessibles"],
+            ["A poser", fieldAssigned.length, "Poteaux attribues"],
             ["Photos", myInterventions.reduce((sum, it) => sum + (it.photos?.length || 0), 0), "Preuves capturees"]
           ],
           body: `
@@ -1958,9 +1961,91 @@
       return escapeAttr(value).replaceAll("'", "&#039;");
     }
 
+    function terrainTeamOf(user) {
+      return String(user?.team || user?.name || "").trim();
+    }
+
+    function terrainUsersForAssignment() {
+      const users = [...(state.terrainUsers || []), ...(state.users || [])]
+        .filter(user => user.role === "terrain");
+      const unique = new Map();
+      users.forEach(user => {
+        const team = terrainTeamOf(user);
+        if (team && !unique.has(team)) unique.set(team, { ...user, team });
+      });
+      if (!unique.size) unique.set("Equipe Terrain A", { id: "terrain-demo", name: "Equipe Terrain A", team: "Equipe Terrain A", role: "terrain" });
+      return [...unique.values()];
+    }
+
+    function currentTerrainTeam() {
+      return terrainTeamOf(apiUser) || "Equipe Terrain A";
+    }
+
+    function isPoleAssignedToCurrentTerrain(pole) {
+      if (apiUser?.role !== "terrain") return true;
+      return String(pole.assignedTeam || "").trim() === currentTerrainTeam();
+    }
+
+    function terrainAssignablePoles() {
+      return state.poles.filter(p => {
+        if (p.status !== "En Transit" || !isPoleAssignedToCurrentTerrain(p)) return false;
+        if (!p.projectId) return true;
+        const project = state.projects.find(item => item.id === p.projectId);
+        return project && ["Pris en main", "En implantation"].includes(project.status);
+      });
+    }
+
+    function projectRequirementsSummary(project) {
+      const requirements = project.requirements || [];
+      return requirements.map(item => `${item.quantity} x ${item.type} ${item.height}m`).join(", ") || "Aucun besoin";
+    }
+
+    function projectStockStatus(project) {
+      return (project.requirements || []).map(item => {
+        const available = state.poles.filter(p => p.status === "En Stock" && p.type === item.type && Number(p.height) === Number(item.height)).length;
+        return `${item.type} ${item.height}m: ${available}/${item.quantity}`;
+      }).join(" | ") || "Aucun besoin";
+    }
+
+    function terrainProjects() {
+      const team = currentTerrainTeam();
+      return state.projects.filter(project => project.assignedTeam === team && project.requestStatus === "Validee");
+    }
+
+    function renderProjectRequests() {
+      const pending = state.projects.filter(project => project.requestStatus === "En attente gestionnaire");
+      return `
+        <div class="card" style="margin-bottom:16px">
+          <div class="section-head">
+            <h3>Demandes projet a valider</h3>
+            <span class="badge ${pending.length ? "warn" : "info"}">${pending.length} demande(s)</span>
+          </div>
+          <div class="section-body">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Projet</th><th>Equipe</th><th>Besoin</th><th>Stock</th><th>Action</th></tr></thead>
+                <tbody>
+                  ${pending.map(project => `
+                    <tr>
+                      <td><strong>${escapeHtml(project.name)}</strong><br><span class="muted">${escapeHtml(project.zone || "")}</span></td>
+                      <td>${escapeHtml(project.assignedTeam || "Non assignee")}</td>
+                      <td>${escapeHtml(projectRequirementsSummary(project))}</td>
+                      <td>${escapeHtml(projectStockStatus(project))}</td>
+                      <td><button class="btn primary" type="button" onclick="validateProjectStock('${project.id}')">Valider stock</button></td>
+                    </tr>
+                  `).join("") || `<tr><td colspan="5"><div class="empty">Aucune demande projet en attente.</div></td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function renderStock() {
       const canWriteStock = can("write_stock");
       $("#stockView").innerHTML = `
+        ${canWriteStock ? renderProjectRequests() : ""}
         <div class="card">
           <div class="section-head">
             <h3>Inventaire depot et chantier</h3>
@@ -1988,7 +2073,22 @@
       drawStockRows();
     }
 
+    async function validateProjectStock(projectId) {
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch(`/projects/${encodeURIComponent(projectId)}/validate-stock`, { method: "POST" });
+        state.projects = payload.projects;
+        state.poles = payload.poles;
+        saveState();
+        renderCurrentView();
+        toast("Demande stock validee et envoyee au terrain");
+      } catch (error) {
+        toast(error.message || "Validation stock impossible");
+      }
+    }
+
     function drawStockRows() {
+      const teams = terrainUsersForAssignment();
       const query = ($("#stockSearch")?.value || "").toLowerCase();
       const type = $("#typeFilter")?.value || "";
       const status = $("#statusFilter")?.value || "";
@@ -2001,7 +2101,7 @@
           (!height || String(p.height) === height);
       });
       $("#stockTable").innerHTML = `
-        <thead><tr><th>Code</th><th>Type</th><th>Specifications</th><th>Depot</th><th>Statut</th><th>Action</th></tr></thead>
+        <thead><tr><th>Code</th><th>Type</th><th>Specifications</th><th>Depot</th><th>Statut</th><th>Attribution terrain</th><th>Action</th></tr></thead>
         <tbody>
           ${rows.map(p => `
             <tr>
@@ -2010,9 +2110,17 @@
               <td>${p.height} m - ${p.effort} - ${p.weight} kg</td>
               <td>${p.depot}</td>
               <td><span class="badge ${statusClass(p.status)}">${p.status}</span></td>
-              <td>${can("write_stock") ? `<button class="btn" type="button" onclick="assignPole('${p.id}')">Attribuer</button>` : `<span class="muted">Lecture</span>`}</td>
+              <td>${p.assignedTeam ? escapeHtml(p.assignedTeam) : `<span class="muted">Non attribue</span>`}</td>
+              <td>${can("write_stock") && !["Valide", "Anomalie", "Pose - En attente validation"].includes(p.status) ? `
+                <div class="toolbar" style="justify-content:flex-start">
+                  <select id="assignTeam-${escapeAttr(p.id)}" aria-label="Equipe terrain">
+                    ${teams.map(user => `<option value="${escapeAttr(user.team)}" ${p.assignedTeam === user.team ? "selected" : ""}>${escapeHtml(user.team)}</option>`).join("")}
+                  </select>
+                  <button class="btn" type="button" onclick="assignPole('${p.id}')">Attribuer</button>
+                </div>
+              ` : `<span class="muted">${can("write_stock") ? "Verrouille" : "Lecture"}</span>`}</td>
             </tr>
-          `).join("") || `<tr><td colspan="6"><div class="empty">Aucun poteau ne correspond aux filtres.</div></td></tr>`}
+          `).join("") || `<tr><td colspan="7"><div class="empty">Aucun poteau ne correspond aux filtres.</div></td></tr>`}
         </tbody>
       `;
     }
@@ -2020,15 +2128,17 @@
     async function assignPole(id) {
       const pole = state.poles.find(p => p.id === id);
       if (!pole) return;
+      const assignedTeam = document.getElementById(`assignTeam-${id}`)?.value || terrainUsersForAssignment()[0]?.team || "Equipe Terrain A";
       pole.status = "En Transit";
-      pole.depot = "Camion equipe terrain";
-      state.offlineQueue.push({ type: "stock-move", poleId: id, date: new Date().toISOString() });
+      pole.depot = `Terrain - ${assignedTeam}`;
+      pole.assignedTeam = assignedTeam;
+      state.offlineQueue.push({ type: "stock-move", poleId: id, assignedTeam, date: new Date().toISOString() });
       saveState();
       try {
         await ensureApiSession();
         await apiFetch(`/poles/${encodeURIComponent(id)}`, {
           method: "PATCH",
-          body: JSON.stringify({ status: pole.status, depot: pole.depot })
+          body: JSON.stringify({ status: pole.status, depot: pole.depot, assignedTeam })
         });
         state.offlineQueue = state.offlineQueue.filter(item => !(item.type === "stock-move" && item.poleId === id));
         saveState();
@@ -2036,16 +2146,18 @@
         console.info("Mouvement stock conserve offline:", error.message);
       }
       renderCurrentView();
-      toast(`${id} attribue au terrain`);
+      toast(`${id} attribue a ${assignedTeam}`);
     }
 
     async function createRequisition() {
       const available = state.poles.filter(p => p.status === "En Stock").slice(0, 3);
       if (!available.length) return toast("Aucun poteau disponible en stock");
-      const operation = { type: "requisition", poles: available.map(p => p.id), date: new Date().toISOString() };
+      const assignedTeam = terrainUsersForAssignment()[0]?.team || "Equipe Terrain A";
+      const operation = { type: "requisition", poles: available.map(p => p.id), assignedTeam, date: new Date().toISOString() };
       available.forEach(p => {
         p.status = "En Transit";
-        p.depot = "Bon sortie BS-" + new Date().getFullYear() + "-AUTO";
+        p.depot = `Terrain - ${assignedTeam}`;
+        p.assignedTeam = assignedTeam;
       });
       state.offlineQueue.push(operation);
       saveState();
@@ -2053,7 +2165,7 @@
         await ensureApiSession();
         const payload = await apiFetch("/requisitions", {
           method: "POST",
-          body: JSON.stringify({ poleIds: operation.poles, destination: available[0].depot })
+          body: JSON.stringify({ poleIds: operation.poles, destination: available[0].depot, assignedTeam })
         });
         state.poles = payload.poles;
         state.offlineQueue = state.offlineQueue.filter(item => item !== operation);
@@ -2062,7 +2174,7 @@
         console.info("Bon de sortie conserve offline:", error.message);
       }
       renderCurrentView();
-      toast(`${available.length} poteaux ajoutes au bon de sortie`);
+      toast(`${available.length} poteaux attribues a ${assignedTeam}`);
     }
 
     function renderField() {
@@ -2070,28 +2182,54 @@
         $("#fieldView").innerHTML = `<div class="empty">Votre role ne permet pas de saisir une fiche terrain.</div>`;
         return;
       }
-      const pending = state.poles.filter(p => p.status === "En Transit" || p.status === "En Stock");
+      const pending = terrainAssignablePoles();
+      const projects = terrainProjects();
       $("#fieldView").innerHTML = `
         <div class="grid content-grid">
           <div class="card">
             <div class="section-head">
-              <h3>Poteaux attribues</h3>
+              <h3>Projets terrain</h3>
+              <span class="badge info">${projects.length} projet(s)</span>
+            </div>
+            <div class="section-body">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Projet</th><th>Zone</th><th>Besoin</th><th>Statut</th><th>Action</th></tr></thead>
+                  <tbody>
+                    ${projects.map(project => `
+                      <tr>
+                        <td><strong>${escapeHtml(project.name)}</strong></td>
+                        <td>${escapeHtml(project.zone || "")}</td>
+                        <td>${escapeHtml(projectRequirementsSummary(project))}</td>
+                        <td><span class="badge ${statusClass(project.status || "")}">${escapeHtml(project.status || "Envoye terrain")}</span></td>
+                        <td>${project.status === "Envoye terrain" ? `<button class="btn primary" type="button" onclick="takeOverProject('${project.id}')">Prendre en main</button>` : `<span class="muted">Pris</span>`}</td>
+                      </tr>
+                    `).join("") || `<tr><td colspan="5"><div class="empty">Aucun projet envoye a votre equipe.</div></td></tr>`}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-head">
+              <h3>Poteaux disponibles</h3>
               <button class="btn primary" type="button" onclick="openDrawer()">${icon("M12 5v14M5 12h14")} Nouvelle pose</button>
             </div>
             <div class="section-body">
               <div class="table-wrap">
                 <table>
-                  <thead><tr><th>Code</th><th>Type</th><th>Depot</th><th>Statut</th><th></th></tr></thead>
+                  <thead><tr><th>Code</th><th>Type</th><th>Depot</th><th>Equipe</th><th>Statut</th><th></th></tr></thead>
                   <tbody>
                     ${pending.map(p => `
                       <tr>
                         <td><strong>${p.id}</strong></td>
                         <td>${p.type} - ${p.height} m</td>
                         <td>${p.depot}</td>
+                        <td>${escapeHtml(p.assignedTeam || "Non attribue")}</td>
                         <td><span class="badge ${statusClass(p.status)}">${p.status}</span></td>
                         <td><button class="btn" type="button" onclick="openDrawer('${p.id}')">Poser</button></td>
                       </tr>
-                    `).join("") || `<tr><td colspan="5"><div class="empty">Aucun poteau attribue.</div></td></tr>`}
+                    `).join("") || `<tr><td colspan="6"><div class="empty">Aucun poteau attribue a votre equipe.</div></td></tr>`}
                   </tbody>
                 </table>
               </div>
@@ -2113,6 +2251,19 @@
           </div>
         </div>
       `;
+    }
+
+    async function takeOverProject(projectId) {
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch(`/projects/${encodeURIComponent(projectId)}/takeover`, { method: "POST" });
+        state.projects = payload.projects;
+        saveState();
+        renderCurrentView();
+        toast("Projet pris en main");
+      } catch (error) {
+        toast(error.message || "Prise en main impossible");
+      }
     }
 
     function hasPoleCoordinates(pole) {
@@ -2137,6 +2288,7 @@
           <span>Type: ${escapeHtml(pole.type)} - ${escapeHtml(pole.height)} m</span>
           <span>Effort: ${escapeHtml(pole.effort || "N/A")}</span>
           <span>Depot: ${escapeHtml(pole.depot || "N/A")}</span>
+          <span>Equipe attribuee: ${escapeHtml(pole.assignedTeam || "N/A")}</span>
           <span>Statut: ${escapeHtml(pole.status || "N/A")}</span>
           <span>GPS: ${escapeHtml(pole.lat)}, ${escapeHtml(pole.lng)}</span>
           ${intervention ? `<span>Derniere fiche: ${escapeHtml(intervention.id)} - ${formatDate(intervention.date)}</span>` : ""}
@@ -2231,6 +2383,7 @@
         return;
       }
       const users = state.users || [];
+      const teams = terrainUsersForAssignment();
       const pending = users.filter(user => user.approved === false).length;
       const active = users.filter(user => user.active !== false).length;
       node.innerHTML = `
@@ -2239,6 +2392,82 @@
           ${metric("Actifs", active, "Peuvent se connecter")}
           ${metric("En attente", pending, "A approuver")}
           ${metric("Roles", new Set(users.map(user => user.role)).size, "Profils utilises")}
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Projet d'implantation</h3>
+            <span class="badge info">${state.projects.length} projet(s)</span>
+          </div>
+          <div class="section-body">
+            <form id="projectForm" class="grid">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="projectName">Nom du projet</label>
+                  <input id="projectName" placeholder="Extension reseau PK12" required>
+                </div>
+                <div class="field">
+                  <label for="projectClient">Client</label>
+                  <input id="projectClient" placeholder="MOOV, CIE, Orange...">
+                </div>
+                <div class="field">
+                  <label for="projectZone">Zone d'intervention</label>
+                  <input id="projectZone" placeholder="Yopougon PK12" required>
+                </div>
+                <div class="field">
+                  <label for="projectTeam">Equipe terrain</label>
+                  <select id="projectTeam" required>
+                    ${teams.map(user => `<option value="${escapeAttr(user.team)}">${escapeHtml(user.team)}</option>`).join("")}
+                  </select>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Type</th><th>Hauteur</th><th>Nombre</th></tr></thead>
+                  <tbody>
+                    ${[0, 1, 2].map(index => `
+                      <tr data-project-need="${index}">
+                        <td>
+                          <select data-project-field="type">
+                            <option value="">--</option>
+                            <option value="BETON">BETON</option>
+                            <option value="METALLIQUE">METALLIQUE</option>
+                          </select>
+                        </td>
+                        <td><input data-project-field="height" type="number" min="3" max="30" step="0.5" placeholder="12"></td>
+                        <td><input data-project-field="quantity" type="number" min="1" step="1" placeholder="10"></td>
+                      </tr>
+                    `).join("")}
+                  </tbody>
+                </table>
+              </div>
+              <div class="toolbar" style="justify-content:flex-start">
+                <button class="btn primary" type="submit">${icon("M12 5v14M5 12h14")} Creer et demander les poteaux</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Suivi des projets</h3>
+          </div>
+          <div class="section-body">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Projet</th><th>Equipe</th><th>Besoin</th><th>Demande</th><th>Statut</th></tr></thead>
+                <tbody>
+                  ${state.projects.map(project => `
+                    <tr>
+                      <td><strong>${escapeHtml(project.name)}</strong><br><span class="muted">${escapeHtml(project.zone || "")}</span></td>
+                      <td>${escapeHtml(project.assignedTeam || "Non assignee")}</td>
+                      <td>${escapeHtml(projectRequirementsSummary(project))}</td>
+                      <td><span class="badge ${statusClass(project.requestStatus || "")}">${escapeHtml(project.requestStatus || "Brouillon")}</span></td>
+                      <td><span class="badge ${statusClass(project.status || "")}">${escapeHtml(project.status || "Planifie")}</span></td>
+                    </tr>
+                  `).join("") || `<tr><td colspan="5"><div class="empty">Aucun projet.</div></td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
         <div class="card" style="margin-top:16px">
           <div class="section-head">
@@ -2295,6 +2524,41 @@
           </div>
         </div>
       `;
+      $("#projectForm")?.addEventListener("submit", createProjectFromAdmin);
+    }
+
+    function projectFormRequirements() {
+      return $all("[data-project-need]").map(row => ({
+        type: $('[data-project-field="type"]', row).value,
+        height: Number($('[data-project-field="height"]', row).value),
+        quantity: Number($('[data-project-field="quantity"]', row).value)
+      })).filter(item => item.type && Number.isFinite(item.height) && item.quantity > 0);
+    }
+
+    async function createProjectFromAdmin(event) {
+      event.preventDefault();
+      const requirements = projectFormRequirements();
+      if (!requirements.length) return toast("Ajoutez au moins un type de poteau demande");
+      const project = {
+        name: $("#projectName").value.trim(),
+        client: $("#projectClient").value.trim(),
+        zone: $("#projectZone").value.trim(),
+        assignedTeam: $("#projectTeam").value,
+        requirements
+      };
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch("/projects", {
+          method: "POST",
+          body: JSON.stringify(project)
+        });
+        state.projects = payload.projects;
+        saveState();
+        renderCurrentView();
+        toast("Projet cree et demande envoyee au gestionnaire");
+      } catch (error) {
+        toast(error.message || "Creation projet impossible");
+      }
     }
 
     async function refreshUsers() {
@@ -2343,8 +2607,8 @@
       const poleSelect = $("#poleId");
       const projectSelect = $("#project");
       if (!poleSelect || !projectSelect) return;
-      poleSelect.innerHTML = state.poles
-        .filter(p => p.status !== "Valide")
+      const poles = terrainAssignablePoles();
+      poleSelect.innerHTML = poles
         .map(p => `<option value="${p.id}">${p.id} - ${p.type} ${p.height}m</option>`)
         .join("");
       projectSelect.innerHTML = state.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join("");
@@ -2354,14 +2618,21 @@
       $("#interventionDrawer").classList.add("open");
       $("#interventionDrawer").setAttribute("aria-hidden", "false");
       $("#interventionForm").reset();
-      $("#agent").value = "Equipe Terrain A";
+      $("#agent").value = apiUser?.name || currentTerrainTeam();
       $("#depth").value = "1.20";
-      $("#teamSignature").value = "A. Konan";
+      $("#teamSignature").value = currentTerrainTeam();
       $("#clientSignature").value = "Controle Qualite";
       selectedPhotos = [];
       renderPhotoInputs();
       populateFormSelects();
+      if (!$("#poleId").options.length) {
+        closeDrawer();
+        toast("Aucun poteau attribue a votre equipe");
+        return;
+      }
       if (poleId) $("#poleId").value = poleId;
+      const pole = state.poles.find(item => item.id === $("#poleId").value);
+      if (pole?.projectId) $("#project").value = pole.projectId;
       fillFallbackGps();
     }
 
@@ -2568,6 +2839,8 @@
           pole.lng = intervention.lng;
           pole.depot = "Implante terrain";
         }
+        const project = state.projects.find(item => item.id === intervention.projectId);
+        if (project && !isDraft) project.status = "En implantation";
         state.offlineQueue.push(operation);
         saveState();
         closeDrawer();
@@ -2870,6 +3143,8 @@
     window.openDrawer = openDrawer;
     window.setView = setView;
     window.assignPole = assignPole;
+    window.validateProjectStock = validateProjectStock;
+    window.takeOverProject = takeOverProject;
     window.generatePdf = generatePdf;
     window.validateReport = validateReport;
     window.refreshUsers = refreshUsers;

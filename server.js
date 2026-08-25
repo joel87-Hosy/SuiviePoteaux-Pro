@@ -60,19 +60,19 @@ function ensureStorage() {
 function seedDb() {
   return {
     users: [
-      user("USR-001", "admin@itc.local", "demo123", "Aminata Kone", "super_admin"),
-      user("USR-002", "depot@itc.local", "demo123", "Magasin Central", "magasinier"),
-      user("USR-003", "terrain@itc.local", "demo123", "Equipe Terrain A", "terrain"),
-      user("USR-004", "controle@itc.local", "demo123", "Controle Qualite", "controleur")
+      user("USR-001", "admin@itc.local", "demo123", "Aminata Kone", "super_admin", { depot: "Direction", team: "" }),
+      user("USR-002", "depot@itc.local", "demo123", "Magasin Central", "magasinier", { depot: "Depot Central", team: "" }),
+      user("USR-003", "terrain@itc.local", "demo123", "Equipe Terrain A", "terrain", { depot: "Terrain", team: "Equipe Terrain A" }),
+      user("USR-004", "controle@itc.local", "demo123", "Controle Qualite", "controleur", { depot: "Controle", team: "" })
     ],
     projects: [
-      { id: "CH-MOOV-A1", name: "MOOV - Axe Yopougon PK12", client: "MOOV", zone: "Abidjan Nord" },
-      { id: "CH-CIE-B4", name: "CIE - Extension reseau B4", client: "CIE", zone: "Bouake Est" },
-      { id: "CH-ORG-T2", name: "Orange - Fibre rurale T2", client: "Orange", zone: "Daloa Sud" }
+      { id: "CH-MOOV-A1", name: "MOOV - Axe Yopougon PK12", client: "MOOV", zone: "Abidjan Nord", poleCount: 2, assignedTeam: "Equipe Terrain A", status: "Pris en main", requestStatus: "Validee", requirements: [{ type: "METALLIQUE", height: 9, quantity: 2 }], assignedPoleIds: ["POT-2026-M4-018", "POT-2026-M4-019"] },
+      { id: "CH-CIE-B4", name: "CIE - Extension reseau B4", client: "CIE", zone: "Bouake Est", poleCount: 1, assignedTeam: "Equipe Terrain A", status: "En implantation", requestStatus: "Validee", requirements: [{ type: "BETON", height: 12, quantity: 1 }], assignedPoleIds: ["POT-2026-B10-021"] },
+      { id: "CH-ORG-T2", name: "Orange - Fibre rurale T2", client: "Orange", zone: "Daloa Sud", poleCount: 0, assignedTeam: "", status: "Planifie", requestStatus: "Brouillon", requirements: [], assignedPoleIds: [] }
     ],
     poles: [
       { id: "POT-2026-B9-001", type: "BETON", height: 12, effort: "400 daN", weight: 860, maker: "SIPREL / Lot B9", status: "En Stock", depot: "Depot Central" },
-      { id: "POT-2026-B9-002", type: "BETON", height: 11, effort: "300 daN", weight: 790, maker: "SIPREL / Lot B9", status: "En Transit", depot: "Camion EQ-A" },
+      { id: "POT-2026-B9-002", type: "BETON", height: 11, effort: "300 daN", weight: 790, maker: "SIPREL / Lot B9", status: "En Transit", depot: "Terrain - Equipe Terrain A", assignedTeam: "Equipe Terrain A" },
       { id: "POT-2026-M4-018", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 235, maker: "METALCI / Lot M4", status: "Pose - En attente validation", depot: "Chantier MOOV", lat: 5.39231, lng: -4.03221 },
       { id: "POT-2026-M4-019", type: "METALLIQUE", height: 9, effort: "250 daN", weight: 236, maker: "METALCI / Lot M4", status: "Valide", depot: "Chantier MOOV", lat: 5.38875, lng: -4.02684 },
       { id: "POT-2026-B10-021", type: "BETON", height: 12, effort: "500 daN", weight: 920, maker: "SIPREL / Lot B10", status: "Anomalie", depot: "Chantier CIE", lat: 7.69592, lng: -5.03012 },
@@ -101,8 +101,8 @@ function seedDb() {
   };
 }
 
-function user(id, email, password, name, role) {
-  return { id, email, passwordHash: hashPassword(password), name, role };
+function user(id, email, password, name, role, details = {}) {
+  return { id, email, passwordHash: hashPassword(password), name, role, ...details };
 }
 
 function hashPassword(password) {
@@ -155,7 +155,14 @@ async function readSupabaseDb() {
       depot: row.depot || "",
       team: row.team || ""
     })),
-    projects,
+    projects: projects.map(row => ({
+      ...row,
+      poleCount: Number(row.pole_count || row.poleCount || 0),
+      assignedTeam: row.assigned_team || row.assignedTeam || "",
+      requestStatus: row.request_status || row.requestStatus || "",
+      requirements: row.requirements || [],
+      assignedPoleIds: row.assigned_pole_ids || row.assignedPoleIds || []
+    })),
     poles: poles.map(row => ({
       id: row.id,
       type: row.type,
@@ -165,6 +172,8 @@ async function readSupabaseDb() {
       maker: row.maker,
       status: row.status,
       depot: row.depot,
+      assignedTeam: row.assigned_team || "",
+      projectId: row.project_id || "",
       lat: row.lat,
       lng: row.lng
     })),
@@ -228,7 +237,24 @@ async function writeSupabaseDb(db) {
       depot: row.depot || null,
       team: row.team || null
     }))),
-    upsertTable("projects", db.projects),
+    upsertTable("projects", db.projects.map(row => ({
+      id: row.id,
+      name: row.name,
+      client: row.client || "",
+      zone: row.zone || "",
+      pole_count: row.poleCount || 0,
+      assigned_team: row.assignedTeam || null,
+      status: row.status || "Planifie",
+      request_status: row.requestStatus || "Brouillon",
+      requirements: row.requirements || [],
+      assigned_pole_ids: row.assignedPoleIds || [],
+      created_by: row.createdBy || null,
+      created_at: row.createdAt || new Date().toISOString(),
+      validated_by: row.validatedBy || null,
+      validated_at: row.validatedAt || null,
+      taken_by: row.takenBy || null,
+      taken_at: row.takenAt || null
+    }))),
     upsertTable("poles", db.poles.map(row => ({
       id: row.id,
       type: row.type,
@@ -238,6 +264,8 @@ async function writeSupabaseDb(db) {
       maker: row.maker,
       status: row.status,
       depot: row.depot,
+      assigned_team: row.assignedTeam || null,
+      project_id: row.projectId || null,
       lat: row.lat || null,
       lng: row.lng || null
     }))),
@@ -295,6 +323,10 @@ function publicUser(userRecord) {
   safeUser.active = userRecord.active !== false;
   safeUser.approved = userRecord.approved !== false;
   return safeUser;
+}
+
+function terrainTeamOf(userRecord) {
+  return String(userRecord?.team || userRecord?.name || "").trim();
 }
 
 function hasPermission(userRecord, permission) {
@@ -363,6 +395,26 @@ function nextReportId(db) {
     .map(Number)
     .reduce((acc, value) => Math.max(acc, value), 0);
   return `RPT-${year}-${String(max + 1).padStart(4, "0")}`;
+}
+
+function nextProjectId(db) {
+  const year = new Date().getFullYear();
+  const max = db.projects
+    .map(item => /^PRJ-\d{4}-(\d+)$/.exec(item.id)?.[1])
+    .filter(Boolean)
+    .map(Number)
+    .reduce((acc, value) => Math.max(acc, value), 0);
+  return `PRJ-${year}-${String(max + 1).padStart(4, "0")}`;
+}
+
+function normalizeRequirements(requirements = []) {
+  return requirements
+    .map(item => ({
+      type: String(item.type || "").trim().toUpperCase(),
+      height: Number(item.height),
+      quantity: Number(item.quantity || 0)
+    }))
+    .filter(item => ["BETON", "METALLIQUE"].includes(item.type) && Number.isFinite(item.height) && item.quantity > 0);
 }
 
 function audit(db, actor, action, payload = {}) {
@@ -514,6 +566,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/bootstrap") {
+    const terrainUsers = db.users.filter(userRecord => userRecord.role === "terrain").map(publicUser);
     return sendJson(res, 200, {
       user: publicUser(actor),
       permissions: rolePermissions[actor.role] || [],
@@ -521,6 +574,7 @@ async function handleApi(req, res, url) {
       poles: db.poles,
       interventions: db.interventions,
       users: hasPermission(actor, "admin") ? db.users.map(publicUser) : [],
+      terrainUsers: hasPermission(actor, "write_stock") || actor.role === "terrain" ? terrainUsers : [],
       offlineQueue: []
     });
   }
@@ -569,7 +623,8 @@ async function handleApi(req, res, url) {
       weight: Number(body.weight || 0),
       maker: body.maker || "",
       status: body.status || "En Stock",
-      depot: body.depot || "Depot Central"
+      depot: body.depot || "Depot Central",
+      assignedTeam: body.assignedTeam || ""
     };
     db.poles.push(pole);
     audit(db, actor, "pole.create", { poleId: pole.id });
@@ -595,8 +650,10 @@ async function handleApi(req, res, url) {
     const moved = [];
     for (const pole of db.poles) {
       if (poleIds.includes(pole.id)) {
+        const assignedTeam = String(body.assignedTeam || "").trim();
         pole.status = "En Transit";
-        pole.depot = body.destination || "Camion equipe terrain";
+        pole.depot = body.destination || (assignedTeam ? `Terrain - ${assignedTeam}` : "Camion equipe terrain");
+        pole.assignedTeam = assignedTeam;
         moved.push(pole.id);
       }
     }
@@ -612,11 +669,76 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/projects") {
     if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
     const body = await readBody(req);
-    if (!body.id || !body.name) return sendError(res, 400, "Champs chantier incomplets");
-    db.projects.push({ id: body.id, name: body.name, client: body.client || "", zone: body.zone || "" });
-    audit(db, actor, "project.create", { projectId: body.id });
+    const requirements = normalizeRequirements(body.requirements);
+    if (!body.name || !body.zone || !body.assignedTeam || !requirements.length) return sendError(res, 400, "Projet, zone, equipe et poteaux demandes requis");
+    const poleCount = requirements.reduce((sum, item) => sum + item.quantity, 0);
+    const project = {
+      id: body.id || nextProjectId(db),
+      name: String(body.name).trim(),
+      client: body.client || "",
+      zone: String(body.zone).trim(),
+      poleCount,
+      assignedTeam: String(body.assignedTeam).trim(),
+      status: "Demande stock",
+      requestStatus: "En attente gestionnaire",
+      requirements,
+      assignedPoleIds: [],
+      createdBy: actor.id,
+      createdAt: new Date().toISOString()
+    };
+    if (db.projects.some(item => item.id === project.id)) return sendError(res, 409, "Code projet deja existant");
+    db.projects.push(project);
+    audit(db, actor, "project.create", { projectId: project.id, assignedTeam: project.assignedTeam, poleCount });
     await writeDb(db);
-    return sendJson(res, 201, { projects: db.projects });
+    return sendJson(res, 201, { project, projects: db.projects });
+  }
+
+  const projectActionMatch = /^\/api\/projects\/([^/]+)\/(validate-stock|takeover)$/.exec(url.pathname);
+  if (req.method === "POST" && projectActionMatch) {
+    const project = db.projects.find(item => item.id === decodeURIComponent(projectActionMatch[1]));
+    if (!project) return sendError(res, 404, "Projet introuvable");
+    const action = projectActionMatch[2];
+    if (action === "validate-stock") {
+      if (!hasPermission(actor, "write_stock")) return sendError(res, 403, "Permission stock requise");
+      const selected = [];
+      const unavailable = [];
+      for (const requirement of normalizeRequirements(project.requirements)) {
+        const matches = db.poles
+          .filter(pole => pole.status === "En Stock" && pole.type === requirement.type && Number(pole.height) === Number(requirement.height))
+          .filter(pole => !selected.includes(pole.id))
+          .slice(0, requirement.quantity);
+        if (matches.length < requirement.quantity) unavailable.push(`${requirement.type} ${requirement.height}m: ${matches.length}/${requirement.quantity}`);
+        selected.push(...matches.map(pole => pole.id));
+      }
+      if (unavailable.length) return sendError(res, 409, `Stock insuffisant: ${unavailable.join(", ")}`);
+      selected.forEach(id => {
+        const pole = db.poles.find(item => item.id === id);
+        if (pole) {
+          pole.status = "En Transit";
+          pole.depot = `Terrain - ${project.assignedTeam}`;
+          pole.assignedTeam = project.assignedTeam;
+          pole.projectId = project.id;
+        }
+      });
+      project.assignedPoleIds = selected;
+      project.status = "Envoye terrain";
+      project.requestStatus = "Validee";
+      project.validatedBy = actor.id;
+      project.validatedAt = new Date().toISOString();
+      audit(db, actor, "project.stock_validate", { projectId: project.id, poleIds: selected });
+      await writeDb(db);
+      return sendJson(res, 200, { project, projects: db.projects, poles: db.poles });
+    }
+    if (action === "takeover") {
+      if (actor.role === "terrain" && project.assignedTeam !== terrainTeamOf(actor)) return sendError(res, 403, "Projet non attribue a votre equipe");
+      if (!hasPermission(actor, "write_intervention")) return sendError(res, 403, "Permission terrain requise");
+      project.status = "Pris en main";
+      project.takenBy = actor.id;
+      project.takenAt = new Date().toISOString();
+      audit(db, actor, "project.takeover", { projectId: project.id });
+      await writeDb(db);
+      return sendJson(res, 200, { project, projects: db.projects });
+    }
   }
 
   if (req.method === "GET" && url.pathname === "/api/interventions") {
@@ -627,6 +749,11 @@ async function handleApi(req, res, url) {
     if (!hasPermission(actor, "write_intervention")) return sendError(res, 403, "Permission terrain requise");
     const body = await readBody(req);
     if (!body.poleId || !body.projectId || !body.lat || !body.lng) return sendError(res, 400, "Fiche de pose incomplete");
+    const pole = db.poles.find(item => item.id === body.poleId);
+    if (!pole) return sendError(res, 404, "Poteau introuvable");
+    if (actor.role === "terrain" && (pole.status !== "En Transit" || pole.assignedTeam !== terrainTeamOf(actor))) {
+      return sendError(res, 403, "Ce poteau n'est pas attribue a votre equipe terrain");
+    }
     const id = body.id && !db.interventions.some(item => item.id === body.id) ? body.id : nextReportId(db);
     const photos = await savePhotos(id, body.photos || []);
     const intervention = {
@@ -648,13 +775,14 @@ async function handleApi(req, res, url) {
       draft: Boolean(body.draft)
     };
     db.interventions.push(intervention);
-    const pole = db.poles.find(item => item.id === body.poleId);
     if (pole) {
       pole.status = intervention.draft ? "En Transit" : intervention.validation;
       pole.lat = intervention.lat;
       pole.lng = intervention.lng;
       pole.depot = "Implante terrain";
     }
+    const project = db.projects.find(item => item.id === body.projectId);
+    if (project && !intervention.draft) project.status = "En implantation";
     audit(db, actor, "intervention.create", { reportId: id, poleId: body.poleId });
     await writeDb(db);
     return sendJson(res, 201, { intervention, poles: db.poles });

@@ -5,28 +5,36 @@
       "email": "admin@itc.local",
       "passwordHash": "pbkdf2$120000$1e8ec471583af8ecdc54a139487e0c97$68e6155aaa6ecdf5ab3d9dcacfb484ad9d627b95f9c629d07d214f22279bc7a3",
       "name": "Aminata Kone",
-      "role": "super_admin"
+      "role": "super_admin",
+      "depot": "Direction",
+      "team": ""
     },
     {
       "id": "USR-002",
       "email": "depot@itc.local",
       "passwordHash": "pbkdf2$120000$2d9c3874acd98051ec93f84f7a9f873e$8899340c2adfab690c7d8d73d57bc596ff9a2dfbfa264c543b1eeaeea1877e52",
       "name": "Magasin Central",
-      "role": "magasinier"
+      "role": "magasinier",
+      "depot": "Depot Central",
+      "team": ""
     },
     {
       "id": "USR-003",
       "email": "terrain@itc.local",
       "passwordHash": "d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791",
       "name": "Equipe Terrain A",
-      "role": "terrain"
+      "role": "terrain",
+      "depot": "Terrain",
+      "team": "Equipe Terrain A"
     },
     {
       "id": "USR-004",
       "email": "controle@itc.local",
       "passwordHash": "d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791",
       "name": "Controle Qualite",
-      "role": "controleur"
+      "role": "controleur",
+      "depot": "Controle",
+      "team": ""
     }
   ],
   "projects": [
@@ -34,19 +42,54 @@
       "id": "CH-MOOV-A1",
       "name": "MOOV - Axe Yopougon PK12",
       "client": "MOOV",
-      "zone": "Abidjan Nord"
+      "zone": "Abidjan Nord",
+      "poleCount": 2,
+      "assignedTeam": "Equipe Terrain A",
+      "status": "Pris en main",
+      "requestStatus": "Validee",
+      "requirements": [
+        {
+          "type": "METALLIQUE",
+          "height": 9,
+          "quantity": 2
+        }
+      ],
+      "assignedPoleIds": [
+        "POT-2026-M4-018",
+        "POT-2026-M4-019"
+      ]
     },
     {
       "id": "CH-CIE-B4",
       "name": "CIE - Extension reseau B4",
       "client": "CIE",
-      "zone": "Bouake Est"
+      "zone": "Bouake Est",
+      "poleCount": 1,
+      "assignedTeam": "Equipe Terrain A",
+      "status": "En implantation",
+      "requestStatus": "Validee",
+      "requirements": [
+        {
+          "type": "BETON",
+          "height": 12,
+          "quantity": 1
+        }
+      ],
+      "assignedPoleIds": [
+        "POT-2026-B10-021"
+      ]
     },
     {
       "id": "CH-ORG-T2",
       "name": "Orange - Fibre rurale T2",
       "client": "Orange",
-      "zone": "Daloa Sud"
+      "zone": "Daloa Sud",
+      "poleCount": 0,
+      "assignedTeam": "",
+      "status": "Planifie",
+      "requestStatus": "Brouillon",
+      "requirements": [],
+      "assignedPoleIds": []
     }
   ],
   "poles": [
@@ -68,7 +111,9 @@
       "weight": 790,
       "maker": "SIPREL / Lot B9",
       "status": "En Transit",
-      "depot": "Camion EQ-A"
+      "depot": "Terrain - Equipe Terrain A",
+      "assignedTeam": "Equipe Terrain A",
+      "projectId": ""
     },
     {
       "id": "POT-2026-M4-018",
@@ -79,6 +124,8 @@
       "maker": "METALCI / Lot M4",
       "status": "Pose - En attente validation",
       "depot": "Chantier MOOV",
+      "assignedTeam": "Equipe Terrain A",
+      "projectId": "CH-MOOV-A1",
       "lat": 5.39231,
       "lng": -4.03221
     },
@@ -91,6 +138,8 @@
       "maker": "METALCI / Lot M4",
       "status": "Valide",
       "depot": "Chantier MOOV",
+      "assignedTeam": "Equipe Terrain A",
+      "projectId": "CH-MOOV-A1",
       "lat": 5.38875,
       "lng": -4.02684
     },
@@ -103,6 +152,8 @@
       "maker": "SIPREL / Lot B10",
       "status": "Anomalie",
       "depot": "Chantier CIE",
+      "assignedTeam": "Equipe Terrain A",
+      "projectId": "CH-CIE-B4",
       "lat": 7.69592,
       "lng": -5.03012
     },

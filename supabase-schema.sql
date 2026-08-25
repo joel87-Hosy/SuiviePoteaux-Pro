@@ -22,6 +22,17 @@ create table if not exists public.projects (
   name text not null,
   client text,
   zone text,
+  pole_count int not null default 0,
+  assigned_team text,
+  status text not null default 'Planifie',
+  request_status text not null default 'Brouillon',
+  requirements jsonb not null default '[]',
+  assigned_pole_ids jsonb not null default '[]',
+  created_by text,
+  validated_by text,
+  validated_at timestamptz,
+  taken_by text,
+  taken_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -34,6 +45,8 @@ create table if not exists public.poles (
   maker text,
   status text not null,
   depot text,
+  assigned_team text,
+  project_id text,
   lat numeric,
   lng numeric,
   created_at timestamptz not null default now(),
@@ -94,8 +107,25 @@ create table if not exists public.audit_log (
   date timestamptz not null default now()
 );
 
+alter table public.poles add column if not exists assigned_team text;
+alter table public.poles add column if not exists project_id text;
+alter table public.projects add column if not exists pole_count int not null default 0;
+alter table public.projects add column if not exists assigned_team text;
+alter table public.projects add column if not exists status text not null default 'Planifie';
+alter table public.projects add column if not exists request_status text not null default 'Brouillon';
+alter table public.projects add column if not exists requirements jsonb not null default '[]';
+alter table public.projects add column if not exists assigned_pole_ids jsonb not null default '[]';
+alter table public.projects add column if not exists created_by text;
+alter table public.projects add column if not exists validated_by text;
+alter table public.projects add column if not exists validated_at timestamptz;
+alter table public.projects add column if not exists taken_by text;
+alter table public.projects add column if not exists taken_at timestamptz;
+
 create index if not exists idx_poles_status on public.poles(status);
 create index if not exists idx_poles_depot on public.poles(depot);
+create index if not exists idx_poles_assigned_team on public.poles(assigned_team);
+create index if not exists idx_poles_project on public.poles(project_id);
+create index if not exists idx_projects_request_status on public.projects(request_status);
 create index if not exists idx_interventions_pole on public.interventions(pole_id);
 create index if not exists idx_interventions_agent on public.interventions(agent_id);
 create index if not exists idx_intervention_photos_intervention on public.intervention_photos(intervention_id);
@@ -119,29 +149,29 @@ revoke all on table public.intervention_photos from anon, authenticated;
 revoke all on table public.stock_movements from anon, authenticated;
 revoke all on table public.audit_log from anon, authenticated;
 
-insert into public.app_users (id, email, password_hash, name, role, active, approved)
+insert into public.app_users (id, email, password_hash, name, role, active, approved, depot, team)
 values
-  ('USR-001', 'admin@itc.local', 'pbkdf2$120000$7e8b36af6f9ff43f7b95c72c70bd9559$2516bae429b4f1a8413a83014c8d29c95d44fc9bda435e921817a5fab37ee3e9', 'Aminata Kone', 'super_admin', true, true),
-  ('USR-002', 'depot@itc.local', 'pbkdf2$120000$7e8b36af6f9ff43f7b95c72c70bd9559$2516bae429b4f1a8413a83014c8d29c95d44fc9bda435e921817a5fab37ee3e9', 'Magasin Central', 'magasinier', true, true),
-  ('USR-003', 'terrain@itc.local', 'pbkdf2$120000$7e8b36af6f9ff43f7b95c72c70bd9559$2516bae429b4f1a8413a83014c8d29c95d44fc9bda435e921817a5fab37ee3e9', 'Equipe Terrain A', 'terrain', true, true),
-  ('USR-004', 'controle@itc.local', 'pbkdf2$120000$7e8b36af6f9ff43f7b95c72c70bd9559$2516bae429b4f1a8413a83014c8d29c95d44fc9bda435e921817a5fab37ee3e9', 'Controle Qualite', 'controleur', true, true)
+  ('USR-001', 'admin@itc.local', 'pbkdf2$120000$7e8b36af6f9ff43f7b95c72c70bd9559$2516bae429b4f1a8413a83014c8d29c95d44fc9bda435e921817a5fab37ee3e9', 'Aminata Kone', 'super_admin', true, true, 'Direction', null),
+  ('USR-002', 'depot@itc.local', 'pbkdf2$120000$7e8b36af6f9ff43f7b95c72c70bd9559$2516bae429b4f1a8413a83014c8d29c95d44fc9bda435e921817a5fab37ee3e9', 'Magasin Central', 'magasinier', true, true, 'Depot Central', null),
+  ('USR-003', 'terrain@itc.local', 'pbkdf2$120000$7e8b36af6f9ff43f7b95c72c70bd9559$2516bae429b4f1a8413a83014c8d29c95d44fc9bda435e921817a5fab37ee3e9', 'Equipe Terrain A', 'terrain', true, true, 'Terrain', 'Equipe Terrain A'),
+  ('USR-004', 'controle@itc.local', 'pbkdf2$120000$7e8b36af6f9ff43f7b95c72c70bd9559$2516bae429b4f1a8413a83014c8d29c95d44fc9bda435e921817a5fab37ee3e9', 'Controle Qualite', 'controleur', true, true, 'Controle', null)
 on conflict (id) do nothing;
 
-insert into public.projects (id, name, client, zone)
+insert into public.projects (id, name, client, zone, pole_count, assigned_team, status, request_status, requirements, assigned_pole_ids)
 values
-  ('CH-MOOV-A1', 'MOOV - Axe Yopougon PK12', 'MOOV', 'Abidjan Nord'),
-  ('CH-CIE-B4', 'CIE - Extension reseau B4', 'CIE', 'Bouake Est'),
-  ('CH-ORG-T2', 'Orange - Fibre rurale T2', 'Orange', 'Daloa Sud')
+  ('CH-MOOV-A1', 'MOOV - Axe Yopougon PK12', 'MOOV', 'Abidjan Nord', 2, 'Equipe Terrain A', 'Pris en main', 'Validee', '[{"type":"METALLIQUE","height":9,"quantity":2}]', '["POT-2026-M4-018","POT-2026-M4-019"]'),
+  ('CH-CIE-B4', 'CIE - Extension reseau B4', 'CIE', 'Bouake Est', 1, 'Equipe Terrain A', 'En implantation', 'Validee', '[{"type":"BETON","height":12,"quantity":1}]', '["POT-2026-B10-021"]'),
+  ('CH-ORG-T2', 'Orange - Fibre rurale T2', 'Orange', 'Daloa Sud', 0, null, 'Planifie', 'Brouillon', '[]', '[]')
 on conflict (id) do nothing;
 
-insert into public.poles (id, type, height, effort, weight, maker, status, depot, lat, lng)
+insert into public.poles (id, type, height, effort, weight, maker, status, depot, assigned_team, project_id, lat, lng)
 values
-  ('POT-2026-B9-001', 'BETON', 12, '400 daN', 860, 'SIPREL / Lot B9', 'En Stock', 'Depot Central', null, null),
-  ('POT-2026-B9-002', 'BETON', 11, '300 daN', 790, 'SIPREL / Lot B9', 'En Transit', 'Camion EQ-A', null, null),
-  ('POT-2026-M4-018', 'METALLIQUE', 9, '250 daN', 235, 'METALCI / Lot M4', 'Pose - En attente validation', 'Chantier MOOV', 5.39231, -4.03221),
-  ('POT-2026-M4-019', 'METALLIQUE', 9, '250 daN', 236, 'METALCI / Lot M4', 'Valide', 'Chantier MOOV', 5.38875, -4.02684),
-  ('POT-2026-B10-021', 'BETON', 12, '500 daN', 920, 'SIPREL / Lot B10', 'Anomalie', 'Chantier CIE', 7.69592, -5.03012),
-  ('POT-2026-M5-030', 'METALLIQUE', 10, '300 daN', 280, 'METALCI / Lot M5', 'En Stock', 'Depot Bouake', null, null)
+  ('POT-2026-B9-001', 'BETON', 12, '400 daN', 860, 'SIPREL / Lot B9', 'En Stock', 'Depot Central', null, null, null, null),
+  ('POT-2026-B9-002', 'BETON', 11, '300 daN', 790, 'SIPREL / Lot B9', 'En Transit', 'Terrain - Equipe Terrain A', 'Equipe Terrain A', null, null, null),
+  ('POT-2026-M4-018', 'METALLIQUE', 9, '250 daN', 235, 'METALCI / Lot M4', 'Pose - En attente validation', 'Chantier MOOV', 'Equipe Terrain A', 'CH-MOOV-A1', 5.39231, -4.03221),
+  ('POT-2026-M4-019', 'METALLIQUE', 9, '250 daN', 236, 'METALCI / Lot M4', 'Valide', 'Chantier MOOV', 'Equipe Terrain A', 'CH-MOOV-A1', 5.38875, -4.02684),
+  ('POT-2026-B10-021', 'BETON', 12, '500 daN', 920, 'SIPREL / Lot B10', 'Anomalie', 'Chantier CIE', 'Equipe Terrain A', 'CH-CIE-B4', 7.69592, -5.03012),
+  ('POT-2026-M5-030', 'METALLIQUE', 10, '300 daN', 280, 'METALCI / Lot M5', 'En Stock', 'Depot Bouake', null, null, null, null)
 on conflict (id) do nothing;
 
 insert into public.interventions (id, pole_id, project_id, agent, agent_id, date, lat, lng, soil, depth, validation, notes, team_signature, client_signature)
