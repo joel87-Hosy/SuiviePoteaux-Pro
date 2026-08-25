@@ -7,7 +7,10 @@
       "name": "Aminata Kone",
       "role": "super_admin",
       "depot": "Direction",
-      "team": ""
+      "team": "",
+      "phone": "",
+      "jobTitle": "Administrateur plateforme",
+      "profilePhoto": ""
     },
     {
       "id": "USR-002",
@@ -16,7 +19,10 @@
       "name": "Magasin Central",
       "role": "magasinier",
       "depot": "Depot Central",
-      "team": ""
+      "team": "",
+      "phone": "",
+      "jobTitle": "Gestionnaire stock",
+      "profilePhoto": ""
     },
     {
       "id": "USR-003",
@@ -25,7 +31,10 @@
       "name": "Equipe Terrain A",
       "role": "terrain",
       "depot": "Terrain",
-      "team": "Equipe Terrain A"
+      "team": "Equipe Terrain A",
+      "phone": "",
+      "jobTitle": "Technicien terrain",
+      "profilePhoto": ""
     },
     {
       "id": "USR-004",
@@ -34,7 +43,10 @@
       "name": "Controle Qualite",
       "role": "controleur",
       "depot": "Controle",
-      "team": ""
+      "team": "",
+      "phone": "",
+      "jobTitle": "Controleur qualite",
+      "profilePhoto": ""
     }
   ],
   "projects": [
@@ -188,9 +200,50 @@
       "validation": "Valide",
       "notes": "Pose conforme, aplomb controle et massif cure.",
       "teamSignature": "A. Konan",
+      "teamSignatureImage": "",
       "clientSignature": "Controle Qualite",
+      "anomalyReason": "",
+      "anomalyStatus": "",
       "photos": []
     }
   ],
-  "auditLog": []
+  "auditLog": [
+    {
+      "id": "4a8cc3f1-67de-4b56-8f82-9bc4f6dc2641",
+      "actorId": "USR-001",
+      "action": "profile.update",
+      "payload": {
+        "userId": "USR-001",
+        "hasPhoto": false,
+        "passwordChanged": false
+      },
+      "date": "2026-08-25T20:00:32.348Z"
+    }
+  ],
+  "settings": {
+    "operators": [
+      "MOOV CI",
+      "Orange CI",
+      "MTN CI",
+      "CIE"
+    ],
+    "poleTypes": [
+      "BETON",
+      "METALLIQUE"
+    ],
+    "poleHeights": [
+      7,
+      9,
+      10,
+      11,
+      12
+    ],
+    "depots": [
+      "Depot Central",
+      "Depot Bouake",
+      "Depot Yopougon"
+    ],
+    "providerName": "ALL SERVICE",
+    "gpsMaxDistanceKm": 5
+  }
 }

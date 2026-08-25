@@ -22,6 +22,15 @@ const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "pole-photos";
 const SUPABASE_ENABLED = Boolean(createClient && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map(origin => origin.trim())
+  .filter(Boolean);
+const ALLOW_PUBLIC_PASSWORD_RESET = process.env.ALLOW_PUBLIC_PASSWORD_RESET === "true";
+const ALLOW_PUBLIC_REGISTRATION = process.env.ALLOW_PUBLIC_REGISTRATION === "true";
+const MAX_PHOTOS_PER_REPORT = 6;
+const MAX_PHOTO_BYTES = 6 * 1024 * 1024;
+const MAX_PROFILE_PHOTO_BYTES = 1024 * 1024;
 const supabase = SUPABASE_ENABLED
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false }
@@ -29,6 +38,7 @@ const supabase = SUPABASE_ENABLED
   : null;
 
 const sessions = new Map();
+const rateLimits = new Map();
 
 const rolePermissions = {
   super_admin: ["read", "write_stock", "write_intervention", "validate", "admin"],
@@ -37,6 +47,14 @@ const rolePermissions = {
   controleur: ["read", "validate"]
 };
 const OPERATORS = ["MOOV CI", "Orange CI", "MTN CI", "CIE"];
+const DEFAULT_SETTINGS = {
+  operators: OPERATORS,
+  poleTypes: ["BETON", "METALLIQUE"],
+  poleHeights: [7, 9, 10, 11, 12],
+  depots: ["Depot Central", "Depot Bouake", "Depot Yopougon"],
+  providerName: "ALL SERVICE",
+  gpsMaxDistanceKm: 5
+};
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -99,12 +117,13 @@ function seedDb() {
       }
     ],
     stockMovements: [],
-    auditLog: []
+    auditLog: [],
+    settings: { ...DEFAULT_SETTINGS }
   };
 }
 
 function user(id, email, password, name, role, details = {}) {
-  return { id, email, passwordHash: hashPassword(password), name, role, ...details };
+  return { id, email, passwordHash: hashPassword(password), name, role, phone: "", jobTitle: "", profilePhoto: "", ...details };
 }
 
 function hashPassword(password) {
@@ -124,10 +143,19 @@ function verifyPassword(password, storedHash) {
   return crypto.timingSafeEqual(Buffer.from(candidate, "hex"), Buffer.from(digest, "hex"));
 }
 
+function strongPassword(password) {
+  const value = String(password || "");
+  return value.length >= 10 &&
+    /[a-z]/.test(value) &&
+    /[A-Z]/.test(value) &&
+    /\d/.test(value) &&
+    /[^A-Za-z0-9]/.test(value);
+}
+
 async function readDb() {
   if (SUPABASE_ENABLED) return readSupabaseDb();
   ensureStorage();
-  return JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+  return normalizeDb(JSON.parse(fs.readFileSync(DB_FILE, "utf8")));
 }
 
 async function writeDb(db) {
@@ -137,16 +165,17 @@ async function writeDb(db) {
 }
 
 async function readSupabaseDb() {
-  const [users, projects, poles, interventions, photos, stockMovements, auditLog] = await Promise.all([
+  const [users, projects, poles, interventions, photos, stockMovements, auditLog, appSettings] = await Promise.all([
     selectTable("app_users"),
     selectTable("projects"),
     selectTable("poles"),
     selectTable("interventions"),
     selectTable("intervention_photos"),
     selectTable("stock_movements"),
-    selectTable("audit_log")
+    selectTable("audit_log"),
+    selectTable("app_settings")
   ]);
-  return {
+  return normalizeDb({
     users: users.map(row => ({
       id: row.id,
       email: row.email,
@@ -156,7 +185,10 @@ async function readSupabaseDb() {
       active: row.active !== false,
       approved: row.approved !== false,
       depot: row.depot || "",
-      team: row.team || ""
+      team: row.team || "",
+      phone: row.phone || "",
+      jobTitle: row.job_title || row.jobTitle || "",
+      profilePhoto: row.profile_photo || row.profilePhoto || ""
     })),
     projects: projects.map(row => ({
       ...row,
@@ -201,6 +233,7 @@ async function readSupabaseDb() {
       validation: row.validation,
       notes: row.notes,
       teamSignature: row.team_signature,
+      teamSignatureImage: row.team_signature_image || "",
       clientSignature: row.client_signature,
       validatedBy: row.validated_by,
       validatedAt: row.validated_at,
@@ -234,8 +267,9 @@ async function readSupabaseDb() {
       action: row.action,
       payload: row.payload || {},
       date: row.date
-    }))
-  };
+    })),
+    settings: appSettings.find(row => row.id === "default")?.value || DEFAULT_SETTINGS
+  });
 }
 
 async function selectTable(table) {
@@ -256,7 +290,10 @@ async function writeSupabaseDb(db) {
       active: row.active !== false,
       approved: row.approved !== false,
       depot: row.depot || null,
-      team: row.team || null
+      team: row.team || null,
+      phone: row.phone || null,
+      job_title: row.jobTitle || null,
+      profile_photo: row.profilePhoto || null
     }))),
     upsertTable("projects", db.projects.map(row => ({
       id: row.id,
@@ -311,6 +348,7 @@ async function writeSupabaseDb(db) {
       validation: row.validation,
       notes: row.notes,
       team_signature: row.teamSignature,
+      team_signature_image: row.teamSignatureImage || null,
       client_signature: row.clientSignature,
       validated_by: row.validatedBy || null,
       validated_at: row.validatedAt || null,
@@ -334,7 +372,12 @@ async function writeSupabaseDb(db) {
       action: row.action,
       payload: row.payload || {},
       date: row.date
-    })))
+    }))),
+    upsertTable("app_settings", [{
+      id: "default",
+      value: normalizeSettings(db.settings),
+      updated_at: new Date().toISOString()
+    }])
   ]);
   const photoRows = db.interventions.flatMap(row => (row.photos || [])
     .filter(photo => photo.url)
@@ -349,6 +392,31 @@ async function writeSupabaseDb(db) {
       url: photo.url
     })));
   await upsertTable("intervention_photos", photoRows);
+}
+
+function normalizeSettings(settings = {}) {
+  const arrayValue = (value, fallback) => Array.isArray(value) && value.length ? value : fallback;
+  return {
+    operators: arrayValue(settings.operators, DEFAULT_SETTINGS.operators).map(String),
+    poleTypes: arrayValue(settings.poleTypes, DEFAULT_SETTINGS.poleTypes).map(String),
+    poleHeights: arrayValue(settings.poleHeights, DEFAULT_SETTINGS.poleHeights).map(Number).filter(Number.isFinite),
+    depots: arrayValue(settings.depots, DEFAULT_SETTINGS.depots).map(String),
+    providerName: String(settings.providerName || DEFAULT_SETTINGS.providerName),
+    gpsMaxDistanceKm: Number(settings.gpsMaxDistanceKm || DEFAULT_SETTINGS.gpsMaxDistanceKm)
+  };
+}
+
+function normalizeDb(db) {
+  return {
+    ...db,
+    users: db.users || [],
+    projects: db.projects || [],
+    poles: db.poles || [],
+    interventions: db.interventions || [],
+    stockMovements: db.stockMovements || [],
+    auditLog: db.auditLog || [],
+    settings: normalizeSettings(db.settings)
+  };
 }
 
 async function upsertTable(table, rows) {
@@ -372,20 +440,103 @@ function hasPermission(userRecord, permission) {
   return rolePermissions[userRecord.role]?.includes(permission);
 }
 
-function sendJson(res, status, payload) {
+function securityHeaders(req, extra = {}) {
+  const origin = req?.headers?.origin || "";
+  const allowedOrigin = allowedCorsOrigin(req, origin);
+  const headers = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Permissions-Policy": "camera=(self), geolocation=(self), microphone=()",
+    "Content-Security-Policy": [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self' https:",
+      "worker-src 'self'"
+    ].join("; "),
+    ...extra
+  };
+  if (req?.socket?.encrypted || req?.headers?.["x-forwarded-proto"] === "https") {
+    headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+  }
+  if (allowedOrigin) {
+    headers["Access-Control-Allow-Origin"] = allowedOrigin;
+    headers["Vary"] = "Origin";
+    headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+    headers["Access-Control-Allow-Methods"] = "GET,POST,PATCH,DELETE,OPTIONS";
+  }
+  return headers;
+}
+
+function sameOrigin(req, origin) {
+  if (!origin) return true;
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const proto = forwardedProto || (req.socket.encrypted ? "https" : "http");
+  const host = req.headers["x-forwarded-host"] || req.headers.host || "";
+  return origin === `${proto}://${host}`;
+}
+
+function allowedCorsOrigin(req, origin) {
+  if (!origin) return "";
+  if (sameOrigin(req, origin)) return origin;
+  return ALLOWED_ORIGINS.includes(origin) ? origin : "";
+}
+
+function validateOrigin(req) {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return true;
+  return sameOrigin(req, req.headers.origin || "") || ALLOWED_ORIGINS.includes(req.headers.origin || "");
+}
+
+function clientIp(req) {
+  return String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "local").split(",")[0].trim();
+}
+
+function consumeRateLimit(key, limit, windowMs) {
+  const now = Date.now();
+  const current = rateLimits.get(key);
+  if (!current || current.resetAt <= now) {
+    rateLimits.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  current.count += 1;
+  return current.count <= limit;
+}
+
+function requireRateLimit(req, res, scope, limit, windowMs) {
+  const ok = consumeRateLimit(`${scope}:${clientIp(req)}`, limit, windowMs);
+  if (!ok) sendError(req, res, 429, "Trop de tentatives. Reessayez plus tard.");
+  return ok;
+}
+
+function sendJson(req, res, status, payload) {
+  if (!payload && typeof status === "object") {
+    payload = status;
+    status = res;
+    res = req;
+    req = res._request || null;
+  }
   const body = JSON.stringify(payload);
-  res.writeHead(status, {
+  res.writeHead(status, securityHeaders(req, {
     "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
     "Cache-Control": "no-store"
-  });
+  }));
   res.end(body);
 }
 
-function sendError(res, status, message) {
-  sendJson(res, status, { error: message });
+function sendError(req, res, status, message) {
+  if (message === undefined) {
+    message = status;
+    status = res;
+    res = req;
+    req = res._request || null;
+  }
+  sendJson(req, res, status, { error: message });
 }
 
 function readBody(req) {
@@ -395,7 +546,7 @@ function readBody(req) {
     req.on("data", chunk => {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
-        reject(new Error("Payload trop volumineux"));
+        reject(Object.assign(new Error("Payload trop volumineux"), { statusCode: 413 }));
         req.destroy();
         return;
       }
@@ -407,7 +558,7 @@ function readBody(req) {
       try {
         resolve(JSON.parse(raw));
       } catch {
-        reject(new Error("JSON invalide"));
+        reject(Object.assign(new Error("JSON invalide"), { statusCode: 400 }));
       }
     });
     req.on("error", reject);
@@ -453,7 +604,7 @@ function normalizeRequirements(requirements = []) {
       height: Number(item.height),
       quantity: Number(item.quantity || 0)
     }))
-    .filter(item => ["BETON", "METALLIQUE"].includes(item.type) && Number.isFinite(item.height) && item.quantity > 0);
+    .filter(item => item.type && Number.isFinite(item.height) && item.quantity > 0);
 }
 
 function projectTotal(project) {
@@ -501,6 +652,8 @@ function stockMovement(db, actor, poleId, movementType, fromDepot, toDepot, payl
 }
 
 async function savePhotos(reportId, photos = []) {
+  if (!Array.isArray(photos)) throw Object.assign(new Error("Photos invalides"), { statusCode: 400 });
+  if (photos.length > MAX_PHOTOS_PER_REPORT) throw Object.assign(new Error("Nombre de photos trop eleve"), { statusCode: 413 });
   const reportDir = path.join(UPLOAD_DIR, reportId);
   if (!SUPABASE_ENABLED) fs.mkdirSync(reportDir, { recursive: true });
   const saved = [];
@@ -518,6 +671,8 @@ async function savePhotos(reportId, photos = []) {
     const ext = match[1].includes("png") ? "png" : match[1].includes("webp") ? "webp" : "jpg";
     const filename = `${String(index + 1).padStart(2, "0")}-${slug(photo.step || "photo")}.${ext}`;
     const buffer = Buffer.from(match[2], "base64");
+    if (buffer.length > MAX_PHOTO_BYTES) throw Object.assign(new Error("Photo trop volumineuse"), { statusCode: 413 });
+    if (!validImageSignature(buffer, ext)) throw Object.assign(new Error("Format image invalide"), { statusCode: 400 });
     let url = `/uploads/${reportId}/${filename}`;
     if (SUPABASE_ENABLED) {
       const storagePath = `${reportId}/${filename}`;
@@ -541,6 +696,24 @@ async function savePhotos(reportId, photos = []) {
   return saved;
 }
 
+function validImageSignature(buffer, ext) {
+  if (ext === "png") return buffer.length > 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (ext === "webp") return buffer.length > 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP";
+  return buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+}
+
+function normalizeProfilePhoto(value) {
+  const photo = String(value || "");
+  if (!photo) return "";
+  const match = /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/i.exec(photo);
+  if (!match) throw Object.assign(new Error("Photo de profil invalide"), { statusCode: 400 });
+  const ext = match[1].includes("png") ? "png" : match[1].includes("webp") ? "webp" : "jpg";
+  const buffer = Buffer.from(match[2], "base64");
+  if (buffer.length > MAX_PROFILE_PHOTO_BYTES) throw Object.assign(new Error("Photo de profil trop volumineuse"), { statusCode: 413 });
+  if (!validImageSignature(buffer, ext)) throw Object.assign(new Error("Format image invalide"), { statusCode: 400 });
+  return photo;
+}
+
 function slug(value) {
   return String(value)
     .normalize("NFD")
@@ -556,14 +729,29 @@ function parseUrl(req) {
 }
 
 async function handleApi(req, res, url) {
+  if (req.method === "OPTIONS") {
+    if (!allowedCorsOrigin(req, req.headers.origin || "") && req.headers.origin) {
+      return sendError(req, res, 403, "Origine non autorisee");
+    }
+    return sendJson(req, res, 204, {});
+  }
+  if (!validateOrigin(req)) return sendError(req, res, 403, "Origine non autorisee");
+  if (!requireRateLimit(req, res, "api", 300, 60 * 1000)) return;
+  if (["POST", "PATCH", "DELETE"].includes(req.method)) {
+    const contentType = req.headers["content-type"] || "";
+    const hasBody = Number(req.headers["content-length"] || 0) > 0 || ["POST", "PATCH"].includes(req.method);
+    if (hasBody && !contentType.includes("application/json")) {
+      return sendError(req, res, 415, "Content-Type application/json requis");
+    }
+  }
   const db = await readDb();
 
-  if (req.method === "OPTIONS") return sendJson(res, 204, {});
   if (req.method === "GET" && url.pathname === "/api/health") {
     return sendJson(res, 200, { ok: true, service: "SuiviPoteaux Pro API", date: new Date().toISOString() });
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/login") {
+    if (!requireRateLimit(req, res, "auth-login", 8, 15 * 60 * 1000)) return;
     const body = await readBody(req);
     const email = String(body.email || "").trim().toLowerCase();
     const found = db.users.find(item => item.email === email && item.active !== false && item.approved !== false && verifyPassword(body.password, item.passwordHash));
@@ -578,14 +766,18 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/register") {
+    if (!requireRateLimit(req, res, "auth-register", 5, 60 * 60 * 1000)) return;
+    if (!ALLOW_PUBLIC_REGISTRATION) {
+      return sendError(res, 403, "Inscription publique desactivee. Contactez un administrateur.");
+    }
     const body = await readBody(req);
     const email = String(body.email || "").trim().toLowerCase();
     const name = String(body.name || "").trim();
     const password = String(body.password || "");
     const allowedRoles = ["magasinier", "terrain", "controleur"];
     const role = allowedRoles.includes(body.role) ? body.role : "terrain";
-    if (!name || !email || password.length < 6) {
-      return sendError(res, 400, "Nom, email et mot de passe de 6 caracteres minimum requis");
+    if (!name || !email || !strongPassword(password)) {
+      return sendError(res, 400, "Nom, email et mot de passe fort requis");
     }
     if (db.users.some(item => item.email === email)) {
       return sendError(res, 409, "Un compte existe deja avec cet email");
@@ -610,11 +802,15 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/reset-password") {
+    if (!requireRateLimit(req, res, "auth-reset", 5, 60 * 60 * 1000)) return;
+    if (!ALLOW_PUBLIC_PASSWORD_RESET) {
+      return sendError(res, 403, "Reinitialisation publique desactivee. Contactez un administrateur.");
+    }
     const body = await readBody(req);
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
-    if (!email || password.length < 6) {
-      return sendError(res, 400, "Email et nouveau mot de passe de 6 caracteres minimum requis");
+    if (!email || !strongPassword(password)) {
+      return sendError(res, 400, "Email et nouveau mot de passe fort requis");
     }
     const found = db.users.find(item => item.email === email);
     if (!found) return sendError(res, 404, "Aucun compte trouve avec cet email");
@@ -638,6 +834,25 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { user: publicUser(actor), permissions: rolePermissions[actor.role] || [] });
   }
 
+  if (req.method === "PATCH" && url.pathname === "/api/me") {
+    const body = await readBody(req);
+    const name = String(body.name || actor.name || "").trim();
+    if (!name) return sendError(res, 400, "Nom requis");
+    actor.name = name;
+    actor.phone = String(body.phone || "").trim();
+    actor.jobTitle = String(body.jobTitle || "").trim();
+    if (body.profilePhoto !== undefined) {
+      actor.profilePhoto = normalizeProfilePhoto(body.profilePhoto);
+    }
+    if (body.password) {
+      if (!strongPassword(body.password)) return sendError(res, 400, "Mot de passe fort requis");
+      actor.passwordHash = hashPassword(body.password);
+    }
+    audit(db, actor, "profile.update", { userId: actor.id, hasPhoto: Boolean(actor.profilePhoto), passwordChanged: Boolean(body.password) });
+    await writeDb(db);
+    return sendJson(res, 200, { user: publicUser(actor) });
+  }
+
   if (req.method === "GET" && url.pathname === "/api/bootstrap") {
     const terrainUsers = db.users.filter(userRecord => userRecord.role === "terrain").map(publicUser);
     return sendJson(res, 200, {
@@ -648,15 +863,54 @@ async function handleApi(req, res, url) {
       interventions: db.interventions,
       stockMovements: db.stockMovements || [],
       auditLog: hasPermission(actor, "admin") ? db.auditLog : [],
+      settings: db.settings || DEFAULT_SETTINGS,
       users: hasPermission(actor, "admin") ? db.users.map(publicUser) : [],
       terrainUsers: hasPermission(actor, "write_stock") || actor.role === "terrain" ? terrainUsers : [],
       offlineQueue: []
     });
   }
 
+  if (req.method === "PATCH" && url.pathname === "/api/settings") {
+    if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
+    const body = await readBody(req);
+    db.settings = normalizeSettings(body);
+    audit(db, actor, "settings.update", { keys: Object.keys(body || {}) });
+    await writeDb(db);
+    return sendJson(res, 200, { settings: db.settings });
+  }
+
   if (req.method === "GET" && url.pathname === "/api/users") {
     if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
     return sendJson(res, 200, { users: db.users.map(publicUser) });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/users") {
+    if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
+    const body = await readBody(req);
+    const email = String(body.email || "").trim().toLowerCase();
+    const name = String(body.name || "").trim();
+    const password = String(body.password || "");
+    const allowedRoles = ["super_admin", "magasinier", "terrain", "controleur"];
+    const role = allowedRoles.includes(body.role) ? body.role : "";
+    if (!name || !email || !role || !strongPassword(password)) {
+      return sendError(res, 400, "Nom, email, role et mot de passe fort requis");
+    }
+    if (db.users.some(item => item.email === email)) {
+      return sendError(res, 409, "Un compte existe deja avec cet email");
+    }
+    const created = {
+      ...user(`USR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, email, password, name, role),
+      active: body.active !== false,
+      approved: body.approved !== false,
+      depot: String(body.depot || "").trim(),
+      team: String(body.team || "").trim(),
+      phone: String(body.phone || "").trim(),
+      jobTitle: String(body.jobTitle || "").trim()
+    };
+    db.users.push(created);
+    audit(db, actor, "user.create", { userId: created.id, email, role });
+    await writeDb(db);
+    return sendJson(res, 201, { user: publicUser(created), users: db.users.map(publicUser) });
   }
 
   const userMatch = /^\/api\/users\/([^/]+)$/.exec(url.pathname);
@@ -672,8 +926,11 @@ async function handleApi(req, res, url) {
     if (body.approved !== undefined) target.approved = Boolean(body.approved);
     if (body.depot !== undefined) target.depot = String(body.depot || "").trim();
     if (body.team !== undefined) target.team = String(body.team || "").trim();
+    if (body.phone !== undefined) target.phone = String(body.phone || "").trim();
+    if (body.jobTitle !== undefined) target.jobTitle = String(body.jobTitle || "").trim();
+    if (body.profilePhoto !== undefined) target.profilePhoto = normalizeProfilePhoto(body.profilePhoto);
     if (body.password) {
-      if (String(body.password).length < 6) return sendError(res, 400, "Mot de passe de 6 caracteres minimum requis");
+      if (!strongPassword(body.password)) return sendError(res, 400, "Mot de passe fort requis");
       target.passwordHash = hashPassword(body.password);
     }
     audit(db, actor, "user.update", { userId: target.id, fields: Object.keys(body).filter(key => key !== "password") });
@@ -755,7 +1012,6 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     const requirements = normalizeRequirements(body.requirements);
     if (!body.name || !body.client || !body.zone || !body.assignedTeam || !body.startDate || !body.endDate || !requirements.length) return sendError(res, 400, "Projet, operateur, planning, zone, equipe et poteaux demandes requis");
-    if (!OPERATORS.includes(body.client)) return sendError(res, 400, "Operateur invalide");
     if (new Date(body.endDate) < new Date(body.startDate)) return sendError(res, 400, "La date de fin doit etre apres le debut");
     const poleCount = requirements.reduce((sum, item) => sum + item.quantity, 0);
     const project = {
@@ -790,7 +1046,6 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     const requirements = normalizeRequirements(body.requirements);
     if (!body.name || !body.client || !body.zone || !body.assignedTeam || !body.startDate || !body.endDate || !requirements.length) return sendError(res, 400, "Projet, operateur, planning, zone, equipe et poteaux demandes requis");
-    if (!OPERATORS.includes(body.client)) return sendError(res, 400, "Operateur invalide");
     if (new Date(body.endDate) < new Date(body.startDate)) return sendError(res, 400, "La date de fin doit etre apres le debut");
     Object.assign(project, {
       name: String(body.name).trim(),
@@ -937,6 +1192,7 @@ async function handleApi(req, res, url) {
       validation: body.validation || "Pose - En attente validation",
       notes: body.notes || "",
       teamSignature: body.teamSignature || "",
+      teamSignatureImage: body.teamSignatureImage || "",
       clientSignature: body.clientSignature || "",
       photos,
       draft: Boolean(body.draft)
@@ -1010,6 +1266,7 @@ async function handleApi(req, res, url) {
       interventions: db.interventions,
       stockMovements: db.stockMovements || [],
       auditLog: hasPermission(actor, "admin") ? db.auditLog : [],
+      settings: db.settings || DEFAULT_SETTINGS,
       offlineQueue: []
     });
   }
@@ -1021,17 +1278,29 @@ function serveStatic(req, res, url) {
   let pathname = decodeURIComponent(url.pathname);
   if (pathname === "/") pathname = "/index.html";
   const filePath = path.normalize(path.join(ROOT, pathname));
-  if (!filePath.startsWith(ROOT)) {
-    res.writeHead(403);
+  const relativePath = path.relative(ROOT, filePath);
+  const firstSegment = relativePath.split(path.sep)[0];
+  const blocked = relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath) ||
+    firstSegment.startsWith(".") ||
+    ["data", "node_modules"].includes(firstSegment) ||
+    ["server.js", "supabase-schema.sql", "package.json", "package-lock.json"].includes(relativePath);
+  if (blocked) {
+    res.writeHead(403, securityHeaders(req, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" }));
     return res.end("Forbidden");
   }
   fs.readFile(filePath, (error, content) => {
     if (error) {
-      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.writeHead(404, securityHeaders(req, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" }));
       return res.end("Not found");
     }
+    const ext = path.extname(filePath).toLowerCase();
+    const cacheControl = [".html", ".js", ".json", ".webmanifest"].includes(ext) ? "no-cache" : "public, max-age=86400";
     res.writeHead(200, {
-      "Content-Type": mimeTypes[path.extname(filePath).toLowerCase()] || "application/octet-stream"
+      ...securityHeaders(req, {
+        "Content-Type": mimeTypes[ext] || "application/octet-stream",
+        "Cache-Control": cacheControl
+      })
     });
     res.end(content);
   });
@@ -1039,11 +1308,12 @@ function serveStatic(req, res, url) {
 
 async function handle(req, res) {
   try {
+    res._request = req;
     const url = parseUrl(req);
     if (url.pathname.startsWith("/api/")) return await handleApi(req, res, url);
     return serveStatic(req, res, url);
   } catch (error) {
-    return sendError(res, 500, error.message || "Erreur serveur");
+    return sendError(req, res, error.statusCode || 500, error.message || "Erreur serveur");
   }
 }
 

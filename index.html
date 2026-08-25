@@ -766,6 +766,80 @@
       background: var(--panel-soft);
     }
 
+    .faq-item {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-soft);
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .faq-item + .faq-item {
+      margin-top: 10px;
+    }
+
+    .faq-item summary {
+      cursor: pointer;
+      font-weight: 800;
+      padding: 14px 16px;
+      list-style-position: inside;
+    }
+
+    .faq-item p {
+      margin: 0;
+      padding: 0 16px 16px 16px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .profile-mini {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .avatar {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      overflow: hidden;
+      border: 2px solid var(--line);
+      background: linear-gradient(135deg, #0f766e, #334155);
+      color: #fff;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .avatar.small {
+      width: 34px;
+      height: 34px;
+      font-size: 12px;
+    }
+
+    .avatar.large {
+      width: 118px;
+      height: 118px;
+      font-size: 34px;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .profile-hero {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 18px;
+      align-items: center;
+    }
+
     .toast {
       position: fixed;
       left: 50%;
@@ -1119,7 +1193,6 @@
       <p>Accedez au stock, aux fiches de pose, a la carte GPS et aux rapports selon votre role.</p>
       <div class="auth-switch" role="tablist" aria-label="Options d'authentification">
         <button class="active" type="button" data-auth-mode="login">Connexion</button>
-        <button type="button" data-auth-mode="register">Creer compte</button>
         <button type="button" data-auth-mode="reset">Mot de passe</button>
       </div>
       <form class="login-form auth-form" id="loginForm" data-auth-form="login">
@@ -1158,7 +1231,7 @@
         </div>
         <div class="field password-field">
           <label for="registerPassword">Mot de passe</label>
-          <input id="registerPassword" type="password" autocomplete="new-password" minlength="6" required>
+          <input id="registerPassword" type="password" autocomplete="new-password" minlength="10" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}" title="10 caracteres minimum avec majuscule, minuscule, chiffre et symbole" required>
           <button class="password-toggle" type="button" data-toggle-password="registerPassword" title="Voir ou cacher le mot de passe" aria-label="Voir ou cacher le mot de passe">
             <svg class="icon" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
@@ -1175,7 +1248,7 @@
         </div>
         <div class="field password-field">
           <label for="resetPassword">Nouveau mot de passe</label>
-          <input id="resetPassword" type="password" autocomplete="new-password" minlength="6" required>
+          <input id="resetPassword" type="password" autocomplete="new-password" minlength="10" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}" title="10 caracteres minimum avec majuscule, minuscule, chiffre et symbole" required>
           <button class="password-toggle" type="button" data-toggle-password="resetPassword" title="Voir ou cacher le mot de passe" aria-label="Voir ou cacher le mot de passe">
             <svg class="icon" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
@@ -1211,8 +1284,13 @@
       <nav class="nav" id="desktopNav"></nav>
       <div class="sync-box">
         <div class="user-card">
-          <strong id="currentUserName">Non connecte</strong>
-          <small id="currentUserEmail">Session locale</small>
+          <div class="profile-mini">
+            <div class="avatar" id="currentUserAvatar">?</div>
+            <div>
+              <strong id="currentUserName">Non connecte</strong>
+              <small id="currentUserEmail">Session locale</small>
+            </div>
+          </div>
           <span class="badge info" id="currentUserRole">offline</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
@@ -1232,6 +1310,7 @@
           <p id="viewSubtitle">Pilotage global des stocks, poses, validations et preuves terrain.</p>
         </div>
         <div class="toolbar">
+          <div class="avatar small" id="topUserAvatar">?</div>
           <span class="badge info" id="topCurrentUser">Non connecte</span>
           <input id="globalSearch" placeholder="Recherche code/projet..." style="max-width:220px">
           <button class="btn" id="globalSearchBtn" type="button">Rechercher</button>
@@ -1258,6 +1337,7 @@
       </header>
 
       <section id="dashboardView" class="view"></section>
+      <section id="profileView" class="view hidden"></section>
       <section id="projectsView" class="view hidden"></section>
       <section id="projectClosureView" class="view hidden"></section>
       <section id="stockView" class="view hidden"></section>
@@ -1265,6 +1345,7 @@
       <section id="mapView" class="view hidden"></section>
       <section id="reportsView" class="view hidden"></section>
       <section id="adminView" class="view hidden"></section>
+      <section id="helpView" class="view hidden"></section>
     </main>
   </div>
 
@@ -1354,12 +1435,19 @@
 
         <div class="form-grid">
           <div class="field">
-            <label for="teamSignature">Signature chef d'equipe</label>
+            <label for="teamSignature">Nom chef d'equipe</label>
             <input id="teamSignature" value="A. Konan">
           </div>
           <div class="field">
             <label for="clientSignature">Controleur / Client</label>
             <input id="clientSignature" value="Controle Qualite">
+          </div>
+          <div class="field span-2">
+            <label>Signature dessinee chef d'equipe</label>
+            <canvas id="teamSignatureCanvas" width="640" height="180" style="width:100%;height:150px;border:1px solid var(--line);border-radius:8px;background:#fff;touch-action:none"></canvas>
+            <div class="toolbar" style="justify-content:flex-start;margin-top:8px">
+              <button class="btn" type="button" id="clearSignatureBtn">Effacer signature</button>
+            </div>
           </div>
         </div>
 
@@ -1394,10 +1482,7 @@
           </div>
           <div class="field">
             <label for="entryType">Type</label>
-            <select id="entryType" required>
-              <option value="BETON">BETON</option>
-              <option value="METALLIQUE">METALLIQUE</option>
-            </select>
+            <select id="entryType" required></select>
           </div>
           <div class="field">
             <label for="entryHeight">Hauteur (m)</label>
@@ -1413,7 +1498,7 @@
           </div>
           <div class="field">
             <label for="entryDepot">Depot de reception</label>
-            <input id="entryDepot" value="Depot Central" required>
+            <select id="entryDepot" required></select>
           </div>
           <div class="field span-2">
             <label for="entryMaker">Constructeur / Numero de lot</label>
@@ -1513,37 +1598,47 @@
       "Massif beton / calage",
       "Apres implantation"
     ];
+    const DEFAULT_SETTINGS = {
+      operators: ["MOOV CI", "Orange CI", "MTN CI", "CIE"],
+      poleTypes: ["BETON", "METALLIQUE"],
+      poleHeights: [7, 9, 10, 11, 12],
+      depots: ["Depot Central", "Depot Bouake", "Depot Yopougon"],
+      providerName: "ALL SERVICE",
+      gpsMaxDistanceKm: 5
+    };
 
     const navItems = [
       ["dashboard", "Tableau de bord", "Pilotage global des stocks, poses, validations et preuves terrain.", "M4 13h6V4H4v9Zm10 7h6V4h-6v16ZM4 20h6v-4H4v4Z"],
+      ["profile", "Mon profil", "Compte, photo, coordonnees, role et preferences personnelles.", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z M20 21a8 8 0 1 0-16 0"],
       ["projects", "Projets", "Creation, planning et evolution des projets d'implantation.", "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z"],
       ["projectClosure", "Cloture projets", "Validation finale des projets termines par les equipes terrain.", "M9 12l2 2 4-4 M21 12a9 9 0 1 1-9-9"],
       ["stock", "Depot & Stock", "Inventaire filtrable, requisitions et bons de sortie terrain.", "M21 8a2 2 0 0 0-1-1.73L13 2.27a2 2 0 0 0-2 0L4 6.27A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z M3.3 7 12 12l8.7-5 M12 22V12"],
       ["field", "Operations terrain", "Interface mobile offline-first pour les equipes de pose.", "M12 2 19 21 12 17 5 21 12 2Z M12 8v5"],
       ["map", "Carte GPS", "Pins OpenStreetMap colores selon les statuts de pose.", "M9 18 3 21V6l6-3 6 3 6-3v15l-6 3-6-3Z M9 3v15 M15 6v15"],
       ["reports", "Rapports PDF", "Export des fiches avec photos, GPS et emargements.", "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z M14 2v6h6 M8 13h8 M8 17h8 M8 9h2"],
-      ["admin", "Admin Utilisateurs", "Gestion des comptes, roles, approbations, depots et equipes.", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M22 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75"]
+      ["admin", "Admin Utilisateurs", "Gestion des comptes, roles, approbations, depots et equipes.", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M22 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75"],
+      ["help", "FAQ & Politiques", "Aide, politique generale, confidentialite, securite et bonnes pratiques.", "M12 17h.01 M9.09 9a3 3 0 1 1 5.83 1c0 2-3 2-3 4 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"]
     ];
 
     const roleUi = {
       super_admin: {
         home: "dashboard",
-        views: ["dashboard", "projects", "projectClosure", "stock", "field", "map", "reports", "admin"],
+        views: ["dashboard", "profile", "projects", "projectClosure", "stock", "field", "map", "reports", "admin", "help"],
         permissions: ["read", "write_stock", "write_intervention", "validate", "admin"]
       },
       magasinier: {
         home: "dashboard",
-        views: ["dashboard", "projects", "stock"],
+        views: ["dashboard", "profile", "projects", "stock", "help"],
         permissions: ["read", "write_stock"]
       },
       terrain: {
         home: "dashboard",
-        views: ["dashboard", "projects", "field", "map", "reports"],
+        views: ["dashboard", "profile", "projects", "field", "map", "reports", "help"],
         permissions: ["read", "write_intervention"]
       },
       controleur: {
         home: "dashboard",
-        views: ["dashboard", "map", "reports"],
+        views: ["dashboard", "profile", "map", "reports", "help"],
         permissions: ["read", "validate"]
       }
     };
@@ -1551,6 +1646,7 @@
     const seedData = {
       theme: "light",
       activeView: "dashboard",
+      settings: structuredClone(DEFAULT_SETTINGS),
       projects: [
         { id: "CH-MOOV-A1", name: "MOOV - Axe Yopougon PK12", client: "MOOV CI", zone: "Abidjan Nord", startDate: "2026-08-20", endDate: "2026-09-05", poleCount: 2, assignedTeam: "Equipe Terrain A", status: "Pris en main", requestStatus: "Validee", requirements: [{ type: "METALLIQUE", height: 9, quantity: 2 }], assignedPoleIds: ["POT-2026-M4-018", "POT-2026-M4-019"] },
         { id: "CH-CIE-B4", name: "CIE - Extension reseau B4", client: "CIE", zone: "Bouake Est", startDate: "2026-08-22", endDate: "2026-08-30", poleCount: 1, assignedTeam: "Equipe Terrain A", status: "En implantation", requestStatus: "Validee", requirements: [{ type: "BETON", height: 12, quantity: 1 }], assignedPoleIds: ["POT-2026-B10-021"] },
@@ -1592,11 +1688,13 @@
     let state = loadState();
     let map;
     let selectedPhotos = [];
+    let profilePhotoDraft = "";
     let apiToken = localStorage.getItem(API_TOKEN_KEY) || "";
     let apiUser = null;
     let apiPermissions = [];
     let qrScanStream = null;
     let qrScanTimer = null;
+    let signaturePad = null;
 
     function loadState() {
       try {
@@ -1616,6 +1714,17 @@
         state = slimState;
         toast("Stockage local allege: photos conservees cote serveur apres synchronisation");
       }
+    }
+
+    function appSettings() {
+      const settings = { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
+      settings.operators = Array.isArray(settings.operators) && settings.operators.length ? settings.operators : DEFAULT_SETTINGS.operators;
+      settings.poleTypes = Array.isArray(settings.poleTypes) && settings.poleTypes.length ? settings.poleTypes : DEFAULT_SETTINGS.poleTypes;
+      settings.poleHeights = Array.isArray(settings.poleHeights) && settings.poleHeights.length ? settings.poleHeights : DEFAULT_SETTINGS.poleHeights;
+      settings.depots = Array.isArray(settings.depots) && settings.depots.length ? settings.depots : DEFAULT_SETTINGS.depots;
+      settings.gpsMaxDistanceKm = Number.isFinite(Number(settings.gpsMaxDistanceKm)) ? Number(settings.gpsMaxDistanceKm) : DEFAULT_SETTINGS.gpsMaxDistanceKm;
+      state.settings = settings;
+      return state.settings;
     }
 
     function stripPhotoData(value) {
@@ -1666,6 +1775,22 @@
       }[role] || role || "offline";
     }
 
+    function userInitials(user = apiUser) {
+      const source = String(user?.name || user?.email || "?").trim();
+      const parts = source.split(/\s+/).filter(Boolean);
+      return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : source.slice(0, 2)).toUpperCase();
+    }
+
+    function avatarHtml(user = apiUser, size = "") {
+      const klass = size ? `avatar ${size}` : "avatar";
+      return `<div class="${klass}">${user?.profilePhoto ? `<img src="${escapeAttr(user.profilePhoto)}" alt="Photo de profil">` : escapeHtml(userInitials(user))}</div>`;
+    }
+
+    function setAvatar(node, user = apiUser) {
+      if (!node) return;
+      node.innerHTML = user?.profilePhoto ? `<img src="${escapeAttr(user.profilePhoto)}" alt="Photo de profil">` : escapeHtml(userInitials(user));
+    }
+
     function currentRoleUi() {
       return roleUi[apiUser?.role] || { home: "dashboard", views: ["dashboard"], permissions: ["read"] };
     }
@@ -1693,6 +1818,8 @@
       $("#currentUserEmail").textContent = apiUser?.email || "Session locale";
       $("#currentUserRole").textContent = roleLabel(apiUser?.role);
       $("#topCurrentUser").textContent = apiUser ? `${apiUser.name} - ${roleLabel(apiUser.role)}` : "Non connecte";
+      setAvatar($("#currentUserAvatar"));
+      setAvatar($("#topUserAvatar"));
       $("#seedBtn").classList.toggle("hidden", !can("admin"));
       $("#newInterventionBtn").classList.toggle("hidden", !can("write_intervention"));
       $("#scanQrBtn").classList.toggle("hidden", !(can("write_intervention") || can("validate") || can("admin")));
@@ -1732,30 +1859,8 @@
     }
 
     async function registerAccount() {
-      const payload = await apiFetch("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({
-          name: $("#registerName").value.trim(),
-          email: $("#registerEmail").value.trim(),
-          role: $("#registerRole").value,
-          password: $("#registerPassword").value
-        })
-      });
-      if (payload.pending) {
-        setAuthMode("login");
-        $("#loginEmail").value = $("#registerEmail").value.trim();
-        toast("Compte cree. En attente d'approbation administrateur.");
-        return;
-      }
-      apiToken = payload.token;
-      apiUser = payload.user;
-      apiPermissions = roleUi[apiUser.role]?.permissions || [];
-      localStorage.setItem(API_TOKEN_KEY, apiToken);
-      await loadBackendData();
-      hideLogin();
-      renderNav();
-      setView(defaultViewForRole());
-      toast(`Compte cree: ${apiUser.name}`);
+      setAuthMode("login");
+      throw new Error("Creation de compte reservee a l'administrateur");
     }
 
     async function resetPassword() {
@@ -1798,6 +1903,7 @@
       try {
         const payload = await apiFetch("/bootstrap");
         apiUser = payload.user;
+        profilePhotoDraft = "";
         apiPermissions = payload.permissions || roleUi[apiUser.role]?.permissions || [];
         state = {
           ...state,
@@ -1806,6 +1912,7 @@
           interventions: payload.interventions,
           stockMovements: payload.stockMovements || state.stockMovements || [],
           auditLog: payload.auditLog || state.auditLog || [],
+          settings: { ...DEFAULT_SETTINGS, ...(payload.settings || state.settings || {}) },
           users: payload.users || state.users || [],
           terrainUsers: payload.terrainUsers || payload.users?.filter(user => user.role === "terrain") || state.terrainUsers || [],
           offlineQueue: state.offlineQueue || []
@@ -1816,6 +1923,7 @@
       } catch (error) {
         apiToken = "";
         apiUser = null;
+        profilePhotoDraft = "";
         apiPermissions = [];
         localStorage.removeItem(API_TOKEN_KEY);
         showLogin(error.message === "Authentification requise" ? "Session expiree" : "Connexion backend requise");
@@ -1905,12 +2013,14 @@
 
     function renderCurrentView() {
       renderDashboard();
+      renderProfile();
       renderProjects();
       renderProjectClosure();
       renderStock();
       renderField();
       renderReports();
       renderAdmin();
+      renderHelp();
       populateFormSelects();
       updateNetwork();
     }
@@ -2027,6 +2137,109 @@
           ${dashboard.body}
         </div>
       `;
+    }
+
+    function renderProfile() {
+      const node = $("#profileView");
+      if (!node) return;
+      const settings = appSettings();
+      const user = apiUser || {};
+      const photo = profilePhotoDraft || user.profilePhoto || "";
+      const myReports = state.interventions.filter(item => item.agentId === user.id || item.agent === user.name);
+      const assignedProjects = user.role === "terrain"
+        ? state.projects.filter(project => project.assignedTeam === terrainTeamOf(user))
+        : state.projects;
+      node.innerHTML = `
+        <div class="card">
+          <div class="section-head">
+            <div class="profile-hero">
+              ${avatarHtml({ ...user, profilePhoto: photo }, "large")}
+              <div>
+                <h3>${escapeHtml(user.name || "Mon profil")}</h3>
+                <p class="muted" style="margin:4px 0 0">${escapeHtml(user.email || "Email non renseigne")} - ${escapeHtml(roleLabel(user.role))}</p>
+              </div>
+            </div>
+            <span class="badge ${user.approved === false ? "warn" : "ok"}">${user.approved === false ? "En attente" : "Compte actif"}</span>
+          </div>
+          <div class="section-body">
+            <form id="profileForm" class="grid">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="profileName">Nom complet</label>
+                  <input id="profileName" value="${escapeAttr(user.name || "")}" required>
+                </div>
+                <div class="field">
+                  <label for="profileEmail">Email</label>
+                  <input id="profileEmail" value="${escapeAttr(user.email || "")}" disabled>
+                </div>
+                <div class="field">
+                  <label for="profilePhone">Telephone</label>
+                  <input id="profilePhone" value="${escapeAttr(user.phone || "")}" placeholder="+225 00 00 00 00 00">
+                </div>
+                <div class="field">
+                  <label for="profileJobTitle">Fonction</label>
+                  <input id="profileJobTitle" value="${escapeAttr(user.jobTitle || "")}" placeholder="Chef equipe, magasinier, controleur...">
+                </div>
+                <div class="field">
+                  <label>Role</label>
+                  <input value="${escapeAttr(roleLabel(user.role))}" disabled>
+                </div>
+                <div class="field">
+                  <label>Depot / Equipe</label>
+                  <input value="${escapeAttr([user.depot, user.team].filter(Boolean).join(" - ") || "Non renseigne")}" disabled>
+                </div>
+                <div class="field span-2">
+                  <label for="profilePhotoInput">Photo du compte</label>
+                  <input id="profilePhotoInput" type="file" accept="image/png,image/jpeg,image/webp">
+                  <small class="muted">Image JPEG, PNG ou WebP. Elle sera compressee avant sauvegarde.</small>
+                </div>
+                <div class="field span-2">
+                  <label for="profilePassword">Nouveau mot de passe</label>
+                  <input id="profilePassword" type="password" autocomplete="new-password" minlength="10" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{10,}" title="10 caracteres minimum avec majuscule, minuscule, chiffre et symbole" placeholder="Laisser vide pour ne pas changer">
+                </div>
+              </div>
+              <div class="toolbar" style="justify-content:flex-start">
+                <button class="btn primary" type="submit">${icon("M20 6 9 17l-5-5")} Enregistrer mon profil</button>
+                <button class="btn" type="button" onclick="clearProfilePhoto()">Retirer la photo</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="grid stats" style="margin-top:16px">
+          ${metric("Projets visibles", assignedProjects.length, "Selon votre role")}
+          ${metric("Fiches liees", myReports.length, "Votre activite terrain")}
+          ${metric("Operateurs", settings.operators.length, "Parametres application")}
+          ${metric("GPS max", `${settings.gpsMaxDistanceKm} km`, "Alerte distance projet")}
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Parametres de votre compte</h3>
+            <span class="badge info">Lecture seule</span>
+          </div>
+          <div class="section-body">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Parametre</th><th>Valeur</th></tr></thead>
+                <tbody>
+                  <tr><td>ID utilisateur</td><td>${escapeHtml(user.id || "N/A")}</td></tr>
+                  <tr><td>Role applicatif</td><td>${escapeHtml(roleLabel(user.role))}</td></tr>
+                  <tr><td>Permissions</td><td>${escapeHtml((apiPermissions || []).join(", ") || "Lecture")}</td></tr>
+                  <tr><td>Depot</td><td>${escapeHtml(user.depot || "Non renseigne")}</td></tr>
+                  <tr><td>Equipe</td><td>${escapeHtml(user.team || "Non renseignee")}</td></tr>
+                  <tr><td>Operateurs projet</td><td>${escapeHtml(settings.operators.join(", "))}</td></tr>
+                  <tr><td>Types de poteaux</td><td>${escapeHtml(settings.poleTypes.join(", "))}</td></tr>
+                  <tr><td>Depots disponibles</td><td>${escapeHtml(settings.depots.join(", "))}</td></tr>
+                  <tr><td>Prestataire PDF</td><td>${escapeHtml(settings.providerName)}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+      $("#profileForm")?.addEventListener("submit", saveMyProfile);
+      $("#profilePhotoInput")?.addEventListener("change", handleProfilePhoto);
     }
 
     function metric(label, value, hint) {
@@ -2317,6 +2530,7 @@
       const node = $("#projectsView");
       if (!node) return;
       const teams = terrainUsersForAssignment();
+      const settings = appSettings();
       const visibleProjects = apiUser?.role === "terrain"
         ? terrainProjects()
         : state.projects;
@@ -2336,10 +2550,7 @@
                     <label for="projectClient">Operateur</label>
                     <select id="projectClient" required>
                       <option value="">Selectionner</option>
-                      <option value="MOOV CI">MOOV CI</option>
-                      <option value="Orange CI">Orange CI</option>
-                      <option value="MTN CI">MTN CI</option>
-                      <option value="CIE">CIE</option>
+                      ${settings.operators.map(operator => `<option value="${escapeAttr(operator)}">${escapeHtml(operator)}</option>`).join("")}
                     </select>
                   </div>
                   <div class="field"><label for="projectZone">Zone d'intervention</label><input id="projectZone" required></div>
@@ -2452,6 +2663,35 @@
         </div>
         ${renderAdminAudit()}
         ${renderAnomalyCenter()}
+      `;
+    }
+
+    function renderAdminSettings() {
+      const settings = appSettings();
+      return `
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Parametres application</h3>
+            <div class="toolbar">
+              <button class="btn" type="button" onclick="exportBackup()">Sauvegarde JSON</button>
+              <label class="btn" for="restoreBackupInput">Restaurer JSON</label>
+              <input id="restoreBackupInput" class="hidden" type="file" accept=".json,application/json">
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="form-grid">
+              <div class="field span-2"><label for="settingsOperators">Operateurs</label><input id="settingsOperators" value="${escapeAttr(settings.operators.join(", "))}"></div>
+              <div class="field"><label for="settingsTypes">Types poteaux</label><input id="settingsTypes" value="${escapeAttr(settings.poleTypes.join(", "))}"></div>
+              <div class="field"><label for="settingsHeights">Hauteurs</label><input id="settingsHeights" value="${escapeAttr(settings.poleHeights.join(", "))}"></div>
+              <div class="field span-2"><label for="settingsDepots">Depots</label><input id="settingsDepots" value="${escapeAttr(settings.depots.join(", "))}"></div>
+              <div class="field"><label for="settingsProvider">Prestataire PDF</label><input id="settingsProvider" value="${escapeAttr(settings.providerName)}"></div>
+              <div class="field"><label for="settingsGpsDistance">Distance GPS max zone (km)</label><input id="settingsGpsDistance" type="number" min="0.1" step="0.1" value="${escapeAttr(settings.gpsMaxDistanceKm)}"></div>
+            </div>
+            <div class="toolbar" style="justify-content:flex-start;margin-top:12px">
+              <button class="btn primary" type="button" onclick="saveAppSettings()">Enregistrer les parametres</button>
+            </div>
+          </div>
+        </div>
       `;
     }
 
@@ -3096,6 +3336,120 @@
       `;
     }
 
+    function renderHelp() {
+      const role = roleLabel(apiUser?.role);
+      $("#helpView").innerHTML = `
+        <div class="grid stats">
+          ${metric("FAQ", "12", "Questions frequentes")}
+          ${metric("Politiques", "5", "Regles generales")}
+          ${metric("Securite", "Active", "Protections serveur")}
+          ${metric("Profil", role, "Regles selon votre role")}
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>FAQ operationnelle</h3>
+            <span class="badge info">Aide terrain</span>
+          </div>
+          <div class="section-body">
+            ${faqItem("Quand un poteau apparait-il sur la carte ?", "Un poteau apparait sur la carte uniquement lorsqu'il possede des coordonnees GPS valides. Les poteaux sans latitude/longitude, avec 0/0 ou avec des valeurs invalides sont masques automatiquement.")}
+            ${faqItem("Que signifient les couleurs sur la carte ?", "Vert signifie poteau valide. Orange signifie pose en attente de validation. Rouge signifie anomalie signalee par le controleur ou l'admin.")}
+            ${faqItem("Quels poteaux le technicien voit-il dans le champ poteau attribue ?", "Le technicien voit seulement les poteaux en transit attribues a son equipe, generalement apres validation de la demande stock par le gestionnaire.")}
+            ${faqItem("A quoi sert le QR code du poteau ?", "Le QR code identifie le poteau physiquement. Il sert a selectionner le bon poteau, verifier son code avant implantation et controler apres pose que le poteau scanne correspond au poteau enregistre.")}
+            ${faqItem("Quelle photo est utilisee dans le rapport PDF ?", "Le rapport reprend les photos ajoutees dans la fiche de pose terrain, notamment la photo obligatoire Apres implantation. Les autres etapes documentent la fouille, le marquage, le levage et le massif.")}
+            ${faqItem("Qui valide un poteau implante ?", "Le controleur valide la conformite technique. L'admin peut aussi intervenir selon les permissions. Le technicien enregistre la pose mais ne valide pas lui-meme la conformite finale.")}
+            ${faqItem("Qui cloture un projet ?", "Le technicien demande la cloture lorsque toutes les poses du projet sont terminees. L'admin valide ensuite la cloture si toutes les fiches sont conformes et sans anomalie ouverte.")}
+            ${faqItem("Que se passe-t-il apres creation d'un projet ?", "Le projet passe en demande stock. Le gestionnaire verifie les disponibilites, affecte les poteaux disponibles, puis envoie le projet a l'equipe terrain.")}
+            ${faqItem("Pourquoi une alerte GPS peut apparaitre ?", "L'alerte apparait si une nouvelle position semble trop eloignee du centre des poses deja enregistrees pour le meme projet. Elle aide a eviter une erreur de localisation.")}
+            ${faqItem("Comment traiter une anomalie ?", "Le controleur ou l'admin indique le motif, suit l'etat de l'anomalie, puis la passe en corrigee lorsque le terrain a repris le point. La fiche revient alors en attente de validation.")}
+            ${faqItem("Peut-on travailler hors connexion ?", "Oui, l'app garde une logique offline-first cote navigateur. Les donnees saisies localement sont conservees et la synchronisation reprend quand le backend est disponible.")}
+            ${faqItem("Le rapport PDF projet se genere quand ?", "Le rapport projet devient disponible apres validation de cloture par l'admin. Il peut ensuite etre telecharge ou imprime depuis Rapports PDF.")}
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Politique generale</h3>
+            <span class="badge ok">Workflow officiel</span>
+          </div>
+          <div class="section-body">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Theme</th><th>Regle</th><th>Responsable</th></tr></thead>
+                <tbody>
+                  <tr><td>Creation projet</td><td>L'admin cree le projet avec operateur, zone, planning, equipe et besoins en poteaux.</td><td>Admin</td></tr>
+                  <tr><td>Stock</td><td>Le gestionnaire valide uniquement les poteaux disponibles et les affecte a l'equipe terrain.</td><td>Gestionnaire</td></tr>
+                  <tr><td>Implantation</td><td>Le technicien implante seulement les poteaux attribues a son equipe et capture GPS, photos et signature.</td><td>Technicien terrain</td></tr>
+                  <tr><td>Controle</td><td>La conformite est validee apres verification documentaire, QR, GPS et photos.</td><td>Controleur / Admin</td></tr>
+                  <tr><td>Cloture</td><td>Un projet cloture ne doit plus etre modifie ni supprime sauf procedure exceptionnelle hors application.</td><td>Admin</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Confidentialite et donnees</h3>
+            <span class="badge warn">Donnees sensibles</span>
+          </div>
+          <div class="section-body">
+            ${policyItem("Donnees collectees", "L'application conserve les comptes utilisateurs, roles, projets, mouvements de stock, fiches de pose, coordonnees GPS, photos, signatures et journaux d'audit.")}
+            ${policyItem("Finalite", "Ces donnees servent au suivi des poteaux, a la preuve d'implantation, au controle qualite, a la cloture projet et a la generation des rapports.")}
+            ${policyItem("Acces par role", "Chaque role voit uniquement les modules necessaires a son travail. Les operations admin et les changements de compte restent reserves aux profils autorises.")}
+            ${policyItem("Conservation", "Les rapports, photos et journaux doivent etre conserves selon les exigences internes du projet et les obligations contractuelles avec l'operateur.")}
+            ${policyItem("Export et sauvegarde", "Les exports CSV, PDF et JSON doivent etre stockes dans un emplacement controle, car ils peuvent contenir des informations terrain sensibles.")}
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Politique securite</h3>
+            <span class="badge danger">Protection</span>
+          </div>
+          <div class="section-body">
+            ${policyItem("Comptes", "Utiliser un compte nominatif par personne. Ne pas partager les identifiants entre admin, gestionnaire, technicien et controleur.")}
+            ${policyItem("Mots de passe", "Les nouveaux mots de passe doivent etre forts: 10 caracteres minimum avec majuscule, minuscule, chiffre et symbole.")}
+            ${policyItem("QR code", "Scanner le QR code avant et apres implantation pour eviter les inversions de poteaux et renforcer la tracabilite.")}
+            ${policyItem("Photos", "Ne joindre que les photos du chantier concerne. Eviter les informations inutiles visibles en arriere-plan.")}
+            ${policyItem("Incident", "En cas de doute sur un compte, une exportation suspecte ou une modification non reconnue, l'admin doit desactiver le compte et verifier le journal d'audit.")}
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Conditions d'utilisation</h3>
+            <span class="badge info">Bonnes pratiques</span>
+          </div>
+          <div class="section-body">
+            ${policyItem("Exactitude terrain", "Chaque utilisateur est responsable de l'exactitude des informations qu'il saisit: code poteau, GPS, projet, photos, observations et signatures.")}
+            ${policyItem("Usage autorise", "L'application doit etre utilisee uniquement pour le suivi des projets d'implantation et les activites associees au stock, au controle et aux rapports.")}
+            ${policyItem("Validation", "Une validation confirme la conformite constatee au moment du controle. Toute correction ulterieure doit passer par le suivi d'anomalie.")}
+            ${policyItem("Documents", "Les PDF et exports generes constituent des pieces de suivi. Ils doivent etre verifies avant transmission externe ou impression d'attachement.")}
+          </div>
+        </div>
+      `;
+    }
+
+    function faqItem(question, answer) {
+      return `
+        <details class="faq-item">
+          <summary>${escapeHtml(question)}</summary>
+          <p>${escapeHtml(answer)}</p>
+        </details>
+      `;
+    }
+
+    function policyItem(title, text) {
+      return `
+        <div class="report-row">
+          <div>
+            <strong>${escapeHtml(title)}</strong>
+            <p class="muted" style="margin:4px 0 0">${escapeHtml(text)}</p>
+          </div>
+        </div>
+      `;
+    }
+
     function renderAdmin() {
       const node = $("#adminView");
       if (!node) return;
@@ -3112,6 +3466,59 @@
           ${metric("Actifs", active, "Peuvent se connecter")}
           ${metric("En attente", pending, "A approuver")}
           ${metric("Roles", new Set(users.map(user => user.role)).size, "Profils utilises")}
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="section-head">
+            <h3>Creer un utilisateur</h3>
+            <span class="badge ok">Admin seulement</span>
+          </div>
+          <div class="section-body">
+            <form id="adminCreateUserForm" class="grid">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="newUserName">Nom complet</label>
+                  <input id="newUserName" autocomplete="name" placeholder="Ex: Koffi Traore" required>
+                </div>
+                <div class="field">
+                  <label for="newUserEmail">Email</label>
+                  <input id="newUserEmail" type="email" autocomplete="email" placeholder="nom@entreprise.com" required>
+                </div>
+                <div class="field">
+                  <label for="newUserRole">Role</label>
+                  <select id="newUserRole" required>
+                    <option value="terrain">Technicien terrain</option>
+                    <option value="magasinier">Gestionnaire depot</option>
+                    <option value="controleur">Controleur qualite</option>
+                    <option value="super_admin">Administrateur</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="newUserPassword">Mot de passe initial</label>
+                  <input id="newUserPassword" type="password" autocomplete="new-password" minlength="10" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{10,}" title="10 caracteres minimum avec majuscule, minuscule, chiffre et symbole" required>
+                </div>
+                <div class="field">
+                  <label for="newUserDepot">Depot</label>
+                  <input id="newUserDepot" placeholder="Depot Central">
+                </div>
+                <div class="field">
+                  <label for="newUserTeam">Equipe</label>
+                  <input id="newUserTeam" placeholder="Equipe Terrain A">
+                </div>
+                <div class="field">
+                  <label for="newUserPhone">Telephone</label>
+                  <input id="newUserPhone" placeholder="+225 00 00 00 00 00">
+                </div>
+                <div class="field">
+                  <label for="newUserJobTitle">Fonction</label>
+                  <input id="newUserJobTitle" placeholder="Chef equipe, magasinier...">
+                </div>
+              </div>
+              <div class="toolbar" style="justify-content:flex-start">
+                <button class="btn primary" type="submit">${icon("M12 5v14M5 12h14")} Creer le compte</button>
+                <button class="btn" type="reset">Vider</button>
+              </div>
+            </form>
+          </div>
         </div>
         <div class="card" style="margin-top:16px">
           <div class="section-head">
@@ -3156,7 +3563,7 @@
                           Approuve
                         </label>
                       </td>
-                      <td><input data-user-field="password" type="password" minlength="6" placeholder="Optionnel"></td>
+                      <td><input data-user-field="password" type="password" minlength="10" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}" title="10 caracteres minimum avec majuscule, minuscule, chiffre et symbole" placeholder="Optionnel"></td>
                       <td>
                         <button class="btn primary" type="button" onclick="saveUserAdmin('${user.id}')">Sauver</button>
                       </td>
@@ -3167,17 +3574,21 @@
             </div>
           </div>
         </div>
+        ${renderAdminSettings()}
+        ${renderAdminAudit()}
+        ${renderAnomalyCenter()}
       `;
+      $("#adminCreateUserForm")?.addEventListener("submit", createUserAdmin);
     }
 
     function projectRequirementRow(index, requirement = {}) {
+      const settings = appSettings();
       return `
         <tr data-project-need="${index}">
           <td>
             <select data-project-field="type">
               <option value="">--</option>
-              <option value="BETON" ${requirement.type === "BETON" ? "selected" : ""}>BETON</option>
-              <option value="METALLIQUE" ${requirement.type === "METALLIQUE" ? "selected" : ""}>METALLIQUE</option>
+              ${settings.poleTypes.map(type => `<option value="${escapeAttr(type)}" ${requirement.type === type ? "selected" : ""}>${escapeHtml(type)}</option>`).join("")}
             </select>
           </td>
           <td><input data-project-field="height" type="number" min="3" max="30" step="0.5" placeholder="12" value="${escapeAttr(requirement.height || "")}"></td>
@@ -3354,6 +3765,36 @@
       }
     }
 
+    async function createUserAdmin(event) {
+      event.preventDefault();
+      const payload = {
+        name: $("#newUserName").value.trim(),
+        email: $("#newUserEmail").value.trim(),
+        role: $("#newUserRole").value,
+        password: $("#newUserPassword").value,
+        depot: $("#newUserDepot").value.trim(),
+        team: $("#newUserTeam").value.trim(),
+        phone: $("#newUserPhone").value.trim(),
+        jobTitle: $("#newUserJobTitle").value.trim(),
+        active: true,
+        approved: true
+      };
+      try {
+        await ensureApiSession();
+        const response = await apiFetch("/users", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        state.users = response.users;
+        event.target.reset();
+        saveState();
+        renderCurrentView();
+        toast("Utilisateur cree");
+      } catch (error) {
+        toast(error.message || "Creation utilisateur impossible");
+      }
+    }
+
     async function saveUserAdmin(userId) {
       const row = $(`[data-user-row="${userId}"]`);
       if (!row) return;
@@ -3413,6 +3854,7 @@
       const pole = state.poles.find(item => item.id === $("#poleId").value);
       if (pole?.projectId) $("#project").value = pole.projectId;
       fillFallbackGps();
+      initSignaturePad();
     }
 
     function closeDrawer() {
@@ -3420,15 +3862,92 @@
       $("#interventionDrawer").setAttribute("aria-hidden", "true");
     }
 
+    function initSignaturePad() {
+      const canvas = $("#teamSignatureCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#17211f";
+      let drawing = false;
+      const point = event => {
+        const rect = canvas.getBoundingClientRect();
+        const touch = event.touches?.[0] || event;
+        return {
+          x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+          y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+        };
+      };
+      const start = event => {
+        drawing = true;
+        const p = point(event);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        event.preventDefault();
+      };
+      const move = event => {
+        if (!drawing) return;
+        const p = point(event);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        event.preventDefault();
+      };
+      const end = () => { drawing = false; };
+      canvas.onmousedown = start;
+      canvas.onmousemove = move;
+      canvas.onmouseup = end;
+      canvas.onmouseleave = end;
+      canvas.ontouchstart = start;
+      canvas.ontouchmove = move;
+      canvas.ontouchend = end;
+      signaturePad = { canvas, ctx };
+      clearSignature();
+    }
+
+    function clearSignature() {
+      const canvas = $("#teamSignatureCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function signatureDataUrl() {
+      const canvas = $("#teamSignatureCanvas");
+      if (!canvas) return "";
+      const ctx = canvas.getContext("2d");
+      const blank = document.createElement("canvas");
+      blank.width = canvas.width;
+      blank.height = canvas.height;
+      return canvas.toDataURL() === blank.toDataURL() ? "" : canvas.toDataURL("image/png");
+    }
+
+    function refreshStockEntryOptions() {
+      const settings = appSettings();
+      const typeSelect = $("#entryType");
+      const depotSelect = $("#entryDepot");
+      if (typeSelect) {
+        typeSelect.innerHTML = settings.poleTypes
+          .map(type => `<option value="${escapeAttr(type)}">${escapeHtml(type)}</option>`)
+          .join("");
+      }
+      if (depotSelect) {
+        depotSelect.innerHTML = settings.depots
+          .map(depot => `<option value="${escapeAttr(depot)}">${escapeHtml(depot)}</option>`)
+          .join("");
+      }
+    }
+
     function openStockEntryDrawer() {
+      const settings = appSettings();
       $("#stockEntryDrawer").classList.add("open");
       $("#stockEntryDrawer").setAttribute("aria-hidden", "false");
+      refreshStockEntryOptions();
       $("#stockEntryForm").reset();
-      $("#entryType").value = "BETON";
-      $("#entryHeight").value = "7";
+      $("#entryType").value = settings.poleTypes[0] || "BETON";
+      $("#entryHeight").value = settings.poleHeights[0] || "7";
       $("#entryEffort").value = "400 daN";
       $("#entryWeight").value = "850";
-      $("#entryDepot").value = "Depot Central";
+      $("#entryDepot").value = settings.depots[0] || "Depot Central";
       $("#entryStatus").value = "En Stock";
       $("#entryCode").value = generatePoleCode();
       $("#entryMaker").value = "SIPREL / Lot " + new Date().getFullYear();
@@ -3767,6 +4286,84 @@
       });
     }
 
+    function compressProfilePhoto(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = reject;
+          img.onload = () => {
+            const size = 360;
+            const scale = Math.max(size / img.width, size / img.height);
+            const width = Math.round(img.width * scale);
+            const height = Math.round(img.height * scale);
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, Math.round((size - width) / 2), Math.round((size - height) / 2), width, height);
+            resolve(canvas.toDataURL("image/jpeg", 0.82));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function handleProfilePhoto(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      if (!/^image\/(png|jpeg|jpg|webp)$/i.test(file.type)) {
+        toast("Format photo non autorise");
+        return;
+      }
+      try {
+        profilePhotoDraft = await compressProfilePhoto(file);
+        renderProfile();
+        toast("Photo prete a enregistrer");
+      } catch {
+        toast("Impossible de lire la photo");
+      }
+    }
+
+    function clearProfilePhoto() {
+      profilePhotoDraft = "";
+      if (apiUser) apiUser.profilePhoto = "";
+      renderProfile();
+      updateCurrentUser();
+      toast("Photo retiree. Enregistrez le profil pour confirmer.");
+    }
+
+    async function saveMyProfile(event) {
+      event?.preventDefault();
+      if (!apiUser) return toast("Connexion requise");
+      const password = $("#profilePassword")?.value || "";
+      const payload = {
+        name: $("#profileName").value.trim(),
+        phone: $("#profilePhone").value.trim(),
+        jobTitle: $("#profileJobTitle").value.trim(),
+        profilePhoto: profilePhotoDraft || apiUser.profilePhoto || ""
+      };
+      if (password) payload.password = password;
+      try {
+        await ensureApiSession();
+        const response = await apiFetch("/me", {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+        apiUser = response.user;
+        profilePhotoDraft = "";
+        state.users = (state.users || []).map(user => user.id === apiUser.id ? { ...user, ...apiUser } : user);
+        saveState();
+        updateCurrentUser();
+        renderCurrentView();
+        toast("Profil enregistre");
+      } catch (error) {
+        toast(error.message || "Profil non enregistre");
+      }
+    }
+
     function fillFallbackGps() {
       if (!$("#latitude").value) $("#latitude").value = (5.35 + Math.random() * .08).toFixed(6);
       if (!$("#longitude").value) $("#longitude").value = (-4.05 + Math.random() * .08).toFixed(6);
@@ -3788,6 +4385,25 @@
       }, { enableHighAccuracy: true, timeout: 9000 });
     }
 
+    function distanceKm(aLat, aLng, bLat, bLng) {
+      const toRad = value => Number(value) * Math.PI / 180;
+      const r = 6371;
+      const dLat = toRad(bLat - aLat);
+      const dLng = toRad(bLng - aLng);
+      const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+      return 2 * r * Math.asin(Math.sqrt(x));
+    }
+
+    function gpsProjectWarning(projectId, lat, lng) {
+      const refs = state.interventions.filter(item => item.projectId === projectId && !item.draft && Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lng)));
+      if (!refs.length) return "";
+      const centerLat = refs.reduce((sum, item) => sum + Number(item.lat), 0) / refs.length;
+      const centerLng = refs.reduce((sum, item) => sum + Number(item.lng), 0) / refs.length;
+      const distance = distanceKm(centerLat, centerLng, lat, lng);
+      const max = Number(appSettings().gpsMaxDistanceKm || 5);
+      return distance > max ? `Position GPS eloignee de ${distance.toFixed(1)} km du centre du projet. Continuer ?` : "";
+    }
+
     async function saveIntervention(isDraft = false) {
       const form = $("#interventionForm");
       if (!isDraft && !form.reportValidity()) {
@@ -3798,6 +4414,10 @@
         toast("Ajoutez au moins les 4 photos obligatoires");
         return;
       }
+      if (!isDraft && !selectedPhotos.some(photo => /apres implantation/i.test(photo?.step || ""))) {
+        toast("La photo Apres implantation est obligatoire");
+        return;
+      }
       const submitButton = form.querySelector("button[type='submit']");
       const originalSubmit = submitButton?.innerHTML;
       if (submitButton) {
@@ -3806,6 +4426,14 @@
       }
       const poleId = $("#poleId").value;
       const date = new Date().toISOString();
+      const gpsWarning = !isDraft ? gpsProjectWarning($("#project").value, Number($("#latitude").value), Number($("#longitude").value)) : "";
+      if (gpsWarning && !confirm(gpsWarning)) {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.innerHTML = originalSubmit;
+        }
+        return;
+      }
       const intervention = {
         id: `RPT-${new Date().getFullYear()}-${String(state.interventions.length + 1).padStart(4, "0")}`,
         poleId,
@@ -3819,6 +4447,7 @@
         validation: $("#validation").value,
         notes: $("#notes").value,
         teamSignature: $("#teamSignature").value,
+        teamSignatureImage: signatureDataUrl(),
         clientSignature: $("#clientSignature").value,
         photos: selectedPhotos.filter(Boolean),
         draft: isDraft
@@ -3950,7 +4579,7 @@
       doc.setFontSize(10);
       doc.text(createdBy, 26, 260, { maxWidth: 38 });
       doc.text(project.status || "N/A", 72, 260, { maxWidth: 34 });
-      doc.text("ALL SERVICE", 112, 260, { maxWidth: 38 });
+      doc.text(appSettings().providerName || "ALL SERVICE", 112, 260, { maxWidth: 38 });
       doc.text(project.client || "N/A", 158, 260, { maxWidth: 28 });
 
       doc.addPage();
@@ -4179,8 +4808,13 @@
         styles: { fontSize: 9, minCellHeight: 14 },
         headStyles: { fillColor: [15, 118, 110] }
       });
+      if (intervention.teamSignatureImage) {
+        try {
+          doc.addImage(intervention.teamSignatureImage, "PNG", 18, doc.lastAutoTable.finalY + 6, 52, 18);
+        } catch {}
+      }
       doc.setFontSize(9);
-      doc.text(`Observations: ${intervention.notes || "RAS"}`, 14, doc.lastAutoTable.finalY + 8, { maxWidth: 180 });
+      doc.text(`Observations: ${intervention.notes || "RAS"}`, 14, doc.lastAutoTable.finalY + 30, { maxWidth: 180 });
       doc.save(`${intervention.id}-${intervention.poleId}.pdf`);
     }
 
@@ -4252,6 +4886,69 @@
       const header = ["id", "poleId", "projectId", "agent", "date", "lat", "lng", "soil", "depth", "validation", "anomalyStatus", "anomalyReason", "notes"];
       const rows = state.interventions.map(item => header.map(key => `"${String(item[key] ?? "").replaceAll('"', '""')}"`).join(","));
       downloadText(`fiches-pose-${new Date().toISOString().slice(0, 10)}.csv`, [header.join(","), ...rows].join("\n"), "text/csv");
+    }
+
+    function listFromInput(id, numeric = false) {
+      return ($(`#${id}`)?.value || "")
+        .split(",")
+        .map(item => item.trim())
+        .filter(Boolean)
+        .map(item => numeric ? Number(item) : item)
+        .filter(item => numeric ? Number.isFinite(item) : true);
+    }
+
+    async function saveAppSettings() {
+      state.settings = {
+        operators: listFromInput("settingsOperators"),
+        poleTypes: listFromInput("settingsTypes"),
+        poleHeights: listFromInput("settingsHeights", true),
+        depots: listFromInput("settingsDepots"),
+        providerName: $("#settingsProvider").value.trim() || DEFAULT_SETTINGS.providerName,
+        gpsMaxDistanceKm: Number($("#settingsGpsDistance").value || DEFAULT_SETTINGS.gpsMaxDistanceKm)
+      };
+      state.settings = appSettings();
+      saveState();
+      let synced = false;
+      try {
+        await ensureApiSession();
+        const payload = await apiFetch("/settings", {
+          method: "PATCH",
+          body: JSON.stringify(state.settings)
+        });
+        state.settings = { ...DEFAULT_SETTINGS, ...(payload.settings || state.settings) };
+        saveState();
+        synced = true;
+      } catch (error) {
+        console.info("Parametres conserves localement:", error.message);
+      }
+      refreshStockEntryOptions();
+      renderCurrentView();
+      toast(synced ? "Parametres enregistres et synchronises" : "Parametres enregistres localement");
+    }
+
+    function exportBackup() {
+      downloadText(`sauvegarde-suivi-poteaux-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(state, null, 2), "application/json");
+    }
+
+    function restoreBackup(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const restored = JSON.parse(reader.result);
+          state = { ...seedData, ...restored, settings: { ...DEFAULT_SETTINGS, ...(restored.settings || {}) } };
+          saveState();
+          renderNav();
+          refreshStockEntryOptions();
+          renderCurrentView();
+          toast("Sauvegarde restauree");
+        } catch {
+          toast("Fichier de sauvegarde invalide");
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = "";
     }
 
     async function photoUrlToDataUrl(url) {
@@ -4367,17 +5064,8 @@
       });
       $("#registerForm").addEventListener("submit", async event => {
         event.preventDefault();
-        const button = event.submitter;
-        button.disabled = true;
-        button.textContent = "Creation...";
-        try {
-          await registerAccount();
-        } catch (error) {
-          showLogin(error.message || "Creation impossible");
-        } finally {
-          button.disabled = false;
-          button.innerHTML = `${icon("M12 5v14M5 12h14")} Creer le compte`;
-        }
+        setAuthMode("login");
+        showLogin("Creation de compte reservee a l'administrateur.");
       });
       $("#resetForm").addEventListener("submit", async event => {
         event.preventDefault();
@@ -4400,6 +5088,7 @@
         button.addEventListener("click", () => togglePassword(button.dataset.togglePassword, button));
       });
       $("#gpsBtn").addEventListener("click", captureGps);
+      $("#clearSignatureBtn").addEventListener("click", clearSignature);
       $("#fieldScanQrBtn").addEventListener("click", openQrScanDrawer);
       $("#draftBtn").addEventListener("click", () => saveIntervention(true));
       $("#interventionForm").addEventListener("submit", event => {
@@ -4436,6 +5125,9 @@
           verifyQrPole($("#manualQrCode").value);
         }
       });
+      document.addEventListener("change", event => {
+        if (event.target?.id === "restoreBackupInput") restoreBackup(event);
+      });
       window.addEventListener("online", updateNetwork);
       window.addEventListener("offline", updateNetwork);
       if ("serviceWorker" in navigator) {
@@ -4465,6 +5157,7 @@
     window.generatePdf = generatePdf;
     window.validateReport = validateReport;
     window.refreshUsers = refreshUsers;
+    window.createUserAdmin = createUserAdmin;
     window.saveUserAdmin = saveUserAdmin;
     window.printEntryQrLabel = printEntryQrLabel;
     window.openQrScanDrawer = openQrScanDrawer;
@@ -4474,6 +5167,11 @@
     window.exportProjectsCsv = exportProjectsCsv;
     window.exportInterventionsCsv = exportInterventionsCsv;
     window.globalSearch = globalSearch;
+    window.saveAppSettings = saveAppSettings;
+    window.exportBackup = exportBackup;
+    window.restoreBackup = restoreBackup;
+    window.clearSignature = clearSignature;
+    window.clearProfilePhoto = clearProfilePhoto;
 
     boot();
   </script>

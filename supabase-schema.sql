@@ -13,6 +13,9 @@ create table if not exists public.app_users (
   approved boolean not null default true,
   depot text,
   team text,
+  phone text,
+  job_title text,
+  profile_photo text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -44,7 +47,7 @@ create table if not exists public.projects (
 
 create table if not exists public.poles (
   id text primary key,
-  type text not null check (type in ('BETON', 'METALLIQUE')),
+  type text not null,
   height numeric not null,
   effort text,
   weight numeric,
@@ -74,6 +77,7 @@ create table if not exists public.interventions (
   validation text not null default 'Pose - En attente validation',
   notes text,
   team_signature text,
+  team_signature_image text,
   client_signature text,
   validated_by text references public.app_users(id) on update cascade,
   validated_at timestamptz,
@@ -115,6 +119,16 @@ create table if not exists public.audit_log (
   date timestamptz not null default now()
 );
 
+create table if not exists public.app_settings (
+  id text primary key,
+  value jsonb not null default '{}',
+  updated_at timestamptz not null default now()
+);
+
+alter table public.poles drop constraint if exists poles_type_check;
+alter table public.app_users add column if not exists phone text;
+alter table public.app_users add column if not exists job_title text;
+alter table public.app_users add column if not exists profile_photo text;
 alter table public.poles add column if not exists assigned_team text;
 alter table public.poles add column if not exists project_id text;
 alter table public.projects add column if not exists start_date date;
@@ -136,6 +150,7 @@ alter table public.projects add column if not exists closed_by text;
 alter table public.projects add column if not exists closed_at timestamptz;
 alter table public.interventions add column if not exists anomaly_reason text;
 alter table public.interventions add column if not exists anomaly_status text;
+alter table public.interventions add column if not exists team_signature_image text;
 
 create index if not exists idx_poles_status on public.poles(status);
 create index if not exists idx_poles_depot on public.poles(depot);
@@ -154,6 +169,7 @@ alter table public.interventions enable row level security;
 alter table public.intervention_photos enable row level security;
 alter table public.stock_movements enable row level security;
 alter table public.audit_log enable row level security;
+alter table public.app_settings enable row level security;
 
 -- L'API Node utilise SUPABASE_SERVICE_ROLE_KEY cote serveur.
 -- Le role service_role contourne RLS. Ne jamais exposer cette cle dans le frontend.
@@ -164,6 +180,14 @@ revoke all on table public.interventions from anon, authenticated;
 revoke all on table public.intervention_photos from anon, authenticated;
 revoke all on table public.stock_movements from anon, authenticated;
 revoke all on table public.audit_log from anon, authenticated;
+revoke all on table public.app_settings from anon, authenticated;
+
+insert into public.app_settings (id, value)
+values (
+  'default',
+  '{"operators":["MOOV CI","Orange CI","MTN CI","CIE"],"poleTypes":["BETON","METALLIQUE"],"poleHeights":[7,9,10,11,12],"depots":["Depot Central","Depot Bouake","Depot Yopougon"],"providerName":"ALL SERVICE","gpsMaxDistanceKm":5}'::jsonb
+)
+on conflict (id) do nothing;
 
 insert into public.app_users (id, email, password_hash, name, role, active, approved, depot, team)
 values
