@@ -52,7 +52,6 @@ const DEFAULT_SETTINGS = {
   poleTypes: ["BETON", "METALLIQUE"],
   poleHeights: [7, 9, 10, 11, 12],
   depots: ["Depot Central", "Depot Bouake", "Depot Yopougon"],
-  providerName: "ALL SERVICE",
   gpsMaxDistanceKm: 5
 };
 
@@ -401,7 +400,6 @@ function normalizeSettings(settings = {}) {
     poleTypes: arrayValue(settings.poleTypes, DEFAULT_SETTINGS.poleTypes).map(String),
     poleHeights: arrayValue(settings.poleHeights, DEFAULT_SETTINGS.poleHeights).map(Number).filter(Number.isFinite),
     depots: arrayValue(settings.depots, DEFAULT_SETTINGS.depots).map(String),
-    providerName: String(settings.providerName || DEFAULT_SETTINGS.providerName),
     gpsMaxDistanceKm: Number(settings.gpsMaxDistanceKm || DEFAULT_SETTINGS.gpsMaxDistanceKm)
   };
 }

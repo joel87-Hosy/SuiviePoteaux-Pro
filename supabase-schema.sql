@@ -185,7 +185,7 @@ revoke all on table public.app_settings from anon, authenticated;
 insert into public.app_settings (id, value)
 values (
   'default',
-  '{"operators":["MOOV CI","Orange CI","MTN CI","CIE"],"poleTypes":["BETON","METALLIQUE"],"poleHeights":[7,9,10,11,12],"depots":["Depot Central","Depot Bouake","Depot Yopougon"],"providerName":"ALL SERVICE","gpsMaxDistanceKm":5}'::jsonb
+  '{"operators":["MOOV CI","Orange CI","MTN CI","CIE"],"poleTypes":["BETON","METALLIQUE"],"poleHeights":[7,9,10,11,12],"depots":["Depot Central","Depot Bouake","Depot Yopougon"],"gpsMaxDistanceKm":5}'::jsonb
 )
 on conflict (id) do nothing;
 
