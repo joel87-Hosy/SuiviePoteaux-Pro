@@ -2084,19 +2084,14 @@
                 </div>
                 <div class="table-wrap">
                   <table>
-                    <thead><tr><th>Type</th><th>Hauteur</th><th>Nombre</th></tr></thead>
-                    <tbody>
-                      ${[0, 1, 2, 3].map(index => `
-                        <tr data-project-need="${index}">
-                          <td><select data-project-field="type"><option value="">--</option><option value="BETON">BETON</option><option value="METALLIQUE">METALLIQUE</option></select></td>
-                          <td><input data-project-field="height" type="number" min="3" max="30" step="0.5" placeholder="12"></td>
-                          <td><input data-project-field="quantity" type="number" min="1" step="1" placeholder="10"></td>
-                        </tr>
-                      `).join("")}
+                    <thead><tr><th>Type</th><th>Hauteur</th><th>Nombre</th><th></th></tr></thead>
+                    <tbody id="projectNeedsBody">
+                      ${projectRequirementRow(0)}
                     </tbody>
                   </table>
                 </div>
                 <div class="toolbar" style="justify-content:flex-start">
+                  <button class="btn" type="button" onclick="addProjectRequirement()">${icon("M12 5v14M5 12h14")} Ajouter poteau</button>
                   <button class="btn primary" type="submit">${icon("M12 5v14M5 12h14")} Enregistrer le projet</button>
                 </div>
               </form>
@@ -2764,6 +2759,50 @@
       `;
     }
 
+    function projectRequirementRow(index, requirement = {}) {
+      return `
+        <tr data-project-need="${index}">
+          <td>
+            <select data-project-field="type">
+              <option value="">--</option>
+              <option value="BETON" ${requirement.type === "BETON" ? "selected" : ""}>BETON</option>
+              <option value="METALLIQUE" ${requirement.type === "METALLIQUE" ? "selected" : ""}>METALLIQUE</option>
+            </select>
+          </td>
+          <td><input data-project-field="height" type="number" min="3" max="30" step="0.5" placeholder="12" value="${escapeAttr(requirement.height || "")}"></td>
+          <td><input data-project-field="quantity" type="number" min="1" step="1" placeholder="10" value="${escapeAttr(requirement.quantity || "")}"></td>
+          <td><button class="btn" type="button" onclick="removeProjectRequirement(this)">Supprimer</button></td>
+        </tr>
+      `;
+    }
+
+    function renderProjectRequirementRows(requirements = [{}]) {
+      const rows = requirements.length ? requirements : [{}];
+      const body = $("#projectNeedsBody");
+      if (!body) return;
+      body.innerHTML = rows.map((requirement, index) => projectRequirementRow(index, requirement)).join("");
+    }
+
+    function addProjectRequirement(requirement = {}) {
+      const body = $("#projectNeedsBody");
+      if (!body) return;
+      const index = $all("[data-project-need]", body).length;
+      body.insertAdjacentHTML("beforeend", projectRequirementRow(index, requirement));
+    }
+
+    function removeProjectRequirement(button) {
+      const rows = $all("[data-project-need]");
+      if (rows.length <= 1) {
+        const row = rows[0];
+        if (!row) return;
+        $('[data-project-field="type"]', row).value = "";
+        $('[data-project-field="height"]', row).value = "";
+        $('[data-project-field="quantity"]', row).value = "";
+        return;
+      }
+      button.closest("[data-project-need]")?.remove();
+    }
+
     function projectFormRequirements() {
       return $all("[data-project-need]").map(row => ({
         type: $('[data-project-field="type"]', row).value,
@@ -2776,6 +2815,7 @@
       $("#projectForm")?.reset();
       if ($("#projectEditId")) $("#projectEditId").value = "";
       if ($("#projectFormTitle")) $("#projectFormTitle").textContent = "Nouveau projet";
+      renderProjectRequirementRows();
     }
 
     function fillProjectForm(project) {
@@ -2788,12 +2828,7 @@
       $("#projectTeam").value = project.assignedTeam || "";
       $("#projectStart").value = project.startDate || "";
       $("#projectEnd").value = project.endDate || "";
-      $all("[data-project-need]").forEach((row, index) => {
-        const need = (project.requirements || [])[index] || {};
-        $('[data-project-field="type"]', row).value = need.type || "";
-        $('[data-project-field="height"]', row).value = need.height || "";
-        $('[data-project-field="quantity"]', row).value = need.quantity || "";
-      });
+      renderProjectRequirementRows(project.requirements || [{}]);
     }
 
     function viewProject(projectId) {
@@ -3703,6 +3738,8 @@
     window.editProject = editProject;
     window.deleteProject = deleteProject;
     window.resetProjectForm = resetProjectForm;
+    window.addProjectRequirement = addProjectRequirement;
+    window.removeProjectRequirement = removeProjectRequirement;
     window.generateProjectPdf = generateProjectPdf;
     window.generatePdf = generatePdf;
     window.validateReport = validateReport;
