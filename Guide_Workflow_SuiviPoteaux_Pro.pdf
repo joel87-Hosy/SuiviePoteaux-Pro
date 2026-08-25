@@ -1,0 +1,631 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 1122 >>
+stream
+BT
+50 790 Td
+/F2 18 Tf
+(Guide workflow et utilisation - SuiviPoteaux Pro) Tj
+0 -36 Td
+/F1 10 Tf
+(Ce document decrit le workflow complet de l'application SuiviPoteaux Pro et explique) Tj
+0 -14 Td
+/F1 10 Tf
+(l'utilisation de chaque compte selon son role. Il sert de guide operationnel pour les) Tj
+0 -14 Td
+/F1 10 Tf
+(projets d'implantation, le stock, le terrain, le controle qualite, la carte GPS, les) Tj
+0 -14 Td
+/F1 10 Tf
+(rapports PDF et la cloture.) Tj
+0 -14 Td
+0 -7 Td
+/F2 14 Tf
+(Objectif de l'application) Tj
+0 -26 Td
+/F1 10 Tf
+(- Suivre les projets d'implantation de poteaux depuis la creation jusqu'a la cloture.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Gerer les stocks de poteaux, leurs mouvements, leurs affectations et leurs QR codes.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Permettre au technicien terrain de saisir les poses avec GPS, photos et signature.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Permettre au controleur et a l'admin de valider la conformite ou declarer une anomalie.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Generer les rapports PDF et conserver une tracabilite audit/stock.) Tj
+0 -14 Td
+ET
+BT /F1 8 Tf 50 32 Td
+(Page 1 / 8 - SuiviPoteaux Pro) Tj
+ET
+endstream
+endobj
+4 0 obj
+<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+endobj
+5 0 obj
+<< /Length 1902 >>
+stream
+BT
+50 790 Td
+/F2 18 Tf
+(Workflow general) Tj
+0 -36 Td
+/F2 14 Tf
+(Flux principal) Tj
+0 -26 Td
+/F1 10 Tf
+(1. L'admin cree un projet avec le nom, l'operateur, la zone, le planning, l'equipe et le) Tj
+0 -14 Td
+/F1 10 Tf
+(   besoin en poteaux.) Tj
+0 -14 Td
+/F1 10 Tf
+(2. Le projet passe en demande stock.) Tj
+0 -14 Td
+/F1 10 Tf
+(3. Le gestionnaire depot verifie le stock disponible et valide les poteaux demandes.) Tj
+0 -14 Td
+/F1 10 Tf
+(4. Les poteaux sont affectes au projet et envoyes a l'equipe terrain.) Tj
+0 -14 Td
+/F1 10 Tf
+(5. Le technicien prend en main le projet et implante uniquement les poteaux attribues a) Tj
+0 -14 Td
+/F1 10 Tf
+(   son equipe.) Tj
+0 -14 Td
+/F1 10 Tf
+(6. Chaque pose genere une fiche avec QR, GPS, photos obligatoires, signature et) Tj
+0 -14 Td
+/F1 10 Tf
+(   observations.) Tj
+0 -14 Td
+/F1 10 Tf
+(7. Le controleur verifie les fiches et valide ou signale une anomalie.) Tj
+0 -14 Td
+/F1 10 Tf
+(8. Quand toutes les poses sont terminees, le technicien demande la cloture.) Tj
+0 -14 Td
+/F1 10 Tf
+(9. L'admin valide la cloture si toutes les fiches sont conformes et sans anomalie) Tj
+0 -14 Td
+/F1 10 Tf
+(   ouverte.) Tj
+0 -14 Td
+/F1 10 Tf
+(10. Le rapport PDF du projet cloture devient disponible pour telechargement ou impression.) Tj
+0 -14 Td
+/F2 14 Tf
+(Statuts importants) Tj
+0 -26 Td
+/F1 10 Tf
+(- Planifie: projet cree ou en preparation.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Demande stock: demande envoyee au gestionnaire.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Envoye terrain: poteaux affectes et transmis au terrain.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Pris en main: projet accepte par l'equipe terrain.) Tj
+0 -14 Td
+/F1 10 Tf
+(- En implantation: poses en cours.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Cloture demandee: le technicien a termine et demande validation finale.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Cloture: validation finale effectuee par l'admin.) Tj
+0 -14 Td
+ET
+BT /F1 8 Tf 50 32 Td
+(Page 2 / 8 - SuiviPoteaux Pro) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 2095 >>
+stream
+BT
+50 790 Td
+/F2 18 Tf
+(Role Administrateur) Tj
+0 -36 Td
+/F2 14 Tf
+(Responsabilites) Tj
+0 -26 Td
+/F1 10 Tf
+(- Creer les projets d'implantation.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Creer les comptes utilisateurs depuis l'onglet Admin Utilisateurs.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Affecter les roles, depots et equipes.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Consulter les projets, stocks, fiches, anomalies, audit et rapports.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Valider la cloture des projets.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Gerer les parametres application.) Tj
+0 -14 Td
+/F2 14 Tf
+(Guide d'utilisation admin) Tj
+0 -26 Td
+/F1 10 Tf
+(1. Se connecter avec un compte administrateur.) Tj
+0 -14 Td
+/F1 10 Tf
+(2. Ouvrir l'onglet Admin Utilisateurs pour creer ou modifier les comptes.) Tj
+0 -14 Td
+/F1 10 Tf
+(3. Ouvrir l'onglet Projets pour creer un projet: nom, operateur, zone, equipe, dates) Tj
+0 -14 Td
+/F1 10 Tf
+(   debut/fin, types et quantites de poteaux.) Tj
+0 -14 Td
+/F1 10 Tf
+(4. Suivre l'evolution du projet avec le pourcentage calcule sur les poteaux poses.) Tj
+0 -14 Td
+/F1 10 Tf
+(5. Consulter l'onglet Cloture projets pour valider les demandes venant du terrain.) Tj
+0 -14 Td
+/F1 10 Tf
+(6. Verifier qu'il n'existe aucune anomalie ouverte avant validation finale.) Tj
+0 -14 Td
+/F1 10 Tf
+(7. Telecharger ou imprimer le rapport PDF depuis Rapports PDF.) Tj
+0 -14 Td
+/F2 14 Tf
+(Onglets principaux admin) Tj
+0 -26 Td
+/F1 10 Tf
+(- Tableau de bord: indicateurs globaux.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Mon profil: informations du compte, photo et mot de passe.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Projets: creation, modification, suppression hors projet cloture.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Cloture projets: validation finale.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Depot & Stock: consultation globale.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Carte GPS: positions des poteaux avec coordonnees valides.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Rapports PDF: fiches et rapports projets.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Admin Utilisateurs: creation et gestion des comptes.) Tj
+0 -14 Td
+/F1 10 Tf
+(- FAQ & Politiques: guide et regles.) Tj
+0 -14 Td
+ET
+BT /F1 8 Tf 50 32 Td
+(Page 3 / 8 - SuiviPoteaux Pro) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 7 0 R >>
+endobj
+9 0 obj
+<< /Length 1461 >>
+stream
+BT
+50 790 Td
+/F2 18 Tf
+(Role Gestionnaire depot) Tj
+0 -36 Td
+/F2 14 Tf
+(Responsabilites) Tj
+0 -26 Td
+/F1 10 Tf
+(- Enregistrer les poteaux en stock.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Generer le code texte et le QR code du poteau.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Valider les demandes de poteaux venant des projets.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Affecter les poteaux disponibles a l'equipe terrain.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Suivre les mouvements de stock.) Tj
+0 -14 Td
+/F2 14 Tf
+(Guide d'utilisation gestionnaire) Tj
+0 -26 Td
+/F1 10 Tf
+(1. Se connecter avec le compte magasinier/gestionnaire depot.) Tj
+0 -14 Td
+/F1 10 Tf
+(2. Ouvrir Depot & Stock.) Tj
+0 -14 Td
+/F1 10 Tf
+(3. Ajouter un poteau en depot avec son code, type, hauteur, effort, poids, constructeur) Tj
+0 -14 Td
+/F1 10 Tf
+(   et depot.) Tj
+0 -14 Td
+/F1 10 Tf
+(4. Imprimer ou recuperer le QR code a coller sur le poteau.) Tj
+0 -14 Td
+/F1 10 Tf
+(5. Consulter les projets en demande stock.) Tj
+0 -14 Td
+/F1 10 Tf
+(6. Valider la demande si les poteaux sont disponibles.) Tj
+0 -14 Td
+/F1 10 Tf
+(7. Verifier le bon de sortie et les mouvements de stock.) Tj
+0 -14 Td
+/F2 14 Tf
+(Regles stock) Tj
+0 -26 Td
+/F1 10 Tf
+(- Un poteau attribue au terrain passe en statut En Transit.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Le technicien ne voit que les poteaux attribues a son equipe.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Chaque entree, sortie ou mouvement est trace dans l'historique.) Tj
+0 -14 Td
+ET
+BT /F1 8 Tf 50 32 Td
+(Page 4 / 8 - SuiviPoteaux Pro) Tj
+ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 9 0 R >>
+endobj
+11 0 obj
+<< /Length 1820 >>
+stream
+BT
+50 790 Td
+/F2 18 Tf
+(Role Technicien terrain) Tj
+0 -36 Td
+/F2 14 Tf
+(Responsabilites) Tj
+0 -26 Td
+/F1 10 Tf
+(- Prendre en main les projets envoyes a son equipe.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Implanter uniquement les poteaux attribues.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Scanner le QR code pour verifier le bon poteau.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Capturer la position GPS.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Ajouter les photos obligatoires, dont Apres implantation.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Signer la fiche terrain.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Demander la cloture du projet lorsque toutes les poses sont terminees.) Tj
+0 -14 Td
+/F2 14 Tf
+(Guide d'utilisation technicien) Tj
+0 -26 Td
+/F1 10 Tf
+(1. Se connecter avec le compte terrain.) Tj
+0 -14 Td
+/F1 10 Tf
+(2. Ouvrir Operations terrain pour voir les projets et poteaux disponibles.) Tj
+0 -14 Td
+/F1 10 Tf
+(3. Cliquer sur Prendre en main si le projet vient d'etre envoye au terrain.) Tj
+0 -14 Td
+/F1 10 Tf
+(4. Cliquer sur Nouvelle pose.) Tj
+0 -14 Td
+/F1 10 Tf
+(5. Selectionner le poteau attribue ou scanner le QR code.) Tj
+0 -14 Td
+/F1 10 Tf
+(6. Capturer le GPS ou verifier la position renseignee.) Tj
+0 -14 Td
+/F1 10 Tf
+(7. Completer type de sol, profondeur, observations et signature.) Tj
+0 -14 Td
+/F1 10 Tf
+(8. Ajouter les photos obligatoires.) Tj
+0 -14 Td
+/F1 10 Tf
+(9. Enregistrer la fiche de pose.) Tj
+0 -14 Td
+/F1 10 Tf
+(10. Quand tous les poteaux sont poses, demander la cloture du projet.) Tj
+0 -14 Td
+/F2 14 Tf
+(Photos terrain) Tj
+0 -26 Td
+/F1 10 Tf
+(- Avant travaux - fouille.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Marquage constructeur.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Levage et aplomb.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Massif beton / calage.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Apres implantation: photo obligatoire pour finaliser la fiche.) Tj
+0 -14 Td
+ET
+BT /F1 8 Tf 50 32 Td
+(Page 5 / 8 - SuiviPoteaux Pro) Tj
+ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 11 0 R >>
+endobj
+13 0 obj
+<< /Length 1122 >>
+stream
+BT
+50 790 Td
+/F2 18 Tf
+(Role Controleur qualite) Tj
+0 -36 Td
+/F2 14 Tf
+(Responsabilites) Tj
+0 -26 Td
+/F1 10 Tf
+(- Verifier les fiches de pose.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Controler QR, GPS, photos, observations et conformite.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Valider une fiche conforme.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Declarer une anomalie avec motif si la pose est non conforme.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Suivre la correction d'anomalie.) Tj
+0 -14 Td
+/F2 14 Tf
+(Guide d'utilisation controleur) Tj
+0 -26 Td
+/F1 10 Tf
+(1. Se connecter avec le compte controleur.) Tj
+0 -14 Td
+/F1 10 Tf
+(2. Ouvrir Rapports PDF ou Carte GPS pour consulter les poses.) Tj
+0 -14 Td
+/F1 10 Tf
+(3. Examiner la fiche: poteau, projet, GPS, photos, signature et observations.) Tj
+0 -14 Td
+/F1 10 Tf
+(4. Cliquer sur Valider si tout est conforme.) Tj
+0 -14 Td
+/F1 10 Tf
+(5. Cliquer sur Non conforme si une anomalie existe et renseigner le motif.) Tj
+0 -14 Td
+/F1 10 Tf
+(6. Suivre l'anomalie jusqu'a correction.) Tj
+0 -14 Td
+/F1 10 Tf
+(7. Revalider apres correction si la fiche est conforme.) Tj
+0 -14 Td
+ET
+BT /F1 8 Tf 50 32 Td
+(Page 6 / 8 - SuiviPoteaux Pro) Tj
+ET
+endstream
+endobj
+14 0 obj
+<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 13 0 R >>
+endobj
+15 0 obj
+<< /Length 1268 >>
+stream
+BT
+50 790 Td
+/F2 18 Tf
+(Carte GPS, QR code et anomalies) Tj
+0 -36 Td
+/F2 14 Tf
+(Carte GPS) Tj
+0 -26 Td
+/F1 10 Tf
+(- La carte affiche uniquement les poteaux avec coordonnees GPS valides.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Les poteaux sans latitude/longitude ou avec 0/0 sont masques pour eviter les points dans) Tj
+0 -14 Td
+/F1 10 Tf
+(  la mer.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Vert: poteau valide.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Orange: pose en attente de validation.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Rouge: anomalie.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Survol: information courte. Clic: details complets du poteau.) Tj
+0 -14 Td
+/F2 14 Tf
+(QR code) Tj
+0 -26 Td
+/F1 10 Tf
+(- Le QR code identifie physiquement le poteau.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Il doit etre genere avec le code texte du poteau et colle sur le poteau.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Le technicien, le controleur et l'admin peuvent scanner le QR code pour verifier le) Tj
+0 -14 Td
+/F1 10 Tf
+(  poteau.) Tj
+0 -14 Td
+/F2 14 Tf
+(Anomalies) Tj
+0 -26 Td
+/F1 10 Tf
+(- L'anomalie est declaree par le controleur ou l'admin.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Elle doit contenir un motif clair.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Apres correction terrain, la fiche revient en attente de validation.) Tj
+0 -14 Td
+ET
+BT /F1 8 Tf 50 32 Td
+(Page 7 / 8 - SuiviPoteaux Pro) Tj
+ET
+endstream
+endobj
+16 0 obj
+<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 15 0 R >>
+endobj
+17 0 obj
+<< /Length 1409 >>
+stream
+BT
+50 790 Td
+/F2 18 Tf
+(Rapports PDF, securite et bonnes pratiques) Tj
+0 -36 Td
+/F2 14 Tf
+(Rapports PDF) Tj
+0 -26 Td
+/F1 10 Tf
+(- Les fiches PDF contiennent les informations de pose, GPS, photos, signatures et) Tj
+0 -14 Td
+/F1 10 Tf
+(  observations.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Le rapport projet est disponible apres cloture validee par l'admin.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Le rapport peut etre telecharge ou imprime pour l'attachement.) Tj
+0 -14 Td
+/F2 14 Tf
+(Securite) Tj
+0 -26 Td
+/F1 10 Tf
+(- Les comptes sont crees par l'admin depuis Admin Utilisateurs.) Tj
+0 -14 Td
+/F1 10 Tf
+(- L'inscription publique est desactivee par defaut.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Les mots de passe forts sont obligatoires pour les nouveaux comptes.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Les exports CSV, PDF et JSON doivent etre conserves dans un emplacement controle.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Les actions sensibles sont tracees dans le journal d'audit.) Tj
+0 -14 Td
+/F2 14 Tf
+(Bonnes pratiques) Tj
+0 -26 Td
+/F1 10 Tf
+(- Toujours scanner le QR code avant implantation.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Verifier la position GPS avant d'enregistrer.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Ne pas cloturer un projet avec anomalie ouverte.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Ne pas partager les comptes utilisateurs.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Mettre a jour la photo et les informations dans Mon profil.) Tj
+0 -14 Td
+ET
+BT /F1 8 Tf 50 32 Td
+(Page 8 / 8 - SuiviPoteaux Pro) Tj
+ET
+endstream
+endobj
+18 0 obj
+<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 17 0 R >>
+endobj
+19 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R 8 0 R 10 0 R 12 0 R 14 0 R 16 0 R 18 0 R] /Count 8 >>
+endobj
+20 0 obj
+<< /Type /Catalog /Pages 19 0 R >>
+endobj
+xref
+0 21
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000000154 00000 n 
+0000001328 00000 n 
+0000001465 00000 n 
+0000003419 00000 n 
+0000003556 00000 n 
+0000005703 00000 n 
+0000005840 00000 n 
+0000007353 00000 n 
+0000007491 00000 n 
+0000009364 00000 n 
+0000009503 00000 n 
+0000010678 00000 n 
+0000010817 00000 n 
+0000012138 00000 n 
+0000012277 00000 n 
+0000013739 00000 n 
+0000013878 00000 n 
+0000013983 00000 n 
+trailer
+<< /Size 21 /Root 20 0 R >>
+startxref
+14034
+%%EOF
