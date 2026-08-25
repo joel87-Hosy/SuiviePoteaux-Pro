@@ -10,7 +10,7 @@
     {
       "id": "USR-002",
       "email": "depot@itc.local",
-      "passwordHash": "d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791",
+      "passwordHash": "pbkdf2$120000$2d9c3874acd98051ec93f84f7a9f873e$8899340c2adfab690c7d8d73d57bc596ff9a2dfbfa264c543b1eeaeea1877e52",
       "name": "Magasin Central",
       "role": "magasinier"
     },
