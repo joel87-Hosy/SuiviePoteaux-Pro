@@ -678,6 +678,56 @@
       overflow: hidden;
     }
 
+    .leaflet-container {
+      overflow: hidden;
+      position: relative;
+      outline: 0;
+      background: #ddd;
+      font: 12px/1.5 Arial, Helvetica, sans-serif;
+    }
+
+    .leaflet-pane,
+    .leaflet-tile,
+    .leaflet-marker-icon,
+    .leaflet-marker-shadow,
+    .leaflet-tile-container,
+    .leaflet-pane > svg,
+    .leaflet-pane > canvas,
+    .leaflet-zoom-box,
+    .leaflet-image-layer,
+    .leaflet-layer {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+
+    .leaflet-tile {
+      width: 256px;
+      height: 256px;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .leaflet-control-container .leaflet-top,
+    .leaflet-control-container .leaflet-bottom {
+      position: absolute;
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    .leaflet-top { top: 0; }
+    .leaflet-right { right: 0; }
+    .leaflet-bottom { bottom: 0; }
+    .leaflet-left { left: 0; }
+
+    .leaflet-control {
+      position: relative;
+      z-index: 800;
+      pointer-events: auto;
+      float: left;
+      clear: both;
+    }
+
     .map-card .section-body {
       padding: 0;
     }

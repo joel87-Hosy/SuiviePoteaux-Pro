@@ -453,7 +453,7 @@ function securityHeaders(req, extra = {}) {
       "frame-ancestors 'none'",
       "form-action 'self'",
       "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://unpkg.com",
       "img-src 'self' data: blob: https:",
       "connect-src 'self' https:",
       "worker-src 'self'"

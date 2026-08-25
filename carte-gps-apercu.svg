@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760">
+  <rect width="1280" height="760" fill="#eef3ef"/>
+  <rect x="28" y="24" width="1224" height="704" rx="8" fill="#ffffff" stroke="#dbe3df"/>
+  <rect x="28" y="24" width="1224" height="58" rx="8" fill="#ffffff"/>
+  <line x1="28" y1="82" x2="1252" y2="82" stroke="#dbe3df"/>
+  <text x="48" y="60" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#101514">Carte interactive GPS</text>
+  <rect x="995" y="40" width="232" height="30" rx="15" fill="#e6eef7"/>
+  <text x="1010" y="60" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#0f559f">4 position(s) GPS - 3 sans GPS masqué(s)</text>
+
+  <defs>
+    <pattern id="grid" width="120" height="120" patternUnits="userSpaceOnUse">
+      <rect width="120" height="120" fill="#f4f1ea"/>
+      <path d="M0 60 H120 M60 0 V120" stroke="#e4ded4" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <clipPath id="mapClip">
+    <rect x="28" y="82" width="1224" height="646" rx="0"/>
+  </clipPath>
+  <g clip-path="url(#mapClip)">
+    <rect x="28" y="82" width="1224" height="646" fill="url(#grid)"/>
+    <path d="M-20 610 C120 560 180 500 290 520 C440 548 505 430 650 450 C780 468 840 360 960 330 C1080 302 1160 240 1320 260" fill="none" stroke="#d9a548" stroke-width="5" opacity=".72"/>
+    <path d="M90 126 C185 192 234 276 210 396 C190 500 232 610 338 738" fill="none" stroke="#c8a7c9" stroke-width="4" opacity=".7"/>
+    <path d="M560 82 C598 210 700 250 756 334 C820 430 798 536 870 728" fill="none" stroke="#c8a7c9" stroke-width="4" opacity=".7"/>
+    <path d="M402 700 C480 610 600 610 684 544 C774 474 802 390 904 354 C1030 310 1122 338 1228 260" fill="none" stroke="#a9d5e8" stroke-width="4" opacity=".85"/>
+    <g fill="#9dcd95" opacity=".88">
+      <path d="M78 214 160 172 230 228 210 332 96 350z"/>
+      <path d="M840 96 920 118 944 210 854 244 796 178z"/>
+      <path d="M948 510 1068 470 1150 540 1106 660 974 642z"/>
+      <path d="M394 290 468 246 540 302 514 398 410 386z"/>
+    </g>
+    <g font-family="Segoe UI, Arial, sans-serif" fill="#717b78" font-size="15" font-weight="600" opacity=".8">
+      <text x="260" y="520">Zone chantier</text>
+      <text x="706" y="376">Axe principal</text>
+      <text x="990" y="292">Abidjan Nord</text>
+      <text x="442" y="182">Dépôt</text>
+    </g>
+
+    <g stroke="#ffffff" stroke-width="4">
+      <circle cx="342" cy="484" r="11" fill="#d89f2b"/>
+      <circle cx="616" cy="438" r="11" fill="#127a43"/>
+      <circle cx="812" cy="392" r="11" fill="#b42318"/>
+      <circle cx="1010" cy="330" r="11" fill="#127a43"/>
+    </g>
+
+    <g transform="translate(48 640)">
+      <rect width="142" height="72" rx="8" fill="#ffffff" fill-opacity=".94" stroke="#dbe3df"/>
+      <g font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#17211f">
+        <circle cx="18" cy="18" r="5" fill="#127a43"/>
+        <text x="32" y="22">Valide</text>
+        <circle cx="18" cy="38" r="5" fill="#d89f2b"/>
+        <text x="32" y="42">En attente</text>
+        <circle cx="18" cy="58" r="5" fill="#b42318"/>
+        <text x="32" y="62">Anomalie</text>
+      </g>
+    </g>
+  </g>
+</svg>
