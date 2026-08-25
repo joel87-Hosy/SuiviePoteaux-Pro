@@ -2116,7 +2116,14 @@
     }
 
     function hasPoleCoordinates(pole) {
-      return Number.isFinite(Number(pole.lat)) && Number.isFinite(Number(pole.lng));
+      const hasLat = pole.lat !== null && pole.lat !== undefined && String(pole.lat).trim() !== "";
+      const hasLng = pole.lng !== null && pole.lng !== undefined && String(pole.lng).trim() !== "";
+      if (!hasLat || !hasLng) return false;
+      const lat = Number(pole.lat);
+      const lng = Number(pole.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+      if (lat === 0 && lng === 0) return false;
+      return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
     }
 
     function mapPoleDetails(pole) {
