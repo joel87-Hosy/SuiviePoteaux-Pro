@@ -2628,12 +2628,29 @@
       const visibleProjects = apiUser?.role === "terrain"
         ? terrainProjects()
         : state.projects;
+      const totalProjects = state.projects.length;
+      const closedProjects = state.projects.filter(project => project.status === "Cloture").length;
+      const currentProjects = totalProjects - closedProjects;
       node.innerHTML = `
         ${can("admin") ? `
-          <div class="card" style="margin-bottom:16px">
+          <div class="section-head">
+            <div>
+              <h3>Indicateurs projets</h3>
+              <p class="muted" style="margin:4px 0 0">Suivi global du portefeuille projets.</p>
+            </div>
+            <button class="btn primary" type="button" onclick="openProjectForm()">${icon("M12 5v14M5 12h14")} Nouveau projet</button>
+          </div>
+          <div class="grid stats" style="margin:16px 0">
+            ${metric("Total projets enregistres", totalProjects, "Tous les projets")}
+            ${metric("Projets en cours", currentProjects, "Projets non clotures")}
+            ${metric("Projets clotures", closedProjects, "Projets termines")}
+          </div>
+        ` : ""}
+        ${can("admin") ? `
+          <div class="card hidden" id="projectFormCard" style="margin-bottom:16px">
             <div class="section-head">
               <h3 id="projectFormTitle">Nouveau projet</h3>
-              <button class="btn" type="button" onclick="resetProjectForm()">Nouveau</button>
+              <button class="btn" type="button" onclick="closeProjectForm()">Fermer</button>
             </div>
             <div class="section-body">
               <form id="projectForm" class="grid">
@@ -3746,6 +3763,18 @@
       })).filter(item => item.type && Number.isFinite(item.height) && item.quantity > 0);
     }
 
+    function openProjectForm() {
+      const formCard = $("#projectFormCard");
+      if (!formCard) return;
+      resetProjectForm();
+      formCard.classList.remove("hidden");
+      formCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function closeProjectForm() {
+      $("#projectFormCard")?.classList.add("hidden");
+    }
+
     function resetProjectForm() {
       $("#projectForm")?.reset();
       if ($("#projectEditId")) $("#projectEditId").value = "";
@@ -3755,6 +3784,7 @@
 
     function fillProjectForm(project) {
       setView("projects");
+      $("#projectFormCard")?.classList.remove("hidden");
       $("#projectEditId").value = project.id;
       $("#projectFormTitle").textContent = `Modifier ${project.id}`;
       $("#projectName").value = project.name || "";
