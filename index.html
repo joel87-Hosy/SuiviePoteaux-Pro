@@ -671,8 +671,8 @@
     }
 
     #map {
-      height: min(64vh, 620px);
-      min-height: 420px;
+      height: min(76vh, 760px);
+      min-height: 520px;
       border-radius: var(--radius);
       border: 1px solid var(--line);
       overflow: hidden;
@@ -682,6 +682,7 @@
       color: var(--text);
       border: 1px solid var(--line);
       box-shadow: var(--shadow);
+      font-weight: 800;
     }
 
     .pole-tooltip .leaflet-tooltip-content {
@@ -704,6 +705,30 @@
       display: block;
       color: var(--muted);
       font-size: 12px;
+    }
+
+    .map-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .map-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .map-legend i {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--legend-color);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--legend-color) 18%, transparent);
     }
 
     .report-list {
@@ -3239,7 +3264,14 @@
               <h3>Carte interactive GPS</h3>
               <span class="badge info">${state.poles.filter(hasPoleCoordinates).length} positions</span>
             </div>
-            <div class="section-body"><div id="map"></div></div>
+            <div class="section-body">
+              <div class="map-legend">
+                <span><i style="--legend-color:#127a43"></i>Valide</span>
+                <span><i style="--legend-color:#d89f2b"></i>En attente</span>
+                <span><i style="--legend-color:#b42318"></i>Anomalie</span>
+              </div>
+              <div id="map"></div>
+            </div>
           </div>
         `;
       }
@@ -3262,14 +3294,14 @@
         const color = p.status === "Valide" ? "#127a43" : p.status === "Anomalie" ? "#b42318" : "#d89f2b";
         const details = mapPoleDetails(p);
         L.circleMarker([Number(p.lat), Number(p.lng)], {
-          radius: 9,
+          radius: 10,
           color,
-          weight: 3,
+          weight: 4,
           fillColor: color,
-          fillOpacity: .75
+          fillOpacity: .88
         })
           .addTo(map)
-          .bindTooltip(details, { sticky: true, direction: "top", opacity: .96, className: "pole-tooltip" })
+          .bindTooltip(`${escapeHtml(p.id)} - ${escapeHtml(p.status || "N/A")}`, { sticky: true, direction: "top", opacity: .94, className: "pole-tooltip" })
           .bindPopup(details);
       });
       if (located.length) {
