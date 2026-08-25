@@ -1112,6 +1112,10 @@
             <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
             Fiche de pose
           </button>
+          <button class="btn" id="scanQrBtn" type="button">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v6h-4v-2h2zM14 18h2v2h-2z"/></svg>
+            Scanner QR
+          </button>
           <button class="btn" id="topLogoutBtn" type="button">
             <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
             Sortir
@@ -1149,6 +1153,13 @@
           <div class="field">
             <label for="poleId">Poteau attribue</label>
             <select id="poleId" required></select>
+          </div>
+          <div class="field">
+            <label>Verification QR</label>
+            <button class="btn" id="fieldScanQrBtn" type="button">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v6h-4v-2h2z"/></svg>
+              Scanner QR poteau
+            </button>
           </div>
           <div class="field">
             <label for="agent">Chef d'equipe</label>
@@ -1289,8 +1300,64 @@
             Enregistrer l'entree
           </button>
           <button class="btn" type="button" id="entryGenerateCodeBtn">Generer un code</button>
+          <button class="btn" type="button" id="entryPrintQrBtn">Imprimer etiquette QR</button>
+        </div>
+        <div class="card" style="box-shadow:none">
+          <div class="section-head">
+            <h3>Etiquette poteau</h3>
+            <span class="badge info">Code texte + QR</span>
+          </div>
+          <div class="section-body">
+            <div id="entryQrPreview" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"></div>
+          </div>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="drawer" id="qrScanDrawer" aria-hidden="true">
+    <div class="drawer-backdrop" data-close-qr-drawer></div>
+    <div class="drawer-panel">
+      <div class="section-head" style="padding:0 0 14px;border-bottom:1px solid var(--line);margin-bottom:16px">
+        <div>
+          <h3>Scan et verification QR poteau</h3>
+          <p class="muted" style="margin:4px 0 0">Identification du poteau et controle apres implantation.</p>
+        </div>
+        <button class="btn icon-btn" type="button" data-close-qr-drawer title="Fermer">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="grid">
+        <div class="card" style="box-shadow:none">
+          <div class="section-head">
+            <h3>Camera</h3>
+            <span class="badge info" id="qrScanStatus">Pret</span>
+          </div>
+          <div class="section-body">
+            <video id="qrVideo" playsinline muted style="width:100%;max-height:320px;border-radius:8px;background:#0f172a;object-fit:cover"></video>
+            <div class="toolbar" style="justify-content:flex-start;margin-top:12px">
+              <button class="btn primary" type="button" id="startQrScanBtn">Lancer le scan</button>
+              <button class="btn" type="button" id="stopQrScanBtn">Arreter</button>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="box-shadow:none">
+          <div class="section-head">
+            <h3>Verification manuelle</h3>
+            <span class="badge warn">Secours</span>
+          </div>
+          <div class="section-body">
+            <div class="field">
+              <label for="manualQrCode">Code poteau lu sur l'etiquette</label>
+              <input id="manualQrCode" placeholder="POT-2026-B01-004">
+            </div>
+            <div class="toolbar" style="justify-content:flex-start">
+              <button class="btn primary" type="button" id="manualQrVerifyBtn">Verifier</button>
+            </div>
+          </div>
+        </div>
+        <div id="qrVerificationResult"></div>
+      </div>
     </div>
   </div>
 
@@ -1391,6 +1458,8 @@
     let apiToken = localStorage.getItem(API_TOKEN_KEY) || "";
     let apiUser = null;
     let apiPermissions = [];
+    let qrScanStream = null;
+    let qrScanTimer = null;
 
     function loadState() {
       try {
@@ -1489,6 +1558,7 @@
       $("#topCurrentUser").textContent = apiUser ? `${apiUser.name} - ${roleLabel(apiUser.role)}` : "Non connecte";
       $("#seedBtn").classList.toggle("hidden", !can("admin"));
       $("#newInterventionBtn").classList.toggle("hidden", !can("write_intervention"));
+      $("#scanQrBtn").classList.toggle("hidden", !(can("write_intervention") || can("validate") || can("admin")));
     }
 
     function showLogin(message = "") {
@@ -3017,6 +3087,7 @@
       $("#entryStatus").value = "En Stock";
       $("#entryCode").value = generatePoleCode();
       $("#entryMaker").value = "SIPREL / Lot " + new Date().getFullYear();
+      updateEntryQrPreview();
     }
 
     function closeStockEntryDrawer() {
@@ -3029,6 +3100,194 @@
       const type = $("#entryType")?.value === "METALLIQUE" ? "M" : "B";
       const count = state.poles.filter(p => p.id.includes(`POT-${year}-${type}`)).length + 1;
       return `POT-${year}-${type}${String(count).padStart(2, "0")}-${String(state.poles.length + 1).padStart(3, "0")}`;
+    }
+
+    function qrCodeUrl(value, size = 180) {
+      return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=8&data=${encodeURIComponent(value)}`;
+    }
+
+    function currentEntryQrData() {
+      const code = ($("#entryCode")?.value || "").trim().toUpperCase();
+      const type = $("#entryType")?.value || "";
+      const height = $("#entryHeight")?.value || "";
+      const effort = $("#entryEffort")?.value || "";
+      const maker = $("#entryMaker")?.value || "";
+      return {
+        code,
+        type,
+        height,
+        effort,
+        maker,
+        payload: [code, type, height ? `${height}m` : "", effort, maker].filter(Boolean).join(" | ")
+      };
+    }
+
+    function updateEntryQrPreview() {
+      const preview = $("#entryQrPreview");
+      if (!preview) return;
+      const data = currentEntryQrData();
+      if (!data.code) {
+        preview.innerHTML = `<div class="empty">Generez ou saisissez un code poteau pour afficher le QR.</div>`;
+        return;
+      }
+      preview.innerHTML = `
+        <img src="${qrCodeUrl(data.payload)}" alt="QR ${escapeAttr(data.code)}" width="132" height="132" style="border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff">
+        <div>
+          <strong style="font-size:18px">${escapeHtml(data.code)}</strong>
+          <p class="muted" style="margin:6px 0 0">${escapeHtml(data.type || "Type non renseigne")} ${escapeHtml(data.height || "")} m - ${escapeHtml(data.effort || "Effort non renseigne")}</p>
+          <p class="muted" style="margin:4px 0 0">${escapeHtml(data.maker || "Lot non renseigne")}</p>
+        </div>
+      `;
+    }
+
+    function printEntryQrLabel() {
+      const data = currentEntryQrData();
+      if (!data.code) return toast("Generez d'abord le code poteau");
+      const win = window.open("", "_blank", "width=420,height=560");
+      if (!win) return toast("Impression bloquee par le navigateur");
+      win.document.write(`
+        <!doctype html>
+        <html>
+          <head>
+            <title>Etiquette ${escapeHtml(data.code)}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 0; padding: 18px; color: #111827; }
+              .label { width: 82mm; min-height: 58mm; border: 1px solid #111827; padding: 8mm; display: grid; gap: 5mm; justify-items: center; text-align: center; }
+              img { width: 38mm; height: 38mm; }
+              .code { font-size: 16px; font-weight: 800; letter-spacing: .5px; }
+              .meta { font-size: 11px; line-height: 1.35; }
+              @media print { body { padding: 0; } .label { page-break-inside: avoid; } }
+            </style>
+          </head>
+          <body>
+            <div class="label">
+              <img src="${qrCodeUrl(data.payload, 240)}" alt="QR ${escapeAttr(data.code)}">
+              <div class="code">${escapeHtml(data.code)}</div>
+              <div class="meta">${escapeHtml(data.type)} ${escapeHtml(data.height)} m<br>${escapeHtml(data.effort)}<br>${escapeHtml(data.maker)}</div>
+            </div>
+            <script>
+              window.onload = () => {
+                const image = document.querySelector("img");
+                if (image.complete) window.print();
+                else image.onload = () => window.print();
+              };
+            <\/script>
+          </body>
+        </html>
+      `);
+      win.document.close();
+    }
+
+    function openQrScanDrawer() {
+      if (!(can("write_intervention") || can("validate") || can("admin"))) return toast("Permission scan QR requise");
+      $("#qrScanDrawer").classList.add("open");
+      $("#qrScanDrawer").setAttribute("aria-hidden", "false");
+      $("#manualQrCode").value = "";
+      $("#qrVerificationResult").innerHTML = `<div class="empty">Scannez un QR ou saisissez un code poteau pour lancer la verification.</div>`;
+      $("#qrScanStatus").textContent = "Pret";
+    }
+
+    function closeQrScanDrawer() {
+      stopQrScanner();
+      $("#qrScanDrawer").classList.remove("open");
+      $("#qrScanDrawer").setAttribute("aria-hidden", "true");
+    }
+
+    function extractPoleCodeFromQr(value) {
+      const raw = String(value || "").trim().toUpperCase();
+      const match = raw.match(/POT-\d{4}-[A-Z]\d{2}-\d{3}/);
+      return match ? match[0] : raw.split("|")[0].trim();
+    }
+
+    async function startQrScanner() {
+      if (!("BarcodeDetector" in window)) {
+        $("#qrScanStatus").textContent = "Saisie manuelle";
+        toast("Scan camera non supporte ici, utilisez la saisie manuelle");
+        return;
+      }
+      try {
+        stopQrScanner();
+        const detector = new BarcodeDetector({ formats: ["qr_code"] });
+        qrScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        const video = $("#qrVideo");
+        video.srcObject = qrScanStream;
+        await video.play();
+        $("#qrScanStatus").textContent = "Scan actif";
+        qrScanTimer = window.setInterval(async () => {
+          try {
+            const codes = await detector.detect(video);
+            if (!codes.length) return;
+            const value = codes[0].rawValue || "";
+            stopQrScanner();
+            verifyQrPole(value);
+          } catch {}
+        }, 450);
+      } catch (error) {
+        $("#qrScanStatus").textContent = "Camera indisponible";
+        toast(error.message || "Impossible d'ouvrir la camera");
+      }
+    }
+
+    function stopQrScanner() {
+      if (qrScanTimer) window.clearInterval(qrScanTimer);
+      qrScanTimer = null;
+      if (qrScanStream) qrScanStream.getTracks().forEach(track => track.stop());
+      qrScanStream = null;
+      const video = $("#qrVideo");
+      if (video) video.srcObject = null;
+      if ($("#qrScanStatus")) $("#qrScanStatus").textContent = "Arrete";
+    }
+
+    function verifyQrPole(rawValue) {
+      const code = extractPoleCodeFromQr(rawValue);
+      const pole = state.poles.find(item => item.id === code);
+      const selectedPole = $("#interventionDrawer")?.classList.contains("open") ? $("#poleId")?.value : "";
+      if (!pole) {
+        $("#qrVerificationResult").innerHTML = `<div class="empty" style="border-color:var(--danger)">Code ${escapeHtml(code)} introuvable dans le stock.</div>`;
+        toast("Poteau introuvable");
+        return;
+      }
+      const interventions = state.interventions
+        .filter(item => item.poleId === pole.id && !item.draft)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+      const intervention = interventions[0];
+      const project = state.projects.find(item => item.id === (pole.projectId || intervention?.projectId));
+      const hasCoords = hasPoleCoordinates(pole) || (intervention?.lat && intervention?.lng);
+      const formOpen = $("#interventionDrawer")?.classList.contains("open");
+      const poleOptionExists = formOpen && $all("#poleId option").some(option => option.value === pole.id);
+      if (poleOptionExists) $("#poleId").value = pole.id;
+      if ($("#project") && project?.id && formOpen) $("#project").value = project.id;
+      const formMatch = !formOpen || poleOptionExists || selectedPole === pole.id;
+      const formLabel = poleOptionExists ? "Poteau selectionne" : formMatch ? "QR conforme" : "QR different du poteau selectionne";
+      const statusBadge = intervention ? statusClass(intervention.validation || pole.status || "") : statusClass(pole.status || "");
+      $("#qrVerificationResult").innerHTML = `
+        <div class="card" style="box-shadow:none">
+          <div class="section-head">
+            <h3>${escapeHtml(pole.id)}</h3>
+            <span class="badge ${formMatch ? "ok" : "danger"}">${formLabel}</span>
+          </div>
+          <div class="section-body">
+            <div class="grid stats">
+              ${metric("Statut", pole.status || "N/A", "Etat actuel")}
+              ${metric("Projet", project?.name || "N/A", project?.zone || "Non affecte")}
+              ${metric("GPS", hasCoords ? "Present" : "Absent", hasCoords ? `${pole.lat || intervention?.lat}, ${pole.lng || intervention?.lng}` : "Non implante")}
+              ${metric("Fiche", intervention?.id || "Aucune", intervention ? formatDate(intervention.date) : "Pas de pose")}
+            </div>
+            <div class="table-wrap" style="margin-top:12px">
+              <table>
+                <tbody>
+                  <tr><th>Type</th><td>${escapeHtml(pole.type || "N/A")} ${escapeHtml(pole.height || "")} m</td></tr>
+                  <tr><th>Effort</th><td>${escapeHtml(pole.effort || "N/A")}</td></tr>
+                  <tr><th>Equipe attribuee</th><td>${escapeHtml(pole.assignedTeam || "N/A")}</td></tr>
+                  <tr><th>Validation terrain</th><td><span class="badge ${statusBadge}">${escapeHtml(intervention?.validation || pole.status || "N/A")}</span></td></tr>
+                  <tr><th>Observation</th><td>${escapeHtml(intervention?.notes || "RAS")}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+      toast(poleOptionExists ? "Poteau selectionne via QR" : formMatch ? "Verification QR conforme" : "Attention: QR different du poteau selectionne");
     }
 
     async function saveStockEntry() {
@@ -3644,6 +3903,7 @@
         toast("Donnees demo rechargees");
       });
       $("#newInterventionBtn").addEventListener("click", () => openDrawer());
+      $("#scanQrBtn").addEventListener("click", openQrScanDrawer);
       $("#syncBtn").addEventListener("click", syncQueue);
       $("#logoutBtn").addEventListener("click", logout);
       $("#topLogoutBtn").addEventListener("click", logout);
@@ -3696,6 +3956,7 @@
         button.addEventListener("click", () => togglePassword(button.dataset.togglePassword, button));
       });
       $("#gpsBtn").addEventListener("click", captureGps);
+      $("#fieldScanQrBtn").addEventListener("click", openQrScanDrawer);
       $("#draftBtn").addEventListener("click", () => saveIntervention(true));
       $("#interventionForm").addEventListener("submit", event => {
         event.preventDefault();
@@ -3707,14 +3968,30 @@
       });
       $("#entryGenerateCodeBtn").addEventListener("click", () => {
         $("#entryCode").value = generatePoleCode();
+        updateEntryQrPreview();
       });
+      $("#entryPrintQrBtn").addEventListener("click", printEntryQrLabel);
       $("#entryType").addEventListener("change", () => {
         if (!$("#entryCode").value || /^POT-\d{4}-[BM]/.test($("#entryCode").value)) {
           $("#entryCode").value = generatePoleCode();
         }
+        updateEntryQrPreview();
+      });
+      ["entryCode", "entryHeight", "entryEffort", "entryMaker"].forEach(id => {
+        $(`#${id}`).addEventListener("input", updateEntryQrPreview);
       });
       $all("[data-close-drawer]").forEach(node => node.addEventListener("click", closeDrawer));
       $all("[data-close-stock-drawer]").forEach(node => node.addEventListener("click", closeStockEntryDrawer));
+      $all("[data-close-qr-drawer]").forEach(node => node.addEventListener("click", closeQrScanDrawer));
+      $("#startQrScanBtn").addEventListener("click", startQrScanner);
+      $("#stopQrScanBtn").addEventListener("click", stopQrScanner);
+      $("#manualQrVerifyBtn").addEventListener("click", () => verifyQrPole($("#manualQrCode").value));
+      $("#manualQrCode").addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          verifyQrPole($("#manualQrCode").value);
+        }
+      });
       window.addEventListener("online", updateNetwork);
       window.addEventListener("offline", updateNetwork);
       if ("serviceWorker" in navigator) {
@@ -3745,6 +4022,9 @@
     window.validateReport = validateReport;
     window.refreshUsers = refreshUsers;
     window.saveUserAdmin = saveUserAdmin;
+    window.printEntryQrLabel = printEntryQrLabel;
+    window.openQrScanDrawer = openQrScanDrawer;
+    window.verifyQrPole = verifyQrPole;
 
     boot();
   </script>
