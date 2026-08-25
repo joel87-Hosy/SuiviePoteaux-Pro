@@ -671,11 +671,19 @@
     }
 
     #map {
-      height: min(76vh, 760px);
-      min-height: 520px;
-      border-radius: var(--radius);
-      border: 1px solid var(--line);
+      height: calc(100vh - 190px);
+      min-height: 620px;
+      border-radius: 0 0 var(--radius) var(--radius);
+      border: 0;
       overflow: hidden;
+    }
+
+    .map-card .section-body {
+      padding: 0;
+    }
+
+    .map-card .section-head {
+      background: var(--panel);
     }
 
     .pole-tooltip {
@@ -707,25 +715,29 @@
       font-size: 12px;
     }
 
-    .map-legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 12px;
+    .leaflet-control.map-status-legend {
+      display: grid;
+      gap: 7px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--panel) 94%, transparent);
+      box-shadow: var(--shadow);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 800;
     }
 
-    .map-legend span {
-      display: inline-flex;
+    .map-status-legend span {
+      display: flex;
       align-items: center;
       gap: 7px;
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 700;
+      white-space: nowrap;
     }
 
-    .map-legend i {
-      width: 12px;
-      height: 12px;
+    .map-status-legend i {
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: var(--legend-color);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--legend-color) 18%, transparent);
@@ -1129,7 +1141,7 @@
       .content-grid, .stats, .filters, .form-grid, .photo-grid { grid-template-columns: 1fr; }
       .drawer-panel { padding: 14px; }
       table { min-width: 680px; }
-      #map { min-height: 360px; }
+      #map { height: calc(100vh - 230px); min-height: 440px; }
       .btn { white-space: normal; }
       .bar-row { grid-template-columns: 1fr; }
       .donut-wrap { grid-template-columns: 1fr; justify-items: center; }
@@ -3254,23 +3266,24 @@
     }
 
     function renderMap() {
-      if (!$("#map")) {
+      const locatedCount = state.poles.filter(hasPoleCoordinates).length;
+      const hiddenCount = state.poles.length - locatedCount;
+      if (!$("#map") || !$("#mapView .map-card")) {
+        if (map) {
+          map.remove();
+          map = null;
+        }
         $("#mapView").innerHTML = `
-          <div class="card">
+          <div class="card map-card">
             <div class="section-head">
               <h3>Carte interactive GPS</h3>
-              <span class="badge info">${state.poles.filter(hasPoleCoordinates).length} positions</span>
+              <span class="badge info">${locatedCount} position(s) GPS${hiddenCount ? ` - ${hiddenCount} sans GPS masque(s)` : ""}</span>
             </div>
-            <div class="section-body">
-              <div class="map-legend">
-                <span><i style="--legend-color:#127a43"></i>Valide</span>
-                <span><i style="--legend-color:#d89f2b"></i>En attente</span>
-                <span><i style="--legend-color:#b42318"></i>Anomalie</span>
-              </div>
-              <div id="map"></div>
-            </div>
+            <div class="section-body"><div id="map"></div></div>
           </div>
         `;
+      } else {
+        $("#mapView .section-head .badge").textContent = `${locatedCount} position(s) GPS${hiddenCount ? ` - ${hiddenCount} sans GPS masque(s)` : ""}`;
       }
       if (!window.L) {
         $("#map").innerHTML = `<div class="empty">Leaflet n'est pas disponible hors connexion au premier chargement.</div>`;
@@ -3282,6 +3295,18 @@
           maxZoom: 19,
           attribution: "&copy; OpenStreetMap"
         }).addTo(map);
+        const legend = L.control({ position: "bottomleft" });
+        legend.onAdd = () => {
+          const div = L.DomUtil.create("div", "map-status-legend");
+          div.innerHTML = `
+            <span><i style="--legend-color:#127a43"></i>Valide</span>
+            <span><i style="--legend-color:#d89f2b"></i>En attente</span>
+            <span><i style="--legend-color:#b42318"></i>Anomalie</span>
+          `;
+          L.DomEvent.disableClickPropagation(div);
+          return div;
+        };
+        legend.addTo(map);
       }
       map.eachLayer(layer => {
         if (layer instanceof L.Marker || layer instanceof L.CircleMarker) map.removeLayer(layer);
@@ -3291,11 +3316,11 @@
         const color = p.status === "Valide" ? "#127a43" : p.status === "Anomalie" ? "#b42318" : "#d89f2b";
         const details = mapPoleDetails(p);
         L.circleMarker([Number(p.lat), Number(p.lng)], {
-          radius: 10,
+          radius: 9,
           color,
-          weight: 4,
+          weight: 3,
           fillColor: color,
-          fillOpacity: .88
+          fillOpacity: .82
         })
           .addTo(map)
           .bindTooltip(`${escapeHtml(p.id)} - ${escapeHtml(p.status || "N/A")}`, { sticky: true, direction: "top", opacity: .94, className: "pole-tooltip" })
