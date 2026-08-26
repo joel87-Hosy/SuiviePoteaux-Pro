@@ -1,6 +1,19 @@
 {
   "users": [
     {
+      "id": "USR-PLATFORM",
+      "email": "platform@itc.local",
+      "passwordHash": "pbkdf2$120000$7e8b36af6f9ff43f7b95c72c70bd9559$2516bae429b4f1a8413a83014c8d29c95d44fc9bda435e921817a5fab37ee3e9",
+      "name": "Equipe SaaS",
+      "role": "platform_admin",
+      "tenantId": null,
+      "depot": "Plateforme",
+      "team": "",
+      "phone": "",
+      "jobTitle": "Administration SaaS",
+      "profilePhoto": ""
+    },
+    {
       "id": "USR-001",
       "email": "admin@itc.local",
       "passwordHash": "pbkdf2$120000$1e8ec471583af8ecdc54a139487e0c97$68e6155aaa6ecdf5ab3d9dcacfb484ad9d627b95f9c629d07d214f22279bc7a3",
@@ -220,6 +233,86 @@
       "date": "2026-08-25T20:00:32.348Z"
     }
   ],
+  "tenants": [
+    {
+      "id": "tenant-demo",
+      "raisonSociale": "ITC Demo",
+      "slug": "itc-demo",
+      "secteurActivite": "BTP / Telecom",
+      "pays": "Cote d'Ivoire",
+      "ville": "Abidjan",
+      "logoUrl": "",
+      "status": "active",
+      "createdAt": "2026-08-22T08:52:28.271Z",
+      "updatedAt": "2026-08-22T08:52:28.271Z"
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "sub-demo",
+      "tenantId": "tenant-demo",
+      "planName": "pro",
+      "status": "active",
+      "billingCycle": "monthly",
+      "currentPeriodStart": "2026-08-11T00:00:00.000Z",
+      "currentPeriodEnd": "2026-09-10T00:00:00.000Z",
+      "cancelAtPeriodEnd": false
+    }
+  ],
+  "tenantLimits": [
+    {
+      "id": "limits-demo",
+      "tenantId": "tenant-demo",
+      "maxDepots": 8,
+      "maxUsers": 35,
+      "maxStorageGb": 80
+    }
+  ],
+  "platformPlans": {
+    "starter": {
+      "priceMonthly": 99000,
+      "priceAnnual": 990000,
+      "maxDepots": 2,
+      "maxUsers": 8,
+      "maxStorageGb": 10,
+      "features": {
+        "offline": true,
+        "pdfExport": true,
+        "customPdf": false,
+        "apiAccess": false
+      }
+    },
+    "pro": {
+      "priceMonthly": 249000,
+      "priceAnnual": 2490000,
+      "maxDepots": 8,
+      "maxUsers": 35,
+      "maxStorageGb": 80,
+      "features": {
+        "offline": true,
+        "pdfExport": true,
+        "customPdf": true,
+        "apiAccess": false
+      }
+    },
+    "enterprise": {
+      "priceMonthly": 650000,
+      "priceAnnual": 6500000,
+      "maxDepots": 99,
+      "maxUsers": 250,
+      "maxStorageGb": 500,
+      "features": {
+        "offline": true,
+        "pdfExport": true,
+        "customPdf": true,
+        "apiAccess": true
+      }
+    }
+  },
+  "coupons": [],
+  "transactions": [],
+  "systemBanners": [],
+  "platformAuditLogs": [],
   "settings": {
     "operators": [
       "MOOV CI",

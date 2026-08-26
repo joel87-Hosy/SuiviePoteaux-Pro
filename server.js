@@ -31,6 +31,21 @@ const ALLOW_PUBLIC_REGISTRATION = process.env.ALLOW_PUBLIC_REGISTRATION === "tru
 const MAX_PHOTOS_PER_REPORT = 6;
 const MAX_PHOTO_BYTES = 6 * 1024 * 1024;
 const MAX_PROFILE_PHOTO_BYTES = 1024 * 1024;
+const DEFAULT_TENANT_ID = "tenant-demo";
+const TENANT_STATUSES = ["active", "trial", "suspended"];
+const PLAN_NAMES = ["starter", "pro", "enterprise"];
+const BILLING_CYCLES = ["monthly", "annual"];
+const tenantRoleAliases = {
+  tenant_admin: "tenant_admin",
+  depot_manager: "magasinier",
+  field_agent: "terrain",
+  quality_inspector: "controleur"
+};
+const planDefaults = {
+  starter: { priceMonthly: 99000, priceAnnual: 990000, maxDepots: 2, maxUsers: 8, maxStorageGb: 10, features: { offline: true, pdfExport: true, customPdf: false, apiAccess: false } },
+  pro: { priceMonthly: 249000, priceAnnual: 2490000, maxDepots: 8, maxUsers: 35, maxStorageGb: 80, features: { offline: true, pdfExport: true, customPdf: true, apiAccess: false } },
+  enterprise: { priceMonthly: 650000, priceAnnual: 6500000, maxDepots: 99, maxUsers: 250, maxStorageGb: 500, features: { offline: true, pdfExport: true, customPdf: true, apiAccess: true } }
+};
 const supabase = SUPABASE_ENABLED
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false }
@@ -41,10 +56,15 @@ const sessions = new Map();
 const rateLimits = new Map();
 
 const rolePermissions = {
+  platform_admin: ["read", "write_stock", "write_intervention", "validate", "admin", "platform_admin"],
   super_admin: ["read", "write_stock", "write_intervention", "validate", "admin"],
+  tenant_admin: ["read", "write_stock", "write_intervention", "validate", "admin"],
   magasinier: ["read", "write_stock"],
+  depot_manager: ["read", "write_stock"],
   terrain: ["read", "write_intervention"],
-  controleur: ["read", "validate"]
+  field_agent: ["read", "write_intervention"],
+  controleur: ["read", "validate"],
+  quality_inspector: ["read", "validate"]
 };
 const OPERATORS = ["MOOV CI", "Orange CI", "MTN CI", "CIE"];
 const DEFAULT_SETTINGS = {
@@ -78,6 +98,7 @@ function ensureStorage() {
 function seedDb() {
   return {
     users: [
+      user("USR-PLATFORM", "platform@itc.local", "demo123", "Equipe SaaS", "platform_admin", { depot: "Plateforme", team: "", tenantId: null }),
       user("USR-001", "admin@itc.local", "demo123", "Aminata Kone", "super_admin", { depot: "Direction", team: "" }),
       user("USR-002", "depot@itc.local", "demo123", "Magasin Central", "magasinier", { depot: "Depot Central", team: "" }),
       user("USR-003", "terrain@itc.local", "demo123", "Equipe Terrain A", "terrain", { depot: "Terrain", team: "Equipe Terrain A" }),
@@ -117,6 +138,40 @@ function seedDb() {
     ],
     stockMovements: [],
     auditLog: [],
+    tenants: [
+      {
+        id: DEFAULT_TENANT_ID,
+        raisonSociale: "ITC Demo",
+        slug: "itc-demo",
+        secteurActivite: "BTP / Telecom",
+        pays: "Cote d'Ivoire",
+        ville: "Abidjan",
+        logoUrl: "",
+        status: "active",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ],
+    subscriptions: [
+      {
+        id: "sub-demo",
+        tenantId: DEFAULT_TENANT_ID,
+        planName: "pro",
+        status: "active",
+        billingCycle: "monthly",
+        currentPeriodStart: new Date(Date.now() - 15 * 86400000).toISOString(),
+        currentPeriodEnd: new Date(Date.now() + 15 * 86400000).toISOString(),
+        cancelAtPeriodEnd: false
+      }
+    ],
+    tenantLimits: [
+      { id: "limits-demo", tenantId: DEFAULT_TENANT_ID, maxDepots: 8, maxUsers: 35, maxStorageGb: 80 }
+    ],
+    platformPlans: planDefaults,
+    coupons: [],
+    transactions: [],
+    systemBanners: [],
+    platformAuditLogs: [],
     settings: { ...DEFAULT_SETTINGS }
   };
 }
@@ -164,7 +219,7 @@ async function writeDb(db) {
 }
 
 async function readSupabaseDb() {
-  const [users, projects, poles, interventions, photos, stockMovements, auditLog, appSettings] = await Promise.all([
+  const [users, projects, poles, interventions, photos, stockMovements, auditLog, appSettings, tenants, subscriptions, tenantLimits, platformPlansRows, coupons, transactions, systemBanners, platformAuditLogs] = await Promise.all([
     selectTable("app_users"),
     selectTable("projects"),
     selectTable("poles"),
@@ -172,7 +227,15 @@ async function readSupabaseDb() {
     selectTable("intervention_photos"),
     selectTable("stock_movements"),
     selectTable("audit_log"),
-    selectTable("app_settings")
+    selectTable("app_settings"),
+    selectTable("tenants"),
+    selectTable("subscriptions"),
+    selectTable("tenant_limits"),
+    selectTable("platform_plans"),
+    selectTable("coupons"),
+    selectTable("transactions"),
+    selectTable("system_banners"),
+    selectTable("platform_audit_logs")
   ]);
   return normalizeDb({
     users: users.map(row => ({
@@ -187,10 +250,12 @@ async function readSupabaseDb() {
       team: row.team || "",
       phone: row.phone || "",
       jobTitle: row.job_title || row.jobTitle || "",
-      profilePhoto: row.profile_photo || row.profilePhoto || ""
+      profilePhoto: row.profile_photo || row.profilePhoto || "",
+      tenantId: row.tenant_id || null
     })),
     projects: projects.map(row => ({
       ...row,
+      tenantId: row.tenant_id || null,
       poleCount: Number(row.pole_count || row.poleCount || 0),
       assignedTeam: row.assigned_team || row.assignedTeam || "",
       startDate: row.start_date || row.startDate || "",
@@ -205,6 +270,7 @@ async function readSupabaseDb() {
     })),
     poles: poles.map(row => ({
       id: row.id,
+      tenantId: row.tenant_id || null,
       type: row.type,
       height: Number(row.height),
       effort: row.effort,
@@ -219,6 +285,7 @@ async function readSupabaseDb() {
     })),
     interventions: interventions.map(row => ({
       id: row.id,
+      tenantId: row.tenant_id || null,
       poleId: row.pole_id,
       projectId: row.project_id,
       agent: row.agent,
@@ -252,6 +319,7 @@ async function readSupabaseDb() {
     })),
     stockMovements: stockMovements.map(row => ({
       id: row.id,
+      tenantId: row.tenant_id || null,
       poleId: row.pole_id,
       movementType: row.movement_type,
       fromDepot: row.from_depot,
@@ -262,10 +330,59 @@ async function readSupabaseDb() {
     })),
     auditLog: auditLog.map(row => ({
       id: row.id,
+      tenantId: row.tenant_id || null,
       actorId: row.actor_id,
       action: row.action,
       payload: row.payload || {},
       date: row.date
+    })),
+    tenants: tenants.map(row => normalizeTenantRecord(row)),
+    subscriptions: subscriptions.map(row => normalizeSubscriptionRecord(row)),
+    tenantLimits: tenantLimits.map(row => normalizeLimitRecord(row)),
+    platformPlans: platformPlansRows.length ? Object.fromEntries(platformPlansRows.map(row => [row.id, {
+      priceMonthly: Number(row.price_monthly || 0),
+      priceAnnual: Number(row.price_annual || 0),
+      maxDepots: Number(row.max_depots || 0),
+      maxUsers: Number(row.max_users || 0),
+      maxStorageGb: Number(row.max_storage_gb || 0),
+      features: row.features || {}
+    }])) : planDefaults,
+    coupons: coupons.map(row => ({
+      id: row.id,
+      code: row.code,
+      discountPercent: Number(row.discount_percent || 0),
+      planName: row.plan_name || "",
+      expiresAt: row.expires_at || "",
+      active: row.active !== false,
+      createdAt: row.created_at
+    })),
+    transactions: transactions.map(row => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      provider: row.provider,
+      amount: Number(row.amount || 0),
+      currency: row.currency || "XOF",
+      status: row.status || "",
+      reference: row.reference || "",
+      date: row.date
+    })),
+    systemBanners: systemBanners.map(row => ({
+      id: row.id,
+      message: row.message,
+      severity: row.severity || "info",
+      active: row.active !== false,
+      startsAt: row.starts_at || "",
+      endsAt: row.ends_at || "",
+      createdAt: row.created_at
+    })),
+    platformAuditLogs: platformAuditLogs.map(row => ({
+      id: row.id,
+      actorId: row.actor_id,
+      targetTenantId: row.target_tenant_id,
+      action: row.action,
+      ipAddress: row.ip_address,
+      timestamp: row.timestamp,
+      payload: row.payload || {}
     })),
     settings: appSettings.find(row => row.id === "default")?.value || DEFAULT_SETTINGS
   });
@@ -282,6 +399,7 @@ async function writeSupabaseDb(db) {
   await Promise.all([
     upsertTable("app_users", db.users.map(row => ({
       id: row.id,
+      tenant_id: row.tenantId || null,
       email: row.email,
       password_hash: row.passwordHash,
       name: row.name,
@@ -296,6 +414,7 @@ async function writeSupabaseDb(db) {
     }))),
     upsertTable("projects", db.projects.map(row => ({
       id: row.id,
+      tenant_id: row.tenantId || DEFAULT_TENANT_ID,
       name: row.name,
       client: row.client || "",
       zone: row.zone || "",
@@ -320,6 +439,7 @@ async function writeSupabaseDb(db) {
     }))),
     upsertTable("poles", db.poles.map(row => ({
       id: row.id,
+      tenant_id: row.tenantId || DEFAULT_TENANT_ID,
       type: row.type,
       height: row.height,
       effort: row.effort,
@@ -334,6 +454,7 @@ async function writeSupabaseDb(db) {
     }))),
     upsertTable("interventions", db.interventions.map(row => ({
       id: row.id,
+      tenant_id: row.tenantId || DEFAULT_TENANT_ID,
       pole_id: row.poleId,
       project_id: row.projectId,
       agent: row.agent,
@@ -357,6 +478,7 @@ async function writeSupabaseDb(db) {
     }))),
     upsertTable("stock_movements", (db.stockMovements || []).map(row => ({
       id: row.id,
+      tenant_id: row.tenantId || DEFAULT_TENANT_ID,
       pole_id: row.poleId || null,
       movement_type: row.movementType,
       from_depot: row.fromDepot || null,
@@ -367,6 +489,7 @@ async function writeSupabaseDb(db) {
     }))),
     upsertTable("audit_log", db.auditLog.map(row => ({
       id: row.id,
+      tenant_id: row.tenantId || DEFAULT_TENANT_ID,
       actor_id: row.actorId,
       action: row.action,
       payload: row.payload || {},
@@ -376,7 +499,82 @@ async function writeSupabaseDb(db) {
       id: "default",
       value: normalizeSettings(db.settings),
       updated_at: new Date().toISOString()
-    }])
+    }]),
+    upsertTable("tenants", (db.tenants || []).map(row => ({
+      id: row.id,
+      raison_sociale: row.raisonSociale,
+      slug: row.slug,
+      secteur_activite: row.secteurActivite || null,
+      pays: row.pays || null,
+      ville: row.ville || null,
+      logo_url: row.logoUrl || null,
+      status: row.status,
+      created_at: row.createdAt || new Date().toISOString(),
+      updated_at: row.updatedAt || new Date().toISOString()
+    }))),
+    upsertTable("subscriptions", (db.subscriptions || []).map(row => ({
+      id: row.id,
+      tenant_id: row.tenantId,
+      plan_name: row.planName,
+      status: row.status,
+      billing_cycle: row.billingCycle || "monthly",
+      current_period_start: row.currentPeriodStart,
+      current_period_end: row.currentPeriodEnd,
+      cancel_at_period_end: Boolean(row.cancelAtPeriodEnd)
+    }))),
+    upsertTable("tenant_limits", (db.tenantLimits || []).map(row => ({
+      id: row.id,
+      tenant_id: row.tenantId,
+      max_depots: row.maxDepots,
+      max_users: row.maxUsers,
+      max_storage_gb: row.maxStorageGb
+    }))),
+    upsertTable("platform_plans", Object.entries(db.platformPlans || planDefaults).map(([id, row]) => ({
+      id,
+      price_monthly: Number(row.priceMonthly || 0),
+      price_annual: Number(row.priceAnnual || 0),
+      max_depots: Number(row.maxDepots || 0),
+      max_users: Number(row.maxUsers || 0),
+      max_storage_gb: Number(row.maxStorageGb || 0),
+      features: row.features || {}
+    }))),
+    upsertTable("coupons", (db.coupons || []).map(row => ({
+      id: row.id,
+      code: row.code,
+      discount_percent: Number(row.discountPercent || 0),
+      plan_name: row.planName || null,
+      expires_at: row.expiresAt || null,
+      active: row.active !== false,
+      created_at: row.createdAt || new Date().toISOString()
+    }))),
+    upsertTable("transactions", (db.transactions || []).map(row => ({
+      id: row.id,
+      tenant_id: row.tenantId,
+      provider: row.provider,
+      amount: Number(row.amount || 0),
+      currency: row.currency || "XOF",
+      status: row.status,
+      reference: row.reference || null,
+      date: row.date || new Date().toISOString()
+    }))),
+    upsertTable("system_banners", (db.systemBanners || []).map(row => ({
+      id: row.id,
+      message: row.message,
+      severity: row.severity || "info",
+      active: row.active !== false,
+      starts_at: row.startsAt || null,
+      ends_at: row.endsAt || null,
+      created_at: row.createdAt || new Date().toISOString()
+    }))),
+    upsertTable("platform_audit_logs", (db.platformAuditLogs || []).map(row => ({
+      id: row.id,
+      actor_id: row.actorId,
+      target_tenant_id: row.targetTenantId || null,
+      action: row.action,
+      ip_address: row.ipAddress || null,
+      payload: row.payload || {},
+      timestamp: row.timestamp || new Date().toISOString()
+    })))
   ]);
   const photoRows = db.interventions.flatMap(row => (row.photos || [])
     .filter(photo => photo.url)
@@ -404,15 +602,76 @@ function normalizeSettings(settings = {}) {
   };
 }
 
+function normalizeRole(role) {
+  return tenantRoleAliases[role] || role || "terrain";
+}
+
+function normalizeTenantRecord(tenant = {}) {
+  const now = new Date().toISOString();
+  return {
+    id: tenant.id || `tenant-${crypto.randomUUID().slice(0, 8)}`,
+    raisonSociale: tenant.raisonSociale || tenant.raison_sociale || tenant.name || "",
+    slug: slug(tenant.slug || tenant.raisonSociale || tenant.raison_sociale || tenant.name || crypto.randomUUID().slice(0, 8)),
+    secteurActivite: tenant.secteurActivite || tenant.secteur_activite || "",
+    pays: tenant.pays || "",
+    ville: tenant.ville || "",
+    logoUrl: tenant.logoUrl || tenant.logo_url || "",
+    status: TENANT_STATUSES.includes(tenant.status) ? tenant.status : "trial",
+    createdAt: tenant.createdAt || tenant.created_at || now,
+    updatedAt: tenant.updatedAt || tenant.updated_at || now
+  };
+}
+
+function normalizeSubscriptionRecord(subscription = {}) {
+  const planName = PLAN_NAMES.includes(subscription.planName || subscription.plan_name) ? (subscription.planName || subscription.plan_name) : "starter";
+  return {
+    id: subscription.id || `sub-${crypto.randomUUID().slice(0, 8)}`,
+    tenantId: subscription.tenantId || subscription.tenant_id || DEFAULT_TENANT_ID,
+    planName,
+    status: subscription.status || "trialing",
+    billingCycle: BILLING_CYCLES.includes(subscription.billingCycle || subscription.billing_cycle) ? (subscription.billingCycle || subscription.billing_cycle) : "monthly",
+    currentPeriodStart: subscription.currentPeriodStart || subscription.current_period_start || new Date().toISOString(),
+    currentPeriodEnd: subscription.currentPeriodEnd || subscription.current_period_end || new Date(Date.now() + 30 * 86400000).toISOString(),
+    cancelAtPeriodEnd: Boolean(subscription.cancelAtPeriodEnd || subscription.cancel_at_period_end)
+  };
+}
+
+function normalizeLimitRecord(limit = {}, tenantId = DEFAULT_TENANT_ID) {
+  const defaults = planDefaults.pro;
+  return {
+    id: limit.id || `limits-${crypto.randomUUID().slice(0, 8)}`,
+    tenantId: limit.tenantId || limit.tenant_id || tenantId,
+    maxDepots: Number(limit.maxDepots || limit.max_depots || defaults.maxDepots),
+    maxUsers: Number(limit.maxUsers || limit.max_users || defaults.maxUsers),
+    maxStorageGb: Number(limit.maxStorageGb || limit.max_storage_gb || defaults.maxStorageGb)
+  };
+}
+
 function normalizeDb(db) {
+  const tenants = (db.tenants?.length ? db.tenants : seedDb().tenants).map(normalizeTenantRecord);
+  const tenantIds = new Set(tenants.map(item => item.id));
+  const defaultTenantId = tenantIds.has(DEFAULT_TENANT_ID) ? DEFAULT_TENANT_ID : tenants[0]?.id;
+  const withTenant = item => ({
+    ...item,
+    role: normalizeRole(item.role),
+    tenantId: item.role === "platform_admin" ? null : (item.tenantId || item.tenant_id || defaultTenantId)
+  });
   return {
     ...db,
-    users: db.users || [],
-    projects: db.projects || [],
-    poles: db.poles || [],
-    interventions: db.interventions || [],
-    stockMovements: db.stockMovements || [],
-    auditLog: db.auditLog || [],
+    users: (db.users || []).map(withTenant),
+    projects: (db.projects || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
+    poles: (db.poles || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
+    interventions: (db.interventions || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
+    stockMovements: (db.stockMovements || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
+    auditLog: (db.auditLog || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
+    tenants,
+    subscriptions: (db.subscriptions || []).map(normalizeSubscriptionRecord),
+    tenantLimits: (db.tenantLimits || db.tenant_limits || []).map(item => normalizeLimitRecord(item, item.tenantId || item.tenant_id || defaultTenantId)),
+    platformPlans: db.platformPlans || db.platform_plans || planDefaults,
+    coupons: db.coupons || [],
+    transactions: db.transactions || [],
+    systemBanners: db.systemBanners || db.system_banners || [],
+    platformAuditLogs: db.platformAuditLogs || db.platform_audit_logs || [],
     settings: normalizeSettings(db.settings)
   };
 }
@@ -436,6 +695,37 @@ function terrainTeamOf(userRecord) {
 
 function hasPermission(userRecord, permission) {
   return rolePermissions[userRecord.role]?.includes(permission);
+}
+
+function isPlatformAdmin(userRecord) {
+  return userRecord?.role === "platform_admin";
+}
+
+function requirePlatformAdmin(req, res, actor) {
+  if (isPlatformAdmin(actor)) return true;
+  sendError(req, res, 403, "Acces reserve a l'equipe proprietaire SaaS");
+  return false;
+}
+
+function tenantMatches(actor, record) {
+  return isPlatformAdmin(actor) || !record?.tenantId || record.tenantId === actor.tenantId;
+}
+
+function scopedRecords(actor, rows = []) {
+  return isPlatformAdmin(actor) ? rows : rows.filter(row => tenantMatches(actor, row));
+}
+
+function platformAudit(db, actor, action, payload = {}, req = null) {
+  db.platformAuditLogs = db.platformAuditLogs || [];
+  db.platformAuditLogs.push({
+    id: crypto.randomUUID(),
+    actorId: actor.id,
+    targetTenantId: payload.tenantId || payload.targetTenantId || null,
+    action,
+    ipAddress: req ? clientIp(req) : "",
+    timestamp: new Date().toISOString(),
+    payload
+  });
 }
 
 function securityHeaders(req, extra = {}) {
@@ -628,6 +918,7 @@ function projectValidationStats(db, projectId) {
 function audit(db, actor, action, payload = {}) {
   db.auditLog.push({
     id: crypto.randomUUID(),
+    tenantId: actor.tenantId || DEFAULT_TENANT_ID,
     actorId: actor.id,
     action,
     payload,
@@ -639,6 +930,7 @@ function stockMovement(db, actor, poleId, movementType, fromDepot, toDepot, payl
   db.stockMovements = db.stockMovements || [];
   db.stockMovements.push({
     id: crypto.randomUUID(),
+    tenantId: actor.tenantId || payload.tenantId || DEFAULT_TENANT_ID,
     poleId,
     movementType,
     fromDepot: fromDepot || "",
@@ -647,6 +939,145 @@ function stockMovement(db, actor, poleId, movementType, fromDepot, toDepot, payl
     payload,
     date: new Date().toISOString()
   });
+}
+
+function tenantUsage(db, tenantId) {
+  const users = db.users.filter(userRecord => userRecord.tenantId === tenantId && userRecord.role !== "platform_admin");
+  const poles = db.poles.filter(pole => pole.tenantId === tenantId);
+  const interventions = db.interventions.filter(item => item.tenantId === tenantId);
+  const storageBytes = interventions.reduce((sum, item) => {
+    return sum + (item.photos || []).reduce((photoSum, photo) => photoSum + String(photo.url || photo.data || "").length, 0);
+  }, 0);
+  return {
+    users: users.length,
+    poles: poles.length,
+    interventions: interventions.length,
+    storageGb: Number((storageBytes / 1024 / 1024 / 1024).toFixed(3))
+  };
+}
+
+function planPrice(plan, cycle = "monthly") {
+  const config = planDefaults[plan] || planDefaults.starter;
+  return cycle === "annual" ? config.priceAnnual : config.priceMonthly;
+}
+
+function platformOverview(db) {
+  const subscriptions = db.subscriptions || [];
+  const monthlyMrr = subscriptions
+    .filter(item => ["active", "trialing"].includes(item.status))
+    .reduce((sum, item) => {
+      const price = planPrice(item.planName, item.billingCycle);
+      return sum + (item.billingCycle === "annual" ? Math.round(price / 12) : price);
+    }, 0);
+  const tenants = db.tenants || [];
+  const monthKeys = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date();
+    date.setMonth(date.getMonth() - (11 - index));
+    return date.toISOString().slice(0, 7);
+  });
+  return {
+    kpis: {
+      mrr: monthlyMrr,
+      arr: monthlyMrr * 12,
+      tenantsTotal: tenants.length,
+      tenantsActive: tenants.filter(item => item.status === "active").length,
+      tenantsTrial: tenants.filter(item => item.status === "trial").length,
+      tenantsSuspended: tenants.filter(item => item.status === "suspended").length,
+      polesTotal: db.poles.length,
+      storageGb: tenants.reduce((sum, tenant) => sum + tenantUsage(db, tenant.id).storageGb, 0)
+    },
+    growth: monthKeys.map(month => ({
+      month,
+      signups: tenants.filter(item => String(item.createdAt || "").slice(0, 7) === month).length,
+      interventions: db.interventions.filter(item => String(item.date || item.createdAt || "").slice(0, 7) === month).length
+    }))
+  };
+}
+
+function platformTenantRows(db) {
+  return (db.tenants || []).map(tenant => {
+    const subscription = (db.subscriptions || []).find(item => item.tenantId === tenant.id) || {};
+    const limits = (db.tenantLimits || []).find(item => item.tenantId === tenant.id) || normalizeLimitRecord({}, tenant.id);
+    return {
+      ...tenant,
+      subscription,
+      limits,
+      usage: tenantUsage(db, tenant.id)
+    };
+  });
+}
+
+function tempPassword() {
+  return `Temp-${crypto.randomUUID().slice(0, 8)}!9a`;
+}
+
+function platformPlanLimits(planName, overrides = {}) {
+  const defaults = planDefaults[planName] || planDefaults.starter;
+  return {
+    maxDepots: Number(overrides.maxDepots || defaults.maxDepots),
+    maxUsers: Number(overrides.maxUsers || defaults.maxUsers),
+    maxStorageGb: Number(overrides.maxStorageGb || defaults.maxStorageGb)
+  };
+}
+
+function createTenantOnboarding(db, actor, body, req) {
+  const company = body.company || {};
+  const admin = body.admin || {};
+  const subscriptionInput = body.subscription || {};
+  const planName = PLAN_NAMES.includes(subscriptionInput.planName) ? subscriptionInput.planName : "starter";
+  const tenantSlug = slug(company.slug || company.raisonSociale);
+  if (!company.raisonSociale || !tenantSlug || !admin.email || !admin.firstName || !admin.lastName) {
+    throw Object.assign(new Error("Societe, slug et admin client requis"), { statusCode: 400 });
+  }
+  if (db.tenants.some(tenant => tenant.slug === tenantSlug)) {
+    throw Object.assign(new Error("Slug tenant deja utilise"), { statusCode: 409 });
+  }
+  const email = String(admin.email).trim().toLowerCase();
+  if (db.users.some(userRecord => userRecord.email === email)) {
+    throw Object.assign(new Error("Email admin deja utilise"), { statusCode: 409 });
+  }
+  const now = new Date();
+  const trialDays = subscriptionInput.trialEnabled ? Math.max(1, Number(subscriptionInput.trialDays || 14)) : 0;
+  const tenant = normalizeTenantRecord({
+    id: `tenant-${crypto.randomUUID().slice(0, 8)}`,
+    raisonSociale: String(company.raisonSociale).trim(),
+    slug: tenantSlug,
+    secteurActivite: String(company.secteurActivite || "").trim(),
+    pays: String(company.pays || "").trim(),
+    ville: String(company.ville || "").trim(),
+    logoUrl: String(company.logoUrl || "").trim(),
+    status: trialDays ? "trial" : "active",
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString()
+  });
+  const password = tempPassword();
+  const owner = {
+    ...user(`USR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, email, password, `${admin.firstName} ${admin.lastName}`.trim(), "tenant_admin"),
+    tenantId: tenant.id,
+    phone: String(admin.phone || "").trim(),
+    jobTitle: "Owner client",
+    active: true,
+    approved: true
+  };
+  const periodEnd = new Date(now);
+  periodEnd.setDate(periodEnd.getDate() + (trialDays || (subscriptionInput.billingCycle === "annual" ? 365 : 30)));
+  const limits = platformPlanLimits(planName, body.limits || {});
+  const subscription = normalizeSubscriptionRecord({
+    id: `sub-${crypto.randomUUID().slice(0, 8)}`,
+    tenantId: tenant.id,
+    planName,
+    status: trialDays ? "trialing" : "active",
+    billingCycle: BILLING_CYCLES.includes(subscriptionInput.billingCycle) ? subscriptionInput.billingCycle : "monthly",
+    currentPeriodStart: now.toISOString(),
+    currentPeriodEnd: periodEnd.toISOString(),
+    cancelAtPeriodEnd: false
+  });
+  db.tenants.push(tenant);
+  db.users.push(owner);
+  db.subscriptions.push(subscription);
+  db.tenantLimits.push({ id: `limits-${crypto.randomUUID().slice(0, 8)}`, tenantId: tenant.id, ...limits });
+  platformAudit(db, actor, "tenant.create", { tenantId: tenant.id, planName, ownerId: owner.id, activationEmailQueued: true }, req);
+  return { tenant, owner: publicUser(owner), subscription, temporaryPassword: password };
 }
 
 async function savePhotos(reportId, photos = []) {
@@ -828,6 +1259,177 @@ async function handleApi(req, res, url) {
   const actor = authenticate(req, db);
   if (!actor) return sendError(res, 401, "Authentification requise");
 
+  if (url.pathname.startsWith("/api/super-admin")) {
+    if (!requirePlatformAdmin(req, res, actor)) return;
+
+    if (req.method === "GET" && url.pathname === "/api/super-admin/overview") {
+      return sendJson(req, res, 200, {
+        overview: platformOverview(db),
+        tenants: platformTenantRows(db).slice(0, 6),
+        transactions: (db.transactions || []).slice(-8).reverse(),
+        banners: db.systemBanners || []
+      });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/super-admin/tenants") {
+      const query = String(url.searchParams.get("q") || "").trim().toLowerCase();
+      const status = String(url.searchParams.get("status") || "").trim();
+      const page = Math.max(1, Number(url.searchParams.get("page") || 1));
+      const pageSize = Math.min(50, Math.max(5, Number(url.searchParams.get("pageSize") || 10)));
+      let rows = platformTenantRows(db);
+      if (query) {
+        rows = rows.filter(item => [item.raisonSociale, item.slug, item.pays, item.ville].some(value => String(value || "").toLowerCase().includes(query)));
+      }
+      if (TENANT_STATUSES.includes(status)) rows = rows.filter(item => item.status === status);
+      const total = rows.length;
+      const start = (page - 1) * pageSize;
+      return sendJson(req, res, 200, { tenants: rows.slice(start, start + pageSize), total, page, pageSize });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/super-admin/tenants") {
+      const body = await readBody(req);
+      const result = createTenantOnboarding(db, actor, body, req);
+      await writeDb(db);
+      return sendJson(req, res, 201, result);
+    }
+
+    const tenantAdminMatch = /^\/api\/super-admin\/tenants\/([^/]+)$/.exec(url.pathname);
+    if (tenantAdminMatch && req.method === "PATCH") {
+      const tenantId = decodeURIComponent(tenantAdminMatch[1]);
+      const tenant = db.tenants.find(item => item.id === tenantId);
+      if (!tenant) return sendError(req, res, 404, "Tenant introuvable");
+      const body = await readBody(req);
+      if (body.status !== undefined) {
+        if (!TENANT_STATUSES.includes(body.status)) return sendError(req, res, 400, "Statut tenant invalide");
+        tenant.status = body.status;
+      }
+      ["raisonSociale", "secteurActivite", "pays", "ville", "logoUrl"].forEach(field => {
+        if (body[field] !== undefined) tenant[field] = String(body[field] || "").trim();
+      });
+      tenant.updatedAt = new Date().toISOString();
+      const subscription = db.subscriptions.find(item => item.tenantId === tenantId);
+      if (subscription && body.subscription) {
+        if (PLAN_NAMES.includes(body.subscription.planName)) subscription.planName = body.subscription.planName;
+        if (body.subscription.status !== undefined) subscription.status = String(body.subscription.status || subscription.status);
+        if (BILLING_CYCLES.includes(body.subscription.billingCycle)) subscription.billingCycle = body.subscription.billingCycle;
+        if (body.subscription.cancelAtPeriodEnd !== undefined) subscription.cancelAtPeriodEnd = Boolean(body.subscription.cancelAtPeriodEnd);
+      }
+      let limits = db.tenantLimits.find(item => item.tenantId === tenantId);
+      if (!limits) {
+        limits = normalizeLimitRecord({}, tenantId);
+        db.tenantLimits.push(limits);
+      }
+      if (body.limits) {
+        if (body.limits.maxDepots !== undefined) limits.maxDepots = Math.max(1, Number(body.limits.maxDepots));
+        if (body.limits.maxUsers !== undefined) limits.maxUsers = Math.max(1, Number(body.limits.maxUsers));
+        if (body.limits.maxStorageGb !== undefined) limits.maxStorageGb = Math.max(1, Number(body.limits.maxStorageGb));
+      }
+      platformAudit(db, actor, "tenant.update", { tenantId, fields: Object.keys(body) }, req);
+      await writeDb(db);
+      return sendJson(req, res, 200, { tenant: platformTenantRows(db).find(item => item.id === tenantId), tenants: platformTenantRows(db) });
+    }
+
+    const tenantStatusMatch = /^\/api\/super-admin\/tenants\/([^/]+)\/status$/.exec(url.pathname);
+    if (tenantStatusMatch && req.method === "POST") {
+      const tenantId = decodeURIComponent(tenantStatusMatch[1]);
+      const tenant = db.tenants.find(item => item.id === tenantId);
+      if (!tenant) return sendError(req, res, 404, "Tenant introuvable");
+      const body = await readBody(req);
+      if (!TENANT_STATUSES.includes(body.status)) return sendError(req, res, 400, "Statut tenant invalide");
+      tenant.status = body.status;
+      tenant.updatedAt = new Date().toISOString();
+      platformAudit(db, actor, "tenant.status", { tenantId, status: tenant.status }, req);
+      await writeDb(db);
+      return sendJson(req, res, 200, { tenant: platformTenantRows(db).find(item => item.id === tenantId) });
+    }
+
+    const impersonateMatch = /^\/api\/super-admin\/tenants\/([^/]+)\/impersonate$/.exec(url.pathname);
+    if (impersonateMatch && req.method === "POST") {
+      const tenantId = decodeURIComponent(impersonateMatch[1]);
+      const tenant = db.tenants.find(item => item.id === tenantId);
+      if (!tenant) return sendError(req, res, 404, "Tenant introuvable");
+      const target = db.users.find(item => item.tenantId === tenantId && item.role === "tenant_admin" && item.active !== false) ||
+        db.users.find(item => item.tenantId === tenantId && item.active !== false);
+      if (!target) return sendError(req, res, 404, "Aucun utilisateur actif pour ce tenant");
+      const token = crypto.randomBytes(32).toString("hex");
+      sessions.set(token, { userId: target.id, createdAt: Date.now(), impersonatedBy: actor.id, tenantId });
+      platformAudit(db, actor, "tenant.impersonate", { tenantId, targetUserId: target.id }, req);
+      await writeDb(db);
+      return sendJson(req, res, 201, { token, user: publicUser(target), expiresInMinutes: Math.round(SESSION_TTL_MS / 60000) });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/super-admin/plans") {
+      return sendJson(req, res, 200, { plans: db.platformPlans || planDefaults, coupons: db.coupons || [] });
+    }
+
+    if (req.method === "PATCH" && url.pathname === "/api/super-admin/plans") {
+      const body = await readBody(req);
+      db.platformPlans = db.platformPlans || planDefaults;
+      Object.entries(body.plans || {}).forEach(([planName, config]) => {
+        if (!PLAN_NAMES.includes(planName)) return;
+        db.platformPlans[planName] = {
+          priceMonthly: Number(config.priceMonthly || 0),
+          priceAnnual: Number(config.priceAnnual || 0),
+          maxDepots: Number(config.maxDepots || 0),
+          maxUsers: Number(config.maxUsers || 0),
+          maxStorageGb: Number(config.maxStorageGb || 0),
+          features: config.features || {}
+        };
+      });
+      platformAudit(db, actor, "plans.update", { plans: Object.keys(body.plans || {}) }, req);
+      await writeDb(db);
+      return sendJson(req, res, 200, { plans: db.platformPlans });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/super-admin/coupons") {
+      const body = await readBody(req);
+      const code = String(body.code || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+      if (!code || db.coupons.some(item => item.code === code)) return sendError(req, res, 409, "Code coupon invalide ou deja utilise");
+      const coupon = {
+        id: `coupon-${crypto.randomUUID().slice(0, 8)}`,
+        code,
+        discountPercent: Math.min(95, Math.max(1, Number(body.discountPercent || 10))),
+        planName: PLAN_NAMES.includes(body.planName) ? body.planName : "",
+        expiresAt: body.expiresAt || "",
+        active: body.active !== false,
+        createdAt: new Date().toISOString()
+      };
+      db.coupons.push(coupon);
+      platformAudit(db, actor, "coupon.create", { couponId: coupon.id, code }, req);
+      await writeDb(db);
+      return sendJson(req, res, 201, { coupon, coupons: db.coupons });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/super-admin/billing") {
+      return sendJson(req, res, 200, { transactions: db.transactions || [], subscriptions: db.subscriptions || [] });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/super-admin/audit-logs") {
+      return sendJson(req, res, 200, { auditLogs: (db.platformAuditLogs || []).slice().reverse() });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/super-admin/banners") {
+      const body = await readBody(req);
+      const message = String(body.message || "").trim();
+      if (!message) return sendError(req, res, 400, "Message de banniere requis");
+      const banner = {
+        id: `banner-${crypto.randomUUID().slice(0, 8)}`,
+        message,
+        severity: ["info", "warn", "danger"].includes(body.severity) ? body.severity : "info",
+        active: body.active !== false,
+        startsAt: body.startsAt || "",
+        endsAt: body.endsAt || "",
+        createdAt: new Date().toISOString()
+      };
+      db.systemBanners.push(banner);
+      platformAudit(db, actor, "banner.create", { bannerId: banner.id }, req);
+      await writeDb(db);
+      return sendJson(req, res, 201, { banner, banners: db.systemBanners });
+    }
+
+    return sendError(req, res, 404, "Route Super Admin introuvable");
+  }
+
   if (req.method === "GET" && url.pathname === "/api/me") {
     return sendJson(res, 200, { user: publicUser(actor), permissions: rolePermissions[actor.role] || [] });
   }
@@ -852,17 +1454,23 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/bootstrap") {
-    const terrainUsers = db.users.filter(userRecord => userRecord.role === "terrain").map(publicUser);
+    const users = scopedRecords(actor, db.users.filter(userRecord => userRecord.role !== "platform_admin"));
+    const projects = scopedRecords(actor, db.projects);
+    const poles = scopedRecords(actor, db.poles);
+    const interventions = scopedRecords(actor, db.interventions);
+    const stockMovements = scopedRecords(actor, db.stockMovements || []);
+    const auditLog = scopedRecords(actor, db.auditLog || []);
+    const terrainUsers = users.filter(userRecord => ["terrain", "field_agent"].includes(userRecord.role)).map(publicUser);
     return sendJson(res, 200, {
       user: publicUser(actor),
       permissions: rolePermissions[actor.role] || [],
-      projects: db.projects,
-      poles: db.poles,
-      interventions: db.interventions,
-      stockMovements: db.stockMovements || [],
-      auditLog: hasPermission(actor, "admin") ? db.auditLog : [],
+      projects,
+      poles,
+      interventions,
+      stockMovements,
+      auditLog: hasPermission(actor, "admin") ? auditLog : [],
       settings: db.settings || DEFAULT_SETTINGS,
-      users: hasPermission(actor, "admin") ? db.users.map(publicUser) : [],
+      users: hasPermission(actor, "admin") ? users.map(publicUser) : [],
       terrainUsers: hasPermission(actor, "write_stock") || actor.role === "terrain" ? terrainUsers : [],
       offlineQueue: []
     });
@@ -879,7 +1487,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/users") {
     if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
-    return sendJson(res, 200, { users: db.users.map(publicUser) });
+    return sendJson(res, 200, { users: scopedRecords(actor, db.users.filter(userRecord => userRecord.role !== "platform_admin")).map(publicUser) });
   }
 
   if (req.method === "POST" && url.pathname === "/api/users") {
@@ -898,6 +1506,7 @@ async function handleApi(req, res, url) {
     }
     const created = {
       ...user(`USR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, email, password, name, role),
+      tenantId: isPlatformAdmin(actor) ? (body.tenantId || DEFAULT_TENANT_ID) : actor.tenantId,
       active: body.active !== false,
       approved: body.approved !== false,
       depot: String(body.depot || "").trim(),
@@ -908,7 +1517,7 @@ async function handleApi(req, res, url) {
     db.users.push(created);
     audit(db, actor, "user.create", { userId: created.id, email, role });
     await writeDb(db);
-    return sendJson(res, 201, { user: publicUser(created), users: db.users.map(publicUser) });
+    return sendJson(res, 201, { user: publicUser(created), users: scopedRecords(actor, db.users.filter(userRecord => userRecord.role !== "platform_admin")).map(publicUser) });
   }
 
   const userMatch = /^\/api\/users\/([^/]+)$/.exec(url.pathname);
@@ -916,6 +1525,7 @@ async function handleApi(req, res, url) {
     if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
     const target = db.users.find(item => item.id === decodeURIComponent(userMatch[1]));
     if (!target) return sendError(res, 404, "Utilisateur introuvable");
+    if (!tenantMatches(actor, target)) return sendError(res, 403, "Tenant non autorise");
     const body = await readBody(req);
     const allowedRoles = ["super_admin", "magasinier", "terrain", "controleur"];
     if (body.name !== undefined) target.name = String(body.name).trim();
@@ -933,11 +1543,11 @@ async function handleApi(req, res, url) {
     }
     audit(db, actor, "user.update", { userId: target.id, fields: Object.keys(body).filter(key => key !== "password") });
     await writeDb(db);
-    return sendJson(res, 200, { user: publicUser(target), users: db.users.map(publicUser) });
+    return sendJson(res, 200, { user: publicUser(target), users: scopedRecords(actor, db.users.filter(userRecord => userRecord.role !== "platform_admin")).map(publicUser) });
   }
 
   if (req.method === "GET" && url.pathname === "/api/poles") {
-    return sendJson(res, 200, { poles: db.poles });
+    return sendJson(res, 200, { poles: scopedRecords(actor, db.poles) });
   }
 
   if (req.method === "POST" && url.pathname === "/api/poles") {
@@ -947,6 +1557,7 @@ async function handleApi(req, res, url) {
     if (db.poles.some(item => item.id === body.id)) return sendError(res, 409, "Code poteau deja existant");
     const pole = {
       id: body.id,
+      tenantId: actor.tenantId || DEFAULT_TENANT_ID,
       type: body.type,
       height: Number(body.height),
       effort: body.effort || "",
@@ -968,6 +1579,7 @@ async function handleApi(req, res, url) {
     if (!hasPermission(actor, "write_stock")) return sendError(res, 403, "Permission stock requise");
     const pole = db.poles.find(item => item.id === decodeURIComponent(poleMatch[1]));
     if (!pole) return sendError(res, 404, "Poteau introuvable");
+    if (!tenantMatches(actor, pole)) return sendError(res, 403, "Tenant non autorise");
     const beforeDepot = pole.depot;
     const beforeStatus = pole.status;
     const body = await readBody(req);
@@ -985,7 +1597,7 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     const poleIds = Array.isArray(body.poleIds) ? body.poleIds : [];
     const moved = [];
-    for (const pole of db.poles) {
+    for (const pole of scopedRecords(actor, db.poles)) {
       if (poleIds.includes(pole.id)) {
         const assignedTeam = String(body.assignedTeam || "").trim();
         const fromDepot = pole.depot;
@@ -1002,7 +1614,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/projects") {
-    return sendJson(res, 200, { projects: db.projects });
+    return sendJson(res, 200, { projects: scopedRecords(actor, db.projects) });
   }
 
   if (req.method === "POST" && url.pathname === "/api/projects") {
@@ -1014,6 +1626,7 @@ async function handleApi(req, res, url) {
     const poleCount = requirements.reduce((sum, item) => sum + item.quantity, 0);
     const project = {
       id: body.id || nextProjectId(db),
+      tenantId: actor.tenantId || DEFAULT_TENANT_ID,
       name: String(body.name).trim(),
       client: body.client,
       zone: String(body.zone).trim(),
@@ -1040,6 +1653,7 @@ async function handleApi(req, res, url) {
     if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
     const project = db.projects.find(item => item.id === decodeURIComponent(projectMatch[1]));
     if (!project) return sendError(res, 404, "Projet introuvable");
+    if (!tenantMatches(actor, project)) return sendError(res, 403, "Tenant non autorise");
     if (project.status === "Cloture") return sendError(res, 409, "Impossible de modifier un projet cloture");
     const body = await readBody(req);
     const requirements = normalizeRequirements(body.requirements);
@@ -1068,6 +1682,7 @@ async function handleApi(req, res, url) {
     if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
     const projectId = decodeURIComponent(projectMatch[1]);
     const project = db.projects.find(item => item.id === projectId);
+    if (project && !tenantMatches(actor, project)) return sendError(res, 403, "Tenant non autorise");
     if (project?.status === "Cloture") return sendError(res, 409, "Impossible de supprimer un projet cloture");
     const hasReports = db.interventions.some(item => item.projectId === projectId);
     if (hasReports) return sendError(res, 409, "Impossible de supprimer un projet avec des fiches de pose");
@@ -1090,6 +1705,7 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && projectActionMatch) {
     const project = db.projects.find(item => item.id === decodeURIComponent(projectActionMatch[1]));
     if (!project) return sendError(res, 404, "Projet introuvable");
+    if (!tenantMatches(actor, project)) return sendError(res, 403, "Tenant non autorise");
     const action = projectActionMatch[2];
     if (action === "validate-stock") {
       if (!hasPermission(actor, "write_stock")) return sendError(res, 403, "Permission stock requise");
@@ -1162,7 +1778,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/interventions") {
-    return sendJson(res, 200, { interventions: db.interventions });
+    return sendJson(res, 200, { interventions: scopedRecords(actor, db.interventions) });
   }
 
   if (req.method === "POST" && url.pathname === "/api/interventions") {
@@ -1171,6 +1787,7 @@ async function handleApi(req, res, url) {
     if (!body.poleId || !body.projectId || !body.lat || !body.lng) return sendError(res, 400, "Fiche de pose incomplete");
     const pole = db.poles.find(item => item.id === body.poleId);
     if (!pole) return sendError(res, 404, "Poteau introuvable");
+    if (!tenantMatches(actor, pole)) return sendError(res, 403, "Tenant non autorise");
     if (actor.role === "terrain" && (pole.status !== "En Transit" || pole.assignedTeam !== terrainTeamOf(actor))) {
       return sendError(res, 403, "Ce poteau n'est pas attribue a votre equipe terrain");
     }
@@ -1178,6 +1795,7 @@ async function handleApi(req, res, url) {
     const photos = await savePhotos(id, body.photos || []);
     const intervention = {
       id,
+      tenantId: actor.tenantId || pole.tenantId || DEFAULT_TENANT_ID,
       poleId: body.poleId,
       projectId: body.projectId,
       agent: body.agent || actor.name,
@@ -1216,6 +1834,7 @@ async function handleApi(req, res, url) {
     if (!hasPermission(actor, "validate")) return sendError(res, 403, "Permission validation requise");
     const intervention = db.interventions.find(item => item.id === decodeURIComponent(validationMatch[1]));
     if (!intervention) return sendError(res, 404, "Rapport introuvable");
+    if (!tenantMatches(actor, intervention)) return sendError(res, 403, "Tenant non autorise");
     const body = await readBody(req);
     intervention.validation = body.validation || "Valide";
     intervention.clientSignature = body.clientSignature || actor.name;
@@ -1241,6 +1860,7 @@ async function handleApi(req, res, url) {
     if (!hasPermission(actor, "validate") && !hasPermission(actor, "admin")) return sendError(res, 403, "Permission controle requise");
     const intervention = db.interventions.find(item => item.id === decodeURIComponent(anomalyMatch[1]));
     if (!intervention) return sendError(res, 404, "Rapport introuvable");
+    if (!tenantMatches(actor, intervention)) return sendError(res, 403, "Tenant non autorise");
     const body = await readBody(req);
     intervention.anomalyStatus = body.anomalyStatus || "Ouverte";
     intervention.anomalyReason = body.anomalyReason || "";
@@ -1330,6 +1950,7 @@ server.on("error", error => {
 
 server.listen(PORT, () => {
   console.log(`SuiviPoteaux Pro backend listening on http://localhost:${PORT}`);
-  console.log("Comptes demo: admin@itc.local / depot@itc.local / terrain@itc.local / controle@itc.local");
+  console.log("Compte Admin SaaS: platform@itc.local");
+  console.log("Comptes metier: admin@itc.local / depot@itc.local / terrain@itc.local / controle@itc.local");
   console.log("Mot de passe demo: demo123");
 });
