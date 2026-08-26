@@ -1113,17 +1113,18 @@
         position: fixed;
         left: 10px;
         right: 10px;
-        bottom: 10px;
+        bottom: max(10px, env(safe-area-inset-bottom));
         z-index: 40;
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
         gap: 6px;
         padding: 8px;
-        background: color-mix(in srgb, var(--panel) 94%, transparent);
+        background: color-mix(in srgb, var(--panel) 42%, transparent);
         border: 1px solid var(--line);
         border-radius: 12px;
         box-shadow: var(--shadow);
-        backdrop-filter: blur(16px);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
       }
       .mobile-tabs button {
         min-height: 46px;
