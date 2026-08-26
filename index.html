@@ -1117,17 +1117,17 @@
         z-index: 40;
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
-        gap: 6px;
-        padding: 8px;
-        background: color-mix(in srgb, var(--panel) 42%, transparent);
-        border: 1px solid var(--line);
+        gap: 4px;
+        padding: 5px;
+        background: color-mix(in srgb, var(--panel) 18%, transparent);
+        border: 1px solid color-mix(in srgb, var(--line) 38%, transparent);
         border-radius: 12px;
-        box-shadow: var(--shadow);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        box-shadow: 0 10px 24px rgba(23, 33, 31, .08);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
       }
       .mobile-tabs button {
-        min-height: 46px;
+        min-height: 38px;
         display: grid;
         place-items: center;
         color: var(--muted);
