@@ -1946,6 +1946,10 @@
       return apiPermissions.includes(permission) || currentRoleUi().permissions.includes(permission);
     }
 
+    function isPlatformRole() {
+      return apiUser?.role === "platform_admin";
+    }
+
     function defaultViewForRole() {
       return currentRoleUi().home;
     }
@@ -1962,9 +1966,13 @@
       $("#topCurrentUser").textContent = apiUser ? `${apiUser.name} - ${roleLabel(apiUser.role)}` : "Non connecte";
       setAvatar($("#currentUserAvatar"));
       setAvatar($("#topUserAvatar"));
-      $("#seedBtn").classList.toggle("hidden", !can("admin"));
-      $("#newInterventionBtn").classList.toggle("hidden", !can("write_intervention"));
-      $("#scanQrBtn").classList.toggle("hidden", !(can("write_intervention") || can("validate") || can("admin")));
+      $("#seedBtn").classList.toggle("hidden", isPlatformRole() || !can("admin"));
+      $("#newInterventionBtn").classList.toggle("hidden", isPlatformRole() || !can("write_intervention"));
+      $("#scanQrBtn").classList.toggle("hidden", isPlatformRole() || !(can("write_intervention") || can("validate") || can("admin")));
+      $("#globalSearch").classList.toggle("hidden", isPlatformRole());
+      $("#globalSearchBtn").classList.toggle("hidden", isPlatformRole());
+      $("#syncBtn").classList.toggle("hidden", isPlatformRole());
+      $("#mobileSyncBtn").classList.toggle("hidden", isPlatformRole());
     }
 
     function showLogin(message = "") {
@@ -2581,6 +2589,34 @@
     }
 
     function renderDashboard() {
+      if (isPlatformRole()) {
+        const overview = platformState.overview || { kpis: {}, growth: [] };
+        const kpis = overview.kpis || {};
+        $("#dashboardView").innerHTML = `
+          <div class="grid stats">
+            ${metric("MRR", moneyXof(kpis.mrr), "Revenu mensuel recurrent")}
+            ${metric("ARR", moneyXof(kpis.arr), "Projection annuelle")}
+            ${metric("Entreprises", kpis.tenantsTotal || 0, `${kpis.tenantsActive || 0} actives / ${kpis.tenantsTrial || 0} essais`)}
+            ${metric("Volume plateforme", kpis.polesTotal || 0, `${Number(kpis.storageGb || 0).toFixed(2)} GB photos & PDF`)}
+          </div>
+          <div class="chart-grid">
+            ${chartCard("Croissance clients", barChart((overview.growth || []).map(row => [row.month, row.signups, "#0f766e"])), "12 mois")}
+            ${chartCard("Activite terrain globale", barChart((overview.growth || []).map(row => [row.month, row.interventions, "#d89f2b"])), "Poses")}
+            ${chartCard("Statuts tenants", donutChart([
+              ["Actifs", kpis.tenantsActive || 0, "#127a43"],
+              ["Essai", kpis.tenantsTrial || 0, "#d89f2b"],
+              ["Suspendus", kpis.tenantsSuspended || 0, "#b42318"]
+            ], Math.max(kpis.tenantsTotal || 0, 1)), "Portefeuille SaaS")}
+            ${chartCard("Actions rapides", `
+              <div class="insight-list">
+                <button class="btn primary" type="button" onclick="setView('platform')">Ouvrir Admin SaaS</button>
+                <button class="btn" type="button" onclick="refreshPlatformData()">Actualiser les donnees SaaS</button>
+              </div>
+            `)}
+          </div>
+        `;
+        return;
+      }
       const dashboardRole = {
         tenant_admin: "super_admin",
         depot_manager: "magasinier",
