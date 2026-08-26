@@ -2057,7 +2057,7 @@
           auditLog: payload.auditLog || state.auditLog || [],
           settings: { ...DEFAULT_SETTINGS, ...(payload.settings || state.settings || {}) },
           users: payload.users || state.users || [],
-          terrainUsers: payload.terrainUsers || payload.users?.filter(user => user.role === "terrain") || state.terrainUsers || [],
+          terrainUsers: payload.terrainUsers || payload.users?.filter(user => isFieldRole(user)) || state.terrainUsers || [],
           offlineQueue: state.offlineQueue || []
         };
         saveState();
@@ -2334,6 +2334,16 @@
       return { active: "Actif", trial: "Essai", suspended: "Suspendu" }[status] || status || "-";
     }
 
+    function manageableRoleOptions() {
+      if (apiUser?.role === "tenant_admin") return ["tenant_admin", "depot_manager", "field_agent", "quality_inspector"];
+      if (apiUser?.role === "super_admin") return ["super_admin", "magasinier", "terrain", "controleur"];
+      return ["depot_manager", "field_agent", "quality_inspector"];
+    }
+
+    function isFieldRole(user = apiUser) {
+      return ["terrain", "field_agent"].includes(user?.role);
+    }
+
     function renderPlatformPlans() {
       const plans = platformState.plans || {};
       return chartCard("Abonnements & tarifs", `
@@ -2571,7 +2581,12 @@
     }
 
     function renderDashboard() {
-      const role = apiUser?.role || "super_admin";
+      const dashboardRole = {
+        tenant_admin: "super_admin",
+        depot_manager: "magasinier",
+        field_agent: "terrain",
+        quality_inspector: "controleur"
+      }[apiUser?.role] || apiUser?.role || "super_admin";
       const total = state.poles.length;
       const installed = state.poles.filter(p => ["Pose - En attente validation", "Valide", "Anomalie"].includes(p.status)).length;
       const beton = state.poles.filter(p => p.type === "BETON").length;
@@ -2583,7 +2598,7 @@
       const stock = countStatus("En Stock");
       const transit = countStatus("En Transit");
       const fieldAssigned = terrainAssignablePoles();
-      const myInterventions = apiUser?.role === "terrain"
+      const myInterventions = isFieldRole(apiUser)
         ? state.interventions.filter(it => it.agentId === apiUser.id || it.agent === apiUser.name)
         : state.interventions;
       const todayCount = myInterventions.filter(it => isToday(it.date)).length;
@@ -2670,7 +2685,7 @@
         }
       };
 
-      const dashboard = dashboards[role] || dashboards.super_admin;
+      const dashboard = dashboards[dashboardRole] || dashboards.super_admin;
 
       $("#dashboardView").innerHTML = `
         <div class="grid stats">
@@ -2691,7 +2706,7 @@
       const user = apiUser || {};
       const photo = profilePhotoDraft || user.profilePhoto || "";
       const myReports = state.interventions.filter(item => item.agentId === user.id || item.agent === user.name);
-      const assignedProjects = user.role === "terrain"
+      const assignedProjects = isFieldRole(user)
         ? state.projects.filter(project => project.assignedTeam === terrainTeamOf(user))
         : state.projects;
       node.innerHTML = `
@@ -3016,7 +3031,7 @@
     }
 
     function canRequestProjectClosure(project) {
-      return apiUser?.role === "terrain" &&
+      return isFieldRole(apiUser) &&
         project.assignedTeam === currentTerrainTeam() &&
         projectProgress(project) >= 100 &&
         !["Cloture demandee", "Cloture"].includes(project.status);
@@ -3075,7 +3090,7 @@
       if (!node) return;
       const teams = terrainUsersForAssignment();
       const settings = appSettings();
-      const visibleProjects = apiUser?.role === "terrain"
+      const visibleProjects = isFieldRole(apiUser)
         ? terrainProjects()
         : state.projects;
       const totalProjects = state.projects.length;
@@ -3141,7 +3156,7 @@
             <span class="badge info">${visibleProjects.length} projet(s)</span>
           </div>
           <div class="section-body">
-            ${apiUser?.role === "terrain" ? projectTimingAlerts(visibleProjects) : ""}
+            ${isFieldRole(apiUser) ? projectTimingAlerts(visibleProjects) : ""}
             <div class="table-wrap">
               <table>
                 <thead><tr><th>Nom</th><th>Zone</th><th>Poteaux</th><th>Evolution</th><th>Timing</th><th>Statut</th><th>Actions</th></tr></thead>
@@ -3316,7 +3331,7 @@
 
     function terrainUsersForAssignment() {
       const users = [...(state.terrainUsers || []), ...(state.users || [])]
-        .filter(user => user.role === "terrain");
+        .filter(user => isFieldRole(user));
       const unique = new Map();
       users.forEach(user => {
         const team = terrainTeamOf(user);
@@ -3331,7 +3346,7 @@
     }
 
     function isPoleAssignedToCurrentTerrain(pole) {
-      if (apiUser?.role !== "terrain") return true;
+      if (!isFieldRole(apiUser)) return true;
       return String(pole.assignedTeam || "").trim() === currentTerrainTeam();
     }
 
@@ -4038,6 +4053,7 @@
         return;
       }
       const users = state.users || [];
+      const roleOptions = manageableRoleOptions();
       const pending = users.filter(user => user.approved === false).length;
       const active = users.filter(user => user.active !== false).length;
       node.innerHTML = `
@@ -4066,10 +4082,7 @@
                 <div class="field">
                   <label for="newUserRole">Role</label>
                   <select id="newUserRole" required>
-                    <option value="terrain">Technicien terrain</option>
-                    <option value="magasinier">Gestionnaire depot</option>
-                    <option value="controleur">Controleur qualite</option>
-                    <option value="super_admin">Administrateur</option>
+                    ${roleOptions.map(role => `<option value="${role}">${roleLabel(role)}</option>`).join("")}
                   </select>
                 </div>
                 <div class="field">
@@ -4128,7 +4141,7 @@
                       </td>
                       <td>
                         <select data-user-field="role">
-                          ${["super_admin", "magasinier", "terrain", "controleur"].map(role => `<option value="${role}" ${user.role === role ? "selected" : ""}>${roleLabel(role)}</option>`).join("")}
+                          ${roleOptions.map(role => `<option value="${role}" ${user.role === role ? "selected" : ""}>${roleLabel(role)}</option>`).join("")}
                         </select>
                       </td>
                       <td><input data-user-field="depot" value="${escapeAttr(user.depot || "")}" placeholder="Depot Central"></td>

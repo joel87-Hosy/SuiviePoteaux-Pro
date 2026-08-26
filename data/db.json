@@ -23,7 +23,8 @@
       "team": "",
       "phone": "",
       "jobTitle": "Administrateur plateforme",
-      "profilePhoto": ""
+      "profilePhoto": "",
+      "tenantId": "tenant-demo"
     },
     {
       "id": "USR-002",
@@ -35,7 +36,8 @@
       "team": "",
       "phone": "",
       "jobTitle": "Gestionnaire stock",
-      "profilePhoto": ""
+      "profilePhoto": "",
+      "tenantId": "tenant-demo"
     },
     {
       "id": "USR-003",
@@ -47,7 +49,8 @@
       "team": "Equipe Terrain A",
       "phone": "",
       "jobTitle": "Technicien terrain",
-      "profilePhoto": ""
+      "profilePhoto": "",
+      "tenantId": "tenant-demo"
     },
     {
       "id": "USR-004",
@@ -59,7 +62,8 @@
       "team": "",
       "phone": "",
       "jobTitle": "Controleur qualite",
-      "profilePhoto": ""
+      "profilePhoto": "",
+      "tenantId": "tenant-demo"
     }
   ],
   "projects": [
@@ -84,7 +88,8 @@
       "assignedPoleIds": [
         "POT-2026-M4-018",
         "POT-2026-M4-019"
-      ]
+      ],
+      "tenantId": "tenant-demo"
     },
     {
       "id": "CH-CIE-B4",
@@ -106,7 +111,8 @@
       ],
       "assignedPoleIds": [
         "POT-2026-B10-021"
-      ]
+      ],
+      "tenantId": "tenant-demo"
     },
     {
       "id": "CH-ORG-T2",
@@ -118,7 +124,8 @@
       "status": "Planifie",
       "requestStatus": "Brouillon",
       "requirements": [],
-      "assignedPoleIds": []
+      "assignedPoleIds": [],
+      "tenantId": "tenant-demo"
     }
   ],
   "poles": [
@@ -130,7 +137,8 @@
       "weight": 860,
       "maker": "SIPREL / Lot B9",
       "status": "En Stock",
-      "depot": "Depot Central"
+      "depot": "Depot Central",
+      "tenantId": "tenant-demo"
     },
     {
       "id": "POT-2026-B9-002",
@@ -142,7 +150,8 @@
       "status": "En Transit",
       "depot": "Terrain - Equipe Terrain A",
       "assignedTeam": "Equipe Terrain A",
-      "projectId": ""
+      "projectId": "",
+      "tenantId": "tenant-demo"
     },
     {
       "id": "POT-2026-M4-018",
@@ -156,7 +165,8 @@
       "assignedTeam": "Equipe Terrain A",
       "projectId": "CH-MOOV-A1",
       "lat": 5.39231,
-      "lng": -4.03221
+      "lng": -4.03221,
+      "tenantId": "tenant-demo"
     },
     {
       "id": "POT-2026-M4-019",
@@ -170,7 +180,8 @@
       "assignedTeam": "Equipe Terrain A",
       "projectId": "CH-MOOV-A1",
       "lat": 5.38875,
-      "lng": -4.02684
+      "lng": -4.02684,
+      "tenantId": "tenant-demo"
     },
     {
       "id": "POT-2026-B10-021",
@@ -184,7 +195,8 @@
       "assignedTeam": "Equipe Terrain A",
       "projectId": "CH-CIE-B4",
       "lat": 7.69592,
-      "lng": -5.03012
+      "lng": -5.03012,
+      "tenantId": "tenant-demo"
     },
     {
       "id": "POT-2026-M5-030",
@@ -194,7 +206,8 @@
       "weight": 280,
       "maker": "METALCI / Lot M5",
       "status": "En Stock",
-      "depot": "Depot Bouake"
+      "depot": "Depot Bouake",
+      "tenantId": "tenant-demo"
     }
   ],
   "stockMovements": [],
@@ -217,7 +230,8 @@
       "clientSignature": "Controle Qualite",
       "anomalyReason": "",
       "anomalyStatus": "",
-      "photos": []
+      "photos": [],
+      "tenantId": "tenant-demo"
     }
   ],
   "auditLog": [
@@ -230,7 +244,8 @@
         "hasPhoto": false,
         "passwordChanged": false
       },
-      "date": "2026-08-25T20:00:32.348Z"
+      "date": "2026-08-25T20:00:32.348Z",
+      "tenantId": "tenant-demo"
     }
   ],
   "tenants": [

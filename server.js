@@ -37,9 +37,9 @@ const PLAN_NAMES = ["starter", "pro", "enterprise"];
 const BILLING_CYCLES = ["monthly", "annual"];
 const tenantRoleAliases = {
   tenant_admin: "tenant_admin",
-  depot_manager: "magasinier",
-  field_agent: "terrain",
-  quality_inspector: "controleur"
+  depot_manager: "depot_manager",
+  field_agent: "field_agent",
+  quality_inspector: "quality_inspector"
 };
 const planDefaults = {
   starter: { priceMonthly: 99000, priceAnnual: 990000, maxDepots: 2, maxUsers: 8, maxStorageGb: 10, features: { offline: true, pdfExport: true, customPdf: false, apiAccess: false } },
@@ -697,8 +697,19 @@ function hasPermission(userRecord, permission) {
   return rolePermissions[userRecord.role]?.includes(permission);
 }
 
+function manageableRoles(actor) {
+  if (actor?.role === "tenant_admin") return ["tenant_admin", "depot_manager", "field_agent", "quality_inspector"];
+  if (actor?.role === "super_admin") return ["super_admin", "magasinier", "terrain", "controleur"];
+  if (isPlatformAdmin(actor)) return ["tenant_admin", "depot_manager", "field_agent", "quality_inspector"];
+  return [];
+}
+
 function isPlatformAdmin(userRecord) {
   return userRecord?.role === "platform_admin";
+}
+
+function isFieldAgent(userRecord) {
+  return ["terrain", "field_agent"].includes(userRecord?.role);
 }
 
 function requirePlatformAdmin(req, res, actor) {
@@ -713,6 +724,17 @@ function tenantMatches(actor, record) {
 
 function scopedRecords(actor, rows = []) {
   return isPlatformAdmin(actor) ? rows : rows.filter(row => tenantMatches(actor, row));
+}
+
+function tenantPayload(db, actor, extra = {}) {
+  return {
+    ...extra,
+    projects: scopedRecords(actor, db.projects),
+    poles: scopedRecords(actor, db.poles),
+    interventions: scopedRecords(actor, db.interventions),
+    stockMovements: scopedRecords(actor, db.stockMovements || []),
+    auditLog: hasPermission(actor, "admin") ? scopedRecords(actor, db.auditLog || []) : []
+  };
 }
 
 function platformAudit(db, actor, action, payload = {}, req = null) {
@@ -862,7 +884,13 @@ function authenticate(req, db) {
     sessions.delete(token);
     return null;
   }
-  return db.users.find(userRecord => userRecord.id === session.userId && userRecord.active !== false && userRecord.approved !== false) || null;
+  const userRecord = db.users.find(item => item.id === session.userId && item.active !== false && item.approved !== false) || null;
+  if (!userRecord) return null;
+  if (!isPlatformAdmin(userRecord)) {
+    const tenant = db.tenants.find(item => item.id === userRecord.tenantId);
+    if (!tenant || tenant.status === "suspended") return null;
+  }
+  return userRecord;
 }
 
 function nextReportId(db) {
@@ -1185,12 +1213,16 @@ async function handleApi(req, res, url) {
     const email = String(body.email || "").trim().toLowerCase();
     const found = db.users.find(item => item.email === email && item.active !== false && item.approved !== false && verifyPassword(body.password, item.passwordHash));
     if (!found) return sendError(res, 401, "Identifiants invalides");
+    if (!isPlatformAdmin(found)) {
+      const tenant = db.tenants.find(item => item.id === found.tenantId);
+      if (!tenant || tenant.status === "suspended") return sendError(res, 403, "Entreprise suspendue ou introuvable");
+    }
     if (!found.passwordHash.startsWith("pbkdf2$")) {
       found.passwordHash = hashPassword(body.password);
       await writeDb(db);
     }
     const token = crypto.randomBytes(32).toString("hex");
-    sessions.set(token, { userId: found.id, createdAt: Date.now() });
+    sessions.set(token, { userId: found.id, tenantId: found.tenantId || null, createdAt: Date.now() });
     return sendJson(res, 200, { token, user: publicUser(found) });
   }
 
@@ -1471,7 +1503,7 @@ async function handleApi(req, res, url) {
       auditLog: hasPermission(actor, "admin") ? auditLog : [],
       settings: db.settings || DEFAULT_SETTINGS,
       users: hasPermission(actor, "admin") ? users.map(publicUser) : [],
-      terrainUsers: hasPermission(actor, "write_stock") || actor.role === "terrain" ? terrainUsers : [],
+      terrainUsers: hasPermission(actor, "write_stock") || isFieldAgent(actor) ? terrainUsers : [],
       offlineQueue: []
     });
   }
@@ -1496,7 +1528,7 @@ async function handleApi(req, res, url) {
     const email = String(body.email || "").trim().toLowerCase();
     const name = String(body.name || "").trim();
     const password = String(body.password || "");
-    const allowedRoles = ["super_admin", "magasinier", "terrain", "controleur"];
+    const allowedRoles = manageableRoles(actor);
     const role = allowedRoles.includes(body.role) ? body.role : "";
     if (!name || !email || !role || !strongPassword(password)) {
       return sendError(res, 400, "Nom, email, role et mot de passe fort requis");
@@ -1527,7 +1559,7 @@ async function handleApi(req, res, url) {
     if (!target) return sendError(res, 404, "Utilisateur introuvable");
     if (!tenantMatches(actor, target)) return sendError(res, 403, "Tenant non autorise");
     const body = await readBody(req);
-    const allowedRoles = ["super_admin", "magasinier", "terrain", "controleur"];
+    const allowedRoles = manageableRoles(actor);
     if (body.name !== undefined) target.name = String(body.name).trim();
     if (body.role !== undefined && allowedRoles.includes(body.role)) target.role = body.role;
     if (body.active !== undefined) target.active = Boolean(body.active);
@@ -1610,7 +1642,7 @@ async function handleApi(req, res, url) {
     }
     audit(db, actor, "requisition.create", { poleIds: moved });
     await writeDb(db);
-    return sendJson(res, 201, { moved, poles: db.poles });
+    return sendJson(res, 201, tenantPayload(db, actor, { moved }));
   }
 
   if (req.method === "GET" && url.pathname === "/api/projects") {
@@ -1645,7 +1677,7 @@ async function handleApi(req, res, url) {
     db.projects.push(project);
     audit(db, actor, "project.create", { projectId: project.id, assignedTeam: project.assignedTeam, poleCount });
     await writeDb(db);
-    return sendJson(res, 201, { project, projects: db.projects });
+    return sendJson(res, 201, tenantPayload(db, actor, { project }));
   }
 
   const projectMatch = /^\/api\/projects\/([^/]+)$/.exec(url.pathname);
@@ -1675,7 +1707,7 @@ async function handleApi(req, res, url) {
     }
     audit(db, actor, "project.update", { projectId: project.id });
     await writeDb(db);
-    return sendJson(res, 200, { project, projects: db.projects, poles: db.poles });
+    return sendJson(res, 200, tenantPayload(db, actor, { project }));
   }
 
   if (projectMatch && req.method === "DELETE") {
@@ -1684,10 +1716,10 @@ async function handleApi(req, res, url) {
     const project = db.projects.find(item => item.id === projectId);
     if (project && !tenantMatches(actor, project)) return sendError(res, 403, "Tenant non autorise");
     if (project?.status === "Cloture") return sendError(res, 409, "Impossible de supprimer un projet cloture");
-    const hasReports = db.interventions.some(item => item.projectId === projectId);
+    const hasReports = scopedRecords(actor, db.interventions).some(item => item.projectId === projectId);
     if (hasReports) return sendError(res, 409, "Impossible de supprimer un projet avec des fiches de pose");
     db.projects = db.projects.filter(item => item.id !== projectId);
-    db.poles.forEach(pole => {
+    scopedRecords(actor, db.poles).forEach(pole => {
       if (pole.projectId === projectId) {
         pole.projectId = "";
         pole.assignedTeam = "";
@@ -1698,7 +1730,7 @@ async function handleApi(req, res, url) {
     audit(db, actor, "project.delete", { projectId });
     await writeDb(db);
     if (SUPABASE_ENABLED) await supabase.from("projects").delete().eq("id", projectId);
-    return sendJson(res, 200, { projects: db.projects, poles: db.poles });
+    return sendJson(res, 200, tenantPayload(db, actor));
   }
 
   const projectActionMatch = /^\/api\/projects\/([^/]+)\/(validate-stock|takeover|request-close|validate-close)$/.exec(url.pathname);
@@ -1712,7 +1744,7 @@ async function handleApi(req, res, url) {
       const selected = [];
       const unavailable = [];
       for (const requirement of normalizeRequirements(project.requirements)) {
-        const matches = db.poles
+        const matches = scopedRecords(actor, db.poles)
           .filter(pole => pole.status === "En Stock" && pole.type === requirement.type && Number(pole.height) === Number(requirement.height))
           .filter(pole => !selected.includes(pole.id))
           .slice(0, requirement.quantity);
@@ -1721,7 +1753,7 @@ async function handleApi(req, res, url) {
       }
       if (unavailable.length) return sendError(res, 409, `Stock insuffisant: ${unavailable.join(", ")}`);
       selected.forEach(id => {
-        const pole = db.poles.find(item => item.id === id);
+        const pole = scopedRecords(actor, db.poles).find(item => item.id === id);
         if (pole) {
           const fromDepot = pole.depot;
           pole.status = "En Transit";
@@ -1738,20 +1770,20 @@ async function handleApi(req, res, url) {
       project.validatedAt = new Date().toISOString();
       audit(db, actor, "project.stock_validate", { projectId: project.id, poleIds: selected });
       await writeDb(db);
-      return sendJson(res, 200, { project, projects: db.projects, poles: db.poles });
+      return sendJson(res, 200, tenantPayload(db, actor, { project }));
     }
     if (action === "takeover") {
-      if (actor.role === "terrain" && project.assignedTeam !== terrainTeamOf(actor)) return sendError(res, 403, "Projet non attribue a votre equipe");
+      if (isFieldAgent(actor) && project.assignedTeam !== terrainTeamOf(actor)) return sendError(res, 403, "Projet non attribue a votre equipe");
       if (!hasPermission(actor, "write_intervention")) return sendError(res, 403, "Permission terrain requise");
       project.status = "Pris en main";
       project.takenBy = actor.id;
       project.takenAt = new Date().toISOString();
       audit(db, actor, "project.takeover", { projectId: project.id });
       await writeDb(db);
-      return sendJson(res, 200, { project, projects: db.projects });
+      return sendJson(res, 200, tenantPayload(db, actor, { project }));
     }
     if (action === "request-close") {
-      if (actor.role === "terrain" && project.assignedTeam !== terrainTeamOf(actor)) return sendError(res, 403, "Projet non attribue a votre equipe");
+      if (isFieldAgent(actor) && project.assignedTeam !== terrainTeamOf(actor)) return sendError(res, 403, "Projet non attribue a votre equipe");
       if (!hasPermission(actor, "write_intervention")) return sendError(res, 403, "Permission terrain requise");
       if (projectDone(db, project.id) < projectTotal(project)) return sendError(res, 409, "Tous les poteaux du projet doivent etre implantes avant cloture");
       if (project.status === "Cloture") return sendError(res, 409, "Projet deja cloture");
@@ -1760,7 +1792,7 @@ async function handleApi(req, res, url) {
       project.closureRequestedAt = new Date().toISOString();
       audit(db, actor, "project.close_request", { projectId: project.id });
       await writeDb(db);
-      return sendJson(res, 200, { project, projects: db.projects });
+      return sendJson(res, 200, tenantPayload(db, actor, { project }));
     }
     if (action === "validate-close") {
       if (!hasPermission(actor, "admin")) return sendError(res, 403, "Permission administrateur requise");
@@ -1773,7 +1805,7 @@ async function handleApi(req, res, url) {
       project.closedAt = new Date().toISOString();
       audit(db, actor, "project.close_validate", { projectId: project.id });
       await writeDb(db);
-      return sendJson(res, 200, { project, projects: db.projects });
+      return sendJson(res, 200, tenantPayload(db, actor, { project }));
     }
   }
 
@@ -1788,7 +1820,7 @@ async function handleApi(req, res, url) {
     const pole = db.poles.find(item => item.id === body.poleId);
     if (!pole) return sendError(res, 404, "Poteau introuvable");
     if (!tenantMatches(actor, pole)) return sendError(res, 403, "Tenant non autorise");
-    if (actor.role === "terrain" && (pole.status !== "En Transit" || pole.assignedTeam !== terrainTeamOf(actor))) {
+    if (isFieldAgent(actor) && (pole.status !== "En Transit" || pole.assignedTeam !== terrainTeamOf(actor))) {
       return sendError(res, 403, "Ce poteau n'est pas attribue a votre equipe terrain");
     }
     const id = body.id && !db.interventions.some(item => item.id === body.id) ? body.id : nextReportId(db);
@@ -1823,10 +1855,11 @@ async function handleApi(req, res, url) {
       if (!intervention.draft) stockMovement(db, actor, pole.id, "Implantation terrain", fromDepot, pole.depot, { projectId: intervention.projectId, reportId: intervention.id, validation: intervention.validation });
     }
     const project = db.projects.find(item => item.id === body.projectId);
+    if (project && !tenantMatches(actor, project)) return sendError(res, 403, "Tenant non autorise");
     if (project && !intervention.draft && !["Cloture demandee", "Cloture"].includes(project.status)) project.status = "En implantation";
     audit(db, actor, "intervention.create", { reportId: id, poleId: body.poleId });
     await writeDb(db);
-    return sendJson(res, 201, { intervention, poles: db.poles, projects: db.projects });
+    return sendJson(res, 201, tenantPayload(db, actor, { intervention }));
   }
 
   const validationMatch = /^\/api\/interventions\/([^/]+)\/validate$/.exec(url.pathname);
@@ -1844,7 +1877,7 @@ async function handleApi(req, res, url) {
       intervention.anomalyReason = body.anomalyReason || intervention.notes || "";
       intervention.anomalyStatus = "Ouverte";
     }
-    const pole = db.poles.find(item => item.id === intervention.poleId);
+    const pole = scopedRecords(actor, db.poles).find(item => item.id === intervention.poleId);
     if (pole) {
       const beforeStatus = pole.status;
       pole.status = intervention.validation;
@@ -1852,7 +1885,7 @@ async function handleApi(req, res, url) {
     }
     audit(db, actor, "intervention.validate", { reportId: intervention.id, validation: intervention.validation });
     await writeDb(db);
-    return sendJson(res, 200, { intervention, poles: db.poles });
+    return sendJson(res, 200, tenantPayload(db, actor, { intervention }));
   }
 
   const anomalyMatch = /^\/api\/interventions\/([^/]+)\/anomaly$/.exec(url.pathname);
@@ -1865,11 +1898,11 @@ async function handleApi(req, res, url) {
     intervention.anomalyStatus = body.anomalyStatus || "Ouverte";
     intervention.anomalyReason = body.anomalyReason || "";
     if (intervention.anomalyStatus === "Corrigee") intervention.validation = "Pose - En attente validation";
-    const pole = db.poles.find(item => item.id === intervention.poleId);
+    const pole = scopedRecords(actor, db.poles).find(item => item.id === intervention.poleId);
     if (pole && intervention.anomalyStatus === "Corrigee") pole.status = "Pose - En attente validation";
     audit(db, actor, "intervention.anomaly_update", { reportId: intervention.id, anomalyStatus: intervention.anomalyStatus });
     await writeDb(db);
-    return sendJson(res, 200, { intervention, poles: db.poles });
+    return sendJson(res, 200, tenantPayload(db, actor, { intervention }));
   }
 
   if (req.method === "POST" && url.pathname === "/api/sync") {
@@ -1879,11 +1912,11 @@ async function handleApi(req, res, url) {
     await writeDb(db);
     return sendJson(res, 200, {
       accepted: operations.length,
-      projects: db.projects,
-      poles: db.poles,
-      interventions: db.interventions,
-      stockMovements: db.stockMovements || [],
-      auditLog: hasPermission(actor, "admin") ? db.auditLog : [],
+      projects: scopedRecords(actor, db.projects),
+      poles: scopedRecords(actor, db.poles),
+      interventions: scopedRecords(actor, db.interventions),
+      stockMovements: scopedRecords(actor, db.stockMovements || []),
+      auditLog: hasPermission(actor, "admin") ? scopedRecords(actor, db.auditLog || []) : [],
       settings: db.settings || DEFAULT_SETTINGS,
       offlineQueue: []
     });
