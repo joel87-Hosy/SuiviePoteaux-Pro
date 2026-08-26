@@ -33,6 +33,7 @@ const MAX_PHOTO_BYTES = 6 * 1024 * 1024;
 const MAX_PROFILE_PHOTO_BYTES = 1024 * 1024;
 const DEFAULT_TENANT_ID = "tenant-demo";
 const TENANT_STATUSES = ["active", "trial", "suspended"];
+const PLATFORM_ROLES = ["platform_owner", "platform_support", "platform_billing", "platform_security"];
 const PLAN_NAMES = ["starter", "pro", "enterprise"];
 const BILLING_CYCLES = ["monthly", "annual"];
 const tenantRoleAliases = {
@@ -171,6 +172,7 @@ function seedDb() {
     coupons: [],
     transactions: [],
     systemBanners: [],
+    activationEmails: [],
     platformAuditLogs: [],
     settings: { ...DEFAULT_SETTINGS }
   };
@@ -219,7 +221,7 @@ async function writeDb(db) {
 }
 
 async function readSupabaseDb() {
-  const [users, projects, poles, interventions, photos, stockMovements, auditLog, appSettings, tenants, subscriptions, tenantLimits, platformPlansRows, coupons, transactions, systemBanners, platformAuditLogs] = await Promise.all([
+  const [users, projects, poles, interventions, photos, stockMovements, auditLog, appSettings, tenants, subscriptions, tenantLimits, platformPlansRows, coupons, transactions, systemBanners, activationEmails, platformAuditLogs] = await Promise.all([
     selectTable("app_users"),
     selectTable("projects"),
     selectTable("poles"),
@@ -235,6 +237,7 @@ async function readSupabaseDb() {
     selectTable("coupons"),
     selectTable("transactions"),
     selectTable("system_banners"),
+    selectTable("activation_emails"),
     selectTable("platform_audit_logs")
   ]);
   return normalizeDb({
@@ -251,7 +254,8 @@ async function readSupabaseDb() {
       phone: row.phone || "",
       jobTitle: row.job_title || row.jobTitle || "",
       profilePhoto: row.profile_photo || row.profilePhoto || "",
-      tenantId: row.tenant_id || null
+      tenantId: row.tenant_id || null,
+      platformRole: row.platform_role || ""
     })),
     projects: projects.map(row => ({
       ...row,
@@ -375,6 +379,17 @@ async function readSupabaseDb() {
       endsAt: row.ends_at || "",
       createdAt: row.created_at
     })),
+    activationEmails: activationEmails.map(row => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      userId: row.user_id,
+      email: row.email,
+      subject: row.subject,
+      status: row.status || "queued",
+      payload: row.payload || {},
+      createdAt: row.created_at,
+      sentAt: row.sent_at || ""
+    })),
     platformAuditLogs: platformAuditLogs.map(row => ({
       id: row.id,
       actorId: row.actor_id,
@@ -410,7 +425,8 @@ async function writeSupabaseDb(db) {
       team: row.team || null,
       phone: row.phone || null,
       job_title: row.jobTitle || null,
-      profile_photo: row.profilePhoto || null
+      profile_photo: row.profilePhoto || null,
+      platform_role: row.platformRole || null
     }))),
     upsertTable("projects", db.projects.map(row => ({
       id: row.id,
@@ -508,7 +524,9 @@ async function writeSupabaseDb(db) {
       pays: row.pays || null,
       ville: row.ville || null,
       logo_url: row.logoUrl || null,
+      branding: row.branding || {},
       status: row.status,
+      archived_at: row.archivedAt || null,
       created_at: row.createdAt || new Date().toISOString(),
       updated_at: row.updatedAt || new Date().toISOString()
     }))),
@@ -566,6 +584,17 @@ async function writeSupabaseDb(db) {
       ends_at: row.endsAt || null,
       created_at: row.createdAt || new Date().toISOString()
     }))),
+    upsertTable("activation_emails", (db.activationEmails || []).map(row => ({
+      id: row.id,
+      tenant_id: row.tenantId,
+      user_id: row.userId,
+      email: row.email,
+      subject: row.subject,
+      status: row.status || "queued",
+      payload: row.payload || {},
+      created_at: row.createdAt || new Date().toISOString(),
+      sent_at: row.sentAt || null
+    }))),
     upsertTable("platform_audit_logs", (db.platformAuditLogs || []).map(row => ({
       id: row.id,
       actor_id: row.actorId,
@@ -616,7 +645,9 @@ function normalizeTenantRecord(tenant = {}) {
     pays: tenant.pays || "",
     ville: tenant.ville || "",
     logoUrl: tenant.logoUrl || tenant.logo_url || "",
+    branding: tenant.branding || {},
     status: TENANT_STATUSES.includes(tenant.status) ? tenant.status : "trial",
+    archivedAt: tenant.archivedAt || tenant.archived_at || "",
     createdAt: tenant.createdAt || tenant.created_at || now,
     updatedAt: tenant.updatedAt || tenant.updated_at || now
   };
@@ -671,6 +702,7 @@ function normalizeDb(db) {
     coupons: db.coupons || [],
     transactions: db.transactions || [],
     systemBanners: db.systemBanners || db.system_banners || [],
+    activationEmails: db.activationEmails || db.activation_emails || [],
     platformAuditLogs: db.platformAuditLogs || db.platform_audit_logs || [],
     settings: normalizeSettings(db.settings)
   };
@@ -997,7 +1029,16 @@ function platformOverview(db) {
       const price = planPrice(item.planName, item.billingCycle);
       return sum + (item.billingCycle === "annual" ? Math.round(price / 12) : price);
     }, 0);
-  const tenants = db.tenants || [];
+  const tenants = (db.tenants || []).filter(item => !item.archivedAt);
+  const failedTransactions = (db.transactions || []).filter(item => ["failed", "past_due"].includes(item.status));
+  const trialsEnding = subscriptions.filter(item => item.status === "trialing" && new Date(item.currentPeriodEnd) <= new Date(Date.now() + 7 * 86400000)).length;
+  const planBreakdown = PLAN_NAMES.map(plan => ({
+    plan,
+    count: subscriptions.filter(item => item.planName === plan && ["active", "trialing"].includes(item.status)).length,
+    mrr: subscriptions
+      .filter(item => item.planName === plan && ["active", "trialing"].includes(item.status))
+      .reduce((sum, item) => sum + (item.billingCycle === "annual" ? Math.round(planPrice(item.planName, item.billingCycle) / 12) : planPrice(item.planName, item.billingCycle)), 0)
+  }));
   const monthKeys = Array.from({ length: 12 }, (_, index) => {
     const date = new Date();
     date.setMonth(date.getMonth() - (11 - index));
@@ -1012,8 +1053,13 @@ function platformOverview(db) {
       tenantsTrial: tenants.filter(item => item.status === "trial").length,
       tenantsSuspended: tenants.filter(item => item.status === "suspended").length,
       polesTotal: db.poles.length,
-      storageGb: tenants.reduce((sum, tenant) => sum + tenantUsage(db, tenant.id).storageGb, 0)
+      storageGb: tenants.reduce((sum, tenant) => sum + tenantUsage(db, tenant.id).storageGb, 0),
+      failedPayments: failedTransactions.length,
+      trialsEnding,
+      churnRisk: tenants.filter(item => item.status === "suspended").length
     },
+    planBreakdown,
+    alerts: platformAlerts(db),
     growth: monthKeys.map(month => ({
       month,
       signups: tenants.filter(item => String(item.createdAt || "").slice(0, 7) === month).length,
@@ -1022,8 +1068,21 @@ function platformOverview(db) {
   };
 }
 
-function platformTenantRows(db) {
-  return (db.tenants || []).map(tenant => {
+function platformAlerts(db) {
+  return platformTenantRows(db)
+    .filter(row => !row.archivedAt)
+    .flatMap(row => {
+      const alerts = [];
+      if (row.limits?.maxUsers && row.usage.users / row.limits.maxUsers >= 0.85) alerts.push({ tenantId: row.id, severity: "warn", message: `${row.raisonSociale}: quota utilisateurs proche de la limite` });
+      if (row.limits?.maxStorageGb && row.usage.storageGb / row.limits.maxStorageGb >= 0.85) alerts.push({ tenantId: row.id, severity: "warn", message: `${row.raisonSociale}: stockage proche de la limite` });
+      if (row.status === "suspended") alerts.push({ tenantId: row.id, severity: "danger", message: `${row.raisonSociale}: entreprise suspendue` });
+      if (row.subscription?.status === "past_due") alerts.push({ tenantId: row.id, severity: "danger", message: `${row.raisonSociale}: paiement en retard` });
+      return alerts;
+    });
+}
+
+function platformTenantRows(db, includeArchived = false) {
+  return (db.tenants || []).filter(tenant => includeArchived || !tenant.archivedAt).map(tenant => {
     const subscription = (db.subscriptions || []).find(item => item.tenantId === tenant.id) || {};
     const limits = (db.tenantLimits || []).find(item => item.tenantId === tenant.id) || normalizeLimitRecord({}, tenant.id);
     return {
@@ -1033,6 +1092,27 @@ function platformTenantRows(db) {
       usage: tenantUsage(db, tenant.id)
     };
   });
+}
+
+function tenantDetail(db, tenantId) {
+  const tenant = platformTenantRows(db, true).find(item => item.id === tenantId);
+  if (!tenant) return null;
+  return {
+    tenant,
+    users: db.users.filter(item => item.tenantId === tenantId && item.role !== "platform_admin").map(publicUser),
+    projects: db.projects.filter(item => item.tenantId === tenantId),
+    poles: db.poles.filter(item => item.tenantId === tenantId),
+    interventions: db.interventions.filter(item => item.tenantId === tenantId),
+    transactions: (db.transactions || []).filter(item => item.tenantId === tenantId),
+    auditLog: (db.auditLog || []).filter(item => item.tenantId === tenantId).slice(-20).reverse(),
+    activationEmails: (db.activationEmails || []).filter(item => item.tenantId === tenantId).slice(-10).reverse()
+  };
+}
+
+function platformTeam(db) {
+  return db.users
+    .filter(item => item.role === "platform_admin")
+    .map(userRecord => ({ ...publicUser(userRecord), platformRole: userRecord.platformRole || "platform_owner" }));
 }
 
 function tempPassword() {
@@ -1104,8 +1184,36 @@ function createTenantOnboarding(db, actor, body, req) {
   db.users.push(owner);
   db.subscriptions.push(subscription);
   db.tenantLimits.push({ id: `limits-${crypto.randomUUID().slice(0, 8)}`, tenantId: tenant.id, ...limits });
+  db.activationEmails = db.activationEmails || [];
+  db.activationEmails.push({
+    id: `mail-${crypto.randomUUID().slice(0, 8)}`,
+    tenantId: tenant.id,
+    userId: owner.id,
+    email: owner.email,
+    subject: "Activation SuiviPoteaux Pro",
+    status: "queued",
+    payload: { loginUrl: "/index.html", temporaryPassword: password, tenantSlug: tenant.slug },
+    createdAt: new Date().toISOString(),
+    sentAt: ""
+  });
   platformAudit(db, actor, "tenant.create", { tenantId: tenant.id, planName, ownerId: owner.id, activationEmailQueued: true }, req);
   return { tenant, owner: publicUser(owner), subscription, temporaryPassword: password };
+}
+
+function runDunning(db, actor, req) {
+  const now = new Date();
+  const affected = [];
+  (db.subscriptions || []).forEach(subscription => {
+    const overdue = subscription.status === "past_due" || (subscription.status === "trialing" && new Date(subscription.currentPeriodEnd) < now);
+    if (!overdue) return;
+    const tenant = db.tenants.find(item => item.id === subscription.tenantId);
+    if (!tenant || tenant.status === "suspended") return;
+    tenant.status = "suspended";
+    tenant.updatedAt = now.toISOString();
+    affected.push(tenant.id);
+  });
+  platformAudit(db, actor, "billing.dunning_run", { affected }, req);
+  return affected;
 }
 
 async function savePhotos(reportId, photos = []) {
@@ -1299,7 +1407,9 @@ async function handleApi(req, res, url) {
         overview: platformOverview(db),
         tenants: platformTenantRows(db).slice(0, 6),
         transactions: (db.transactions || []).slice(-8).reverse(),
-        banners: db.systemBanners || []
+        banners: db.systemBanners || [],
+        platformTeam: platformTeam(db),
+        activationEmails: (db.activationEmails || []).slice(-8).reverse()
       });
     }
 
@@ -1308,7 +1418,8 @@ async function handleApi(req, res, url) {
       const status = String(url.searchParams.get("status") || "").trim();
       const page = Math.max(1, Number(url.searchParams.get("page") || 1));
       const pageSize = Math.min(50, Math.max(5, Number(url.searchParams.get("pageSize") || 10)));
-      let rows = platformTenantRows(db);
+      const includeArchived = url.searchParams.get("archived") === "true";
+      let rows = platformTenantRows(db, includeArchived);
       if (query) {
         rows = rows.filter(item => [item.raisonSociale, item.slug, item.pays, item.ville].some(value => String(value || "").toLowerCase().includes(query)));
       }
@@ -1326,6 +1437,13 @@ async function handleApi(req, res, url) {
     }
 
     const tenantAdminMatch = /^\/api\/super-admin\/tenants\/([^/]+)$/.exec(url.pathname);
+    if (tenantAdminMatch && req.method === "GET") {
+      const tenantId = decodeURIComponent(tenantAdminMatch[1]);
+      const detail = tenantDetail(db, tenantId);
+      if (!detail) return sendError(req, res, 404, "Tenant introuvable");
+      return sendJson(req, res, 200, detail);
+    }
+
     if (tenantAdminMatch && req.method === "PATCH") {
       const tenantId = decodeURIComponent(tenantAdminMatch[1]);
       const tenant = db.tenants.find(item => item.id === tenantId);
@@ -1338,6 +1456,10 @@ async function handleApi(req, res, url) {
       ["raisonSociale", "secteurActivite", "pays", "ville", "logoUrl"].forEach(field => {
         if (body[field] !== undefined) tenant[field] = String(body[field] || "").trim();
       });
+      tenant.branding = {
+        ...(tenant.branding || {}),
+        ...(body.branding || {})
+      };
       tenant.updatedAt = new Date().toISOString();
       const subscription = db.subscriptions.find(item => item.tenantId === tenantId);
       if (subscription && body.subscription) {
@@ -1359,6 +1481,19 @@ async function handleApi(req, res, url) {
       platformAudit(db, actor, "tenant.update", { tenantId, fields: Object.keys(body) }, req);
       await writeDb(db);
       return sendJson(req, res, 200, { tenant: platformTenantRows(db).find(item => item.id === tenantId), tenants: platformTenantRows(db) });
+    }
+
+    if (tenantAdminMatch && req.method === "DELETE") {
+      const tenantId = decodeURIComponent(tenantAdminMatch[1]);
+      const tenant = db.tenants.find(item => item.id === tenantId);
+      if (!tenant) return sendError(req, res, 404, "Tenant introuvable");
+      if (tenant.id === DEFAULT_TENANT_ID) return sendError(req, res, 409, "Le tenant demo ne peut pas etre archive");
+      tenant.archivedAt = new Date().toISOString();
+      tenant.status = "suspended";
+      db.users.filter(item => item.tenantId === tenantId).forEach(item => { item.active = false; });
+      platformAudit(db, actor, "tenant.archive", { tenantId }, req);
+      await writeDb(db);
+      return sendJson(req, res, 200, { archived: true, tenantId });
     }
 
     const tenantStatusMatch = /^\/api\/super-admin\/tenants\/([^/]+)\/status$/.exec(url.pathname);
@@ -1436,8 +1571,52 @@ async function handleApi(req, res, url) {
       return sendJson(req, res, 200, { transactions: db.transactions || [], subscriptions: db.subscriptions || [] });
     }
 
+    if (req.method === "POST" && url.pathname === "/api/super-admin/billing/dunning-run") {
+      const affected = runDunning(db, actor, req);
+      await writeDb(db);
+      return sendJson(req, res, 200, { affected, count: affected.length });
+    }
+
     if (req.method === "GET" && url.pathname === "/api/super-admin/audit-logs") {
-      return sendJson(req, res, 200, { auditLogs: (db.platformAuditLogs || []).slice().reverse() });
+      const tenantId = String(url.searchParams.get("tenantId") || "").trim();
+      const action = String(url.searchParams.get("action") || "").trim().toLowerCase();
+      const from = String(url.searchParams.get("from") || "").trim();
+      const to = String(url.searchParams.get("to") || "").trim();
+      let logs = (db.platformAuditLogs || []).slice().reverse();
+      if (tenantId) logs = logs.filter(item => item.targetTenantId === tenantId);
+      if (action) logs = logs.filter(item => String(item.action || "").toLowerCase().includes(action));
+      if (from) logs = logs.filter(item => new Date(item.timestamp) >= new Date(`${from}T00:00:00`));
+      if (to) logs = logs.filter(item => new Date(item.timestamp) <= new Date(`${to}T23:59:59`));
+      return sendJson(req, res, 200, { auditLogs: logs });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/super-admin/activation-emails") {
+      return sendJson(req, res, 200, { activationEmails: (db.activationEmails || []).slice().reverse() });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/super-admin/platform-users") {
+      return sendJson(req, res, 200, { users: platformTeam(db) });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/super-admin/platform-users") {
+      const body = await readBody(req);
+      const email = String(body.email || "").trim().toLowerCase();
+      const name = String(body.name || "").trim();
+      const password = String(body.password || "");
+      if (!email || !name || !strongPassword(password)) return sendError(req, res, 400, "Nom, email et mot de passe fort requis");
+      if (db.users.some(item => item.email === email)) return sendError(req, res, 409, "Email deja utilise");
+      const platformRole = PLATFORM_ROLES.includes(body.platformRole) ? body.platformRole : "platform_support";
+      const created = {
+        ...user(`USR-PLATFORM-${crypto.randomUUID().slice(0, 6).toUpperCase()}`, email, password, name, "platform_admin"),
+        tenantId: null,
+        platformRole,
+        active: body.active !== false,
+        approved: true
+      };
+      db.users.push(created);
+      platformAudit(db, actor, "platform_user.create", { userId: created.id, platformRole }, req);
+      await writeDb(db);
+      return sendJson(req, res, 201, { user: publicUser(created), users: platformTeam(db) });
     }
 
     if (req.method === "POST" && url.pathname === "/api/super-admin/banners") {

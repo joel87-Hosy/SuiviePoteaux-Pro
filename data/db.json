@@ -257,7 +257,9 @@
       "pays": "Cote d'Ivoire",
       "ville": "Abidjan",
       "logoUrl": "",
+      "branding": {},
       "status": "active",
+      "archivedAt": "",
       "createdAt": "2026-08-22T08:52:28.271Z",
       "updatedAt": "2026-08-22T08:52:28.271Z"
     }
@@ -327,6 +329,7 @@
   "coupons": [],
   "transactions": [],
   "systemBanners": [],
+  "activationEmails": [],
   "platformAuditLogs": [],
   "settings": {
     "operators": [

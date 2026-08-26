@@ -1827,7 +1827,10 @@
       coupons: [],
       transactions: [],
       auditLogs: [],
-      banners: []
+      banners: [],
+      activationEmails: [],
+      platformTeam: [],
+      alerts: []
     };
     let qrScanStream = null;
     let qrScanTimer = null;
@@ -2197,7 +2200,10 @@
         coupons: plansPayload.coupons || [],
         transactions: billingPayload.transactions || overviewPayload.transactions || [],
         auditLogs: auditPayload.auditLogs || [],
-        banners: overviewPayload.banners || []
+        banners: overviewPayload.banners || [],
+        activationEmails: overviewPayload.activationEmails || [],
+        platformTeam: overviewPayload.platformTeam || [],
+        alerts: overviewPayload.overview?.alerts || []
       };
       return true;
     }
@@ -2226,6 +2232,7 @@
           ${chartCard("Croissance inscriptions", barChart((overview.growth || []).map(row => [row.month, row.signups, "#0f766e"])), "12 mois")}
           ${chartCard("Activite poses", barChart((overview.growth || []).map(row => [row.month, row.interventions, "#d89f2b"])), "12 mois")}
         </div>
+        ${renderPlatformAlerts()}
         ${renderTenantOnboarding()}
         ${renderTenantManagement()}
         <div class="content-grid">
@@ -2235,6 +2242,10 @@
         <div class="content-grid">
           ${renderPlatformSecurity()}
           ${renderPlatformAuditLogs()}
+        </div>
+        <div class="content-grid">
+          ${renderPlatformTeam()}
+          ${renderActivationEmails()}
         </div>
       `;
       $("#platformTenantForm")?.addEventListener("submit", createPlatformTenant);
@@ -2248,6 +2259,7 @@
       $("#platformPlanForm")?.addEventListener("submit", savePlatformPlans);
       $("#platformCouponForm")?.addEventListener("submit", createPlatformCoupon);
       $("#platformBannerForm")?.addEventListener("submit", createPlatformBanner);
+      $("#platformUserForm")?.addEventListener("submit", createPlatformUser);
     }
 
     function renderTenantOnboarding() {
@@ -2318,9 +2330,11 @@
                       <td>${formatDate(tenant.createdAt)}</td>
                       <td>
                         <div class="toolbar" style="justify-content:flex-start">
+                          <button class="btn" type="button" onclick="viewTenantDetail('${tenant.id}')">Detail</button>
                           <button class="btn" type="button" onclick="impersonateTenant('${tenant.id}')">Impersonate</button>
                           <button class="btn" type="button" onclick="editTenantPlan('${tenant.id}')">Plan & quotas</button>
                           <button class="btn warning" type="button" onclick="changeTenantStatus('${tenant.id}')">Statut</button>
+                          ${tenant.id === "tenant-demo" ? "" : `<button class="btn" type="button" onclick="archiveTenant('${tenant.id}')">Archiver</button>`}
                         </div>
                       </td>
                     </tr>
@@ -2336,6 +2350,14 @@
           </div>
         </div>
       `;
+    }
+
+    function renderPlatformAlerts() {
+      return chartCard("Alertes plateforme", `
+        <div class="report-list">
+          ${(platformState.alerts || []).slice(0, 8).map(alert => `<div class="report-row"><strong>${escapeHtml(alert.message)}</strong><span class="badge ${alert.severity === "danger" ? "danger" : "warn"}">${escapeHtml(alert.severity)}</span></div>`).join("") || `<div class="empty">Aucune alerte quota, paiement ou suspension.</div>`}
+        </div>
+      `, `${(platformState.alerts || []).length} alerte(s)`);
     }
 
     function tenantStatusLabel(status) {
@@ -2405,6 +2427,9 @@
             <tbody>${(platformState.transactions || []).slice(-8).reverse().map(tx => `<tr><td>${formatDate(tx.date)}</td><td>${escapeHtml(tx.tenantId || "-")}</td><td>${escapeHtml(tx.provider || "-")}</td><td>${moneyXof(tx.amount)}</td><td><span class="badge ${tx.status === "paid" ? "ok" : "warn"}">${escapeHtml(tx.status || "-")}</span></td></tr>`).join("") || `<tr><td colspan="5"><div class="empty">Aucune transaction enregistree.</div></td></tr>`}</tbody>
           </table>
         </div>
+        <div class="toolbar" style="justify-content:flex-start;margin-top:12px">
+          <button class="btn warning" type="button" onclick="runDunning()">Lancer dunning</button>
+        </div>
       `);
     }
 
@@ -2426,11 +2451,43 @@
 
     function renderPlatformAuditLogs() {
       return chartCard("Logs audit SaaS", `
+        <div class="toolbar" style="justify-content:flex-start;margin-bottom:12px">
+          <input id="auditActionFilter" placeholder="Filtrer action..." style="max-width:190px">
+          <input id="auditFromFilter" type="date" style="max-width:160px">
+          <input id="auditToFilter" type="date" style="max-width:160px">
+          <button class="btn" type="button" onclick="filterPlatformAudit()">Filtrer</button>
+          <button class="btn" type="button" onclick="exportPlatformAuditCsv()">Export CSV</button>
+        </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Date</th><th>Acteur</th><th>Tenant cible</th><th>Action</th><th>IP</th></tr></thead>
             <tbody>${(platformState.auditLogs || []).slice(0, 12).map(log => `<tr><td>${formatDate(log.timestamp)}</td><td>${escapeHtml(log.actorId || "-")}</td><td>${escapeHtml(log.targetTenantId || "-")}</td><td>${escapeHtml(log.action || "-")}</td><td>${escapeHtml(log.ipAddress || "-")}</td></tr>`).join("") || `<tr><td colspan="5"><div class="empty">Aucun log plateforme.</div></td></tr>`}</tbody>
           </table>
+        </div>
+      `);
+    }
+
+    function renderPlatformTeam() {
+      return chartCard("Equipe SaaS", `
+        <form id="platformUserForm" class="grid">
+          <div class="form-grid">
+            <div class="field"><label for="platformUserName">Nom</label><input id="platformUserName" required></div>
+            <div class="field"><label for="platformUserEmail">Email</label><input id="platformUserEmail" type="email" required></div>
+            <div class="field"><label for="platformUserRole">Privilege</label><select id="platformUserRole"><option value="platform_support">Support</option><option value="platform_billing">Billing</option><option value="platform_security">Security</option><option value="platform_owner">Owner</option></select></div>
+            <div class="field"><label for="platformUserPassword">Mot de passe</label><input id="platformUserPassword" type="password" required minlength="10" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{10,}"></div>
+          </div>
+          <button class="btn primary" type="submit">Ajouter admin SaaS</button>
+        </form>
+        <div class="report-list" style="margin-top:12px">
+          ${(platformState.platformTeam || []).map(user => `<div class="report-row"><strong>${escapeHtml(user.name)}</strong><span>${escapeHtml(user.email)} - ${escapeHtml(user.platformRole || "platform_owner")}</span></div>`).join("") || `<div class="empty">Aucun admin SaaS.</div>`}
+        </div>
+      `);
+    }
+
+    function renderActivationEmails() {
+      return chartCard("Emails activation", `
+        <div class="report-list">
+          ${(platformState.activationEmails || []).slice(0, 8).map(mail => `<div class="report-row"><strong>${escapeHtml(mail.email)}</strong><span class="badge ${mail.status === "sent" ? "ok" : "warn"}">${escapeHtml(mail.status || "queued")}</span></div>`).join("") || `<div class="empty">Aucun email en file.</div>`}
         </div>
       `);
     }
@@ -2528,6 +2585,48 @@
       }
     }
 
+    async function viewTenantDetail(tenantId) {
+      try {
+        const detail = await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}`);
+        const tenant = detail.tenant;
+        alert([
+          `${tenant.raisonSociale} (${tenant.slug})`,
+          `Statut: ${tenantStatusLabel(tenant.status)}`,
+          `Plan: ${tenant.subscription?.planName || "-"} / ${tenant.subscription?.billingCycle || "monthly"}`,
+          `Utilisateurs: ${detail.users.length} / ${tenant.limits?.maxUsers || "-"}`,
+          `Poteaux: ${detail.poles.length}`,
+          `Projets: ${detail.projects.length}`,
+          `Fiches: ${detail.interventions.length}`,
+          `Stockage: ${tenant.usage?.storageGb || 0} / ${tenant.limits?.maxStorageGb || "-"} GB`,
+          `Emails activation: ${detail.activationEmails.length}`,
+          `Transactions: ${detail.transactions.length}`
+        ].join("\n"));
+      } catch (error) {
+        toast(error.message || "Detail tenant impossible");
+      }
+    }
+
+    async function archiveTenant(tenantId) {
+      if (!confirm("Archiver cette entreprise ? Les comptes seront desactives, les donnees restent conservees.")) return;
+      try {
+        await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}`, { method: "DELETE" });
+        await refreshPlatformData();
+      } catch (error) {
+        toast(error.message || "Archivage impossible");
+      }
+    }
+
+    async function runDunning() {
+      if (!confirm("Lancer le traitement dunning maintenant ?")) return;
+      try {
+        const result = await apiFetch("/super-admin/billing/dunning-run", { method: "POST", body: JSON.stringify({}) });
+        await refreshPlatformData();
+        toast(`${result.count || 0} entreprise(s) suspendue(s)`);
+      } catch (error) {
+        toast(error.message || "Dunning impossible");
+      }
+    }
+
     function changePlatformPage(delta) {
       const totalPages = Math.max(1, Math.ceil((platformState.total || 0) / platformState.pageSize));
       platformState.page = Math.min(totalPages, Math.max(1, platformState.page + delta));
@@ -2586,6 +2685,46 @@
       } catch (error) {
         toast(error.message || "Creation banniere impossible");
       }
+    }
+
+    async function createPlatformUser(event) {
+      event.preventDefault();
+      try {
+        await apiFetch("/super-admin/platform-users", {
+          method: "POST",
+          body: JSON.stringify({
+            name: $("#platformUserName").value.trim(),
+            email: $("#platformUserEmail").value.trim(),
+            platformRole: $("#platformUserRole").value,
+            password: $("#platformUserPassword").value
+          })
+        });
+        event.target.reset();
+        await refreshPlatformData();
+      } catch (error) {
+        toast(error.message || "Creation admin SaaS impossible");
+      }
+    }
+
+    async function filterPlatformAudit() {
+      try {
+        const params = new URLSearchParams({
+          action: $("#auditActionFilter")?.value || "",
+          from: $("#auditFromFilter")?.value || "",
+          to: $("#auditToFilter")?.value || ""
+        });
+        const payload = await apiFetch(`/super-admin/audit-logs?${params}`);
+        platformState.auditLogs = payload.auditLogs || [];
+        renderSuperAdmin();
+      } catch (error) {
+        toast(error.message || "Filtre audit impossible");
+      }
+    }
+
+    function exportPlatformAuditCsv() {
+      const header = ["timestamp", "actorId", "targetTenantId", "action", "ipAddress"];
+      const rows = (platformState.auditLogs || []).map(log => header.map(key => `"${String(log[key] || "").replaceAll('"', '""')}"`).join(","));
+      downloadText(`audit-saas-${new Date().toISOString().slice(0, 10)}.csv`, [header.join(","), ...rows].join("\n"), "text/csv");
     }
 
     function renderDashboard() {
@@ -5810,7 +5949,12 @@
     window.editTenantPlan = editTenantPlan;
     window.changeTenantStatus = changeTenantStatus;
     window.impersonateTenant = impersonateTenant;
+    window.viewTenantDetail = viewTenantDetail;
+    window.archiveTenant = archiveTenant;
+    window.runDunning = runDunning;
     window.changePlatformPage = changePlatformPage;
+    window.filterPlatformAudit = filterPlatformAudit;
+    window.exportPlatformAuditCsv = exportPlatformAuditCsv;
     window.exportProjectsCsv = exportProjectsCsv;
     window.exportInterventionsCsv = exportInterventionsCsv;
     window.globalSearch = globalSearch;

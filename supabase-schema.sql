@@ -11,7 +11,9 @@ create table if not exists public.tenants (
   pays text,
   ville text,
   logo_url text,
+  branding jsonb not null default '{}',
   status text not null default 'trial' check (status in ('active', 'trial', 'suspended')),
+  archived_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -30,6 +32,7 @@ create table if not exists public.app_users (
   phone text,
   job_title text,
   profile_photo text,
+  platform_role text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -205,6 +208,18 @@ create table if not exists public.system_banners (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.activation_emails (
+  id text primary key,
+  tenant_id text references public.tenants(id) on update cascade on delete cascade,
+  user_id text references public.app_users(id) on update cascade on delete cascade,
+  email text not null,
+  subject text not null,
+  status text not null default 'queued',
+  payload jsonb not null default '{}',
+  created_at timestamptz not null default now(),
+  sent_at timestamptz
+);
+
 create table if not exists public.platform_audit_logs (
   id uuid primary key default gen_random_uuid(),
   actor_id text references public.app_users(id) on update cascade,
@@ -222,6 +237,9 @@ alter table public.app_users add column if not exists tenant_id text references 
 alter table public.app_users add column if not exists phone text;
 alter table public.app_users add column if not exists job_title text;
 alter table public.app_users add column if not exists profile_photo text;
+alter table public.app_users add column if not exists platform_role text;
+alter table public.tenants add column if not exists branding jsonb not null default '{}';
+alter table public.tenants add column if not exists archived_at timestamptz;
 alter table public.poles add column if not exists assigned_team text;
 alter table public.projects add column if not exists tenant_id text references public.tenants(id) on update cascade on delete restrict;
 alter table public.poles add column if not exists tenant_id text references public.tenants(id) on update cascade on delete restrict;
@@ -257,6 +275,7 @@ create index if not exists idx_poles_tenant on public.poles(tenant_id);
 create index if not exists idx_interventions_tenant on public.interventions(tenant_id);
 create index if not exists idx_tenants_status on public.tenants(status);
 create index if not exists idx_platform_audit_logs_timestamp on public.platform_audit_logs(timestamp desc);
+create index if not exists idx_activation_emails_status on public.activation_emails(status);
 create index if not exists idx_poles_depot on public.poles(depot);
 create index if not exists idx_poles_assigned_team on public.poles(assigned_team);
 create index if not exists idx_poles_project on public.poles(project_id);
@@ -275,6 +294,7 @@ alter table public.coupons enable row level security;
 alter table public.transactions enable row level security;
 alter table public.system_banners enable row level security;
 alter table public.platform_audit_logs enable row level security;
+alter table public.activation_emails enable row level security;
 alter table public.projects enable row level security;
 alter table public.poles enable row level security;
 alter table public.interventions enable row level security;
@@ -294,6 +314,7 @@ revoke all on table public.coupons from anon, authenticated;
 revoke all on table public.transactions from anon, authenticated;
 revoke all on table public.system_banners from anon, authenticated;
 revoke all on table public.platform_audit_logs from anon, authenticated;
+revoke all on table public.activation_emails from anon, authenticated;
 revoke all on table public.projects from anon, authenticated;
 revoke all on table public.poles from anon, authenticated;
 revoke all on table public.interventions from anon, authenticated;
