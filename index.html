@@ -1439,6 +1439,9 @@
       <section id="projectsView" class="view hidden"></section>
       <section id="projectClosureView" class="view hidden"></section>
       <section id="stockView" class="view hidden"></section>
+      <section id="productionView" class="view hidden"></section>
+      <section id="salesView" class="view hidden"></section>
+      <section id="financeView" class="view hidden"></section>
       <section id="fieldView" class="view hidden"></section>
       <section id="mapView" class="view hidden"></section>
       <section id="reportsView" class="view hidden"></section>
@@ -1703,6 +1706,7 @@
       depots: ["Depot Central", "Depot Bouake", "Depot Yopougon"],
       gpsMaxDistanceKm: 5
     };
+    const DEFAULT_MODULES = { production: false, sales: false, finance: false };
 
     const navItems = [
       ["platform", "Admin SaaS", "Administration globale des tenants, abonnements, facturation et securite plateforme.", "M12 3 3 8l9 5 9-5-9-5Z M3 16l9 5 9-5 M3 12l9 5 9-5"],
@@ -1711,6 +1715,9 @@
       ["projects", "Projets", "Creation, planning et evolution des projets d'implantation.", "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z"],
       ["projectClosure", "Cloture projets", "Validation finale des projets termines par les equipes terrain.", "M9 12l2 2 4-4 M21 12a9 9 0 1 1-9-9"],
       ["stock", "Depot & Stock", "Inventaire filtrable, requisitions et bons de sortie terrain.", "M21 8a2 2 0 0 0-1-1.73L13 2.27a2 2 0 0 0-2 0L4 6.27A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z M3.3 7 12 12l8.7-5 M12 22V12"],
+      ["production", "Production usine", "Ordres de fabrication, cure, controle usine et stock usine.", "M3 21h18M5 21V9l7-4v16M19 21V7l-7 4 M9 17h.01M13 17h.01M17 17h.01"],
+      ["sales", "Ventes & Clients", "Repertoire clients, commandes, bons de livraison et tracabilite commerciale.", "M16 21v-2a4 4 0 0 0-4-4H5a3 3 0 0 0-3 3v3 M16 3.13a4 4 0 0 1 0 7.75 M22 21v-2a4 4 0 0 0-3-3.87 M6 7h.01 M10 7h.01 M14 7h.01"],
+      ["finance", "Finance", "Bilans de ventes par periode, marge nette et top clients.", "M3 3v18h18 M7 15l4-4 3 3 5-7"],
       ["field", "Operations terrain", "Interface mobile offline-first pour les equipes de pose.", "M12 2 19 21 12 17 5 21 12 2Z M12 8v5"],
       ["map", "Carte GPS", "Pins OpenStreetMap colores selon les statuts de pose.", "M9 18 3 21V6l6-3 6 3 6-3v15l-6 3-6-3Z M9 3v15 M15 6v15"],
       ["reports", "Rapports PDF", "Export des fiches avec photos, GPS et emargements.", "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z M14 2v6h6 M8 13h8 M8 17h8 M8 9h2"],
@@ -1726,8 +1733,23 @@
       },
       super_admin: {
         home: "dashboard",
-        views: ["dashboard", "profile", "projects", "projectClosure", "stock", "field", "map", "reports", "admin", "help"],
-        permissions: ["read", "write_stock", "write_intervention", "validate", "admin"]
+        views: ["dashboard", "profile", "projects", "projectClosure", "stock", "production", "sales", "finance", "field", "map", "reports", "admin", "help"],
+        permissions: ["read", "write_stock", "write_intervention", "validate", "admin", "production", "sales", "finance"]
+      },
+      chef_production: {
+        home: "production",
+        views: ["dashboard", "profile", "stock", "production", "help"],
+        permissions: ["read", "write_stock", "production"]
+      },
+      commercial: {
+        home: "sales",
+        views: ["dashboard", "profile", "sales", "help"],
+        permissions: ["read", "sales"]
+      },
+      direction_finance: {
+        home: "finance",
+        views: ["dashboard", "profile", "sales", "finance", "help"],
+        permissions: ["read", "sales", "finance"]
       },
       magasinier: {
         home: "dashboard",
@@ -1746,8 +1768,8 @@
       },
       tenant_admin: {
         home: "dashboard",
-        views: ["dashboard", "profile", "projects", "projectClosure", "stock", "field", "map", "reports", "admin", "help"],
-        permissions: ["read", "write_stock", "write_intervention", "validate", "admin"]
+        views: ["dashboard", "profile", "projects", "projectClosure", "stock", "production", "sales", "finance", "field", "map", "reports", "admin", "help"],
+        permissions: ["read", "write_stock", "write_intervention", "validate", "admin", "production", "sales", "finance"]
       },
       depot_manager: {
         home: "dashboard",
@@ -1805,7 +1827,13 @@
       ],
       offlineQueue: [],
       stockMovements: [],
-      auditLog: []
+      auditLog: [],
+      productionOrders: [],
+      factoryQualityChecks: [],
+      clients: [],
+      sales: [],
+      saleItems: [],
+      modules: { ...DEFAULT_MODULES }
     };
 
     let state = loadState();
@@ -1914,6 +1942,9 @@
         depot_manager: "Gestionnaire depot",
         field_agent: "Agent Terrain",
         quality_inspector: "Controleur",
+        chef_production: "Chef Production",
+        commercial: "Commercial",
+        direction_finance: "Direction Finance",
         magasinier: "Magasinier",
         terrain: "Agent Terrain",
         controleur: "Controleur"
@@ -1940,9 +1971,22 @@
       return roleUi[apiUser?.role] || { home: "dashboard", views: ["dashboard"], permissions: ["read"] };
     }
 
+    function moduleForView(view) {
+      return { production: "production", sales: "sales", finance: "finance" }[view] || "";
+    }
+
+    function appModules() {
+      return { ...DEFAULT_MODULES, ...(state.modules || {}) };
+    }
+
+    function moduleEnabledForView(view) {
+      const moduleName = moduleForView(view);
+      return !moduleName || Boolean(appModules()[moduleName]);
+    }
+
     function visibleNavItems() {
       const views = currentRoleUi().views;
-      return navItems.filter(([id]) => views.includes(id));
+      return navItems.filter(([id]) => views.includes(id) && moduleEnabledForView(id));
     }
 
     function can(permission) {
@@ -2065,6 +2109,12 @@
           poles: payload.poles,
           interventions: payload.interventions,
           stockMovements: payload.stockMovements || state.stockMovements || [],
+          productionOrders: payload.productionOrders || [],
+          factoryQualityChecks: payload.factoryQualityChecks || [],
+          clients: payload.clients || [],
+          sales: payload.sales || [],
+          saleItems: payload.saleItems || [],
+          modules: { ...DEFAULT_MODULES, ...(payload.modules || {}) },
           auditLog: payload.auditLog || state.auditLog || [],
           settings: { ...DEFAULT_SETTINGS, ...(payload.settings || state.settings || {}) },
           users: payload.users || state.users || [],
@@ -2172,6 +2222,9 @@
       renderProjects();
       renderProjectClosure();
       renderStock();
+      renderProduction();
+      renderSales();
+      renderFinance();
       renderField();
       renderReports();
       renderAdmin();
@@ -2289,6 +2342,9 @@
                 <div class="field"><label for="tenantMaxDepots">Max depots</label><input id="tenantMaxDepots" type="number" min="1" placeholder="Auto"></div>
                 <div class="field"><label for="tenantMaxUsers">Max utilisateurs</label><input id="tenantMaxUsers" type="number" min="1" placeholder="Auto"></div>
                 <div class="field"><label for="tenantMaxStorage">Stockage GB</label><input id="tenantMaxStorage" type="number" min="1" placeholder="Auto"></div>
+                <label style="display:flex;gap:8px;align-items:center"><input id="tenantModuleProduction" type="checkbox" style="width:auto"> Production usine</label>
+                <label style="display:flex;gap:8px;align-items:center"><input id="tenantModuleSales" type="checkbox" style="width:auto"> Ventes clients</label>
+                <label style="display:flex;gap:8px;align-items:center"><input id="tenantModuleFinance" type="checkbox" style="width:auto"> Finance</label>
               </div>
               <div class="toolbar" style="justify-content:flex-start">
                 <button class="btn primary" type="submit">${icon("M12 5v14M5 12h14")} Creer le tenant</button>
@@ -2318,12 +2374,13 @@
           <div class="section-body">
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Entreprise</th><th>Plan</th><th>Statut</th><th>Utilisateurs</th><th>Stockage</th><th>Creation</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Entreprise</th><th>Plan</th><th>Modules</th><th>Statut</th><th>Utilisateurs</th><th>Stockage</th><th>Creation</th><th>Actions</th></tr></thead>
                 <tbody>
                   ${(platformState.tenants || []).map(tenant => `
                     <tr>
                       <td><strong>${escapeHtml(tenant.raisonSociale)}</strong><br><span class="muted">${escapeHtml(tenant.slug)} - ${escapeHtml(tenant.pays || "")}</span></td>
                       <td>${escapeHtml(tenant.subscription?.planName || "-")}<br><span class="muted">${escapeHtml(tenant.subscription?.billingCycle || "monthly")}</span></td>
+                      <td>${tenantModulesBadges(tenant.modules)}</td>
                       <td><span class="badge ${tenant.status === "active" ? "ok" : tenant.status === "suspended" ? "danger" : "warn"}">${tenantStatusLabel(tenant.status)}</span></td>
                       <td>${tenant.usage?.users || 0} / ${tenant.limits?.maxUsers || "-"}</td>
                       <td>${tenant.usage?.storageGb || 0} / ${tenant.limits?.maxStorageGb || "-"} GB</td>
@@ -2338,7 +2395,7 @@
                         </div>
                       </td>
                     </tr>
-                  `).join("") || `<tr><td colspan="7"><div class="empty">Aucun tenant trouve.</div></td></tr>`}
+                  `).join("") || `<tr><td colspan="8"><div class="empty">Aucun tenant trouve.</div></td></tr>`}
                 </tbody>
               </table>
             </div>
@@ -2364,10 +2421,22 @@
       return { active: "Actif", trial: "Essai", suspended: "Suspendu" }[status] || status || "-";
     }
 
+    function tenantModulesBadges(modules = {}) {
+      const normalized = { ...DEFAULT_MODULES, ...(modules || {}) };
+      const rows = [
+        ["production", "Usine"],
+        ["sales", "Ventes"],
+        ["finance", "Finance"]
+      ].filter(([key]) => normalized[key]);
+      return rows.length
+        ? rows.map(([, label]) => `<span class="badge ok">${label}</span>`).join(" ")
+        : `<span class="muted">Workflow standard</span>`;
+    }
+
     function manageableRoleOptions() {
-      if (apiUser?.role === "tenant_admin") return ["tenant_admin", "depot_manager", "field_agent", "quality_inspector"];
-      if (apiUser?.role === "super_admin") return ["super_admin", "magasinier", "terrain", "controleur"];
-      return ["depot_manager", "field_agent", "quality_inspector"];
+      if (apiUser?.role === "tenant_admin") return ["tenant_admin", "depot_manager", "field_agent", "quality_inspector", "chef_production", "commercial", "direction_finance"];
+      if (apiUser?.role === "super_admin") return ["super_admin", "magasinier", "terrain", "controleur", "chef_production", "commercial", "direction_finance"];
+      return ["depot_manager", "field_agent", "quality_inspector", "chef_production", "commercial", "direction_finance"];
     }
 
     function isFieldRole(user = apiUser) {
@@ -2529,6 +2598,11 @@
           maxDepots: Number($("#tenantMaxDepots").value || 0),
           maxUsers: Number($("#tenantMaxUsers").value || 0),
           maxStorageGb: Number($("#tenantMaxStorage").value || 0)
+        },
+        modules: {
+          production: $("#tenantModuleProduction").checked,
+          sales: $("#tenantModuleSales").checked,
+          finance: $("#tenantModuleFinance").checked
         }
       };
       try {
@@ -2549,12 +2623,22 @@
       const maxUsers = prompt("Nombre max utilisateurs", tenant.limits?.maxUsers || 10);
       const maxDepots = prompt("Nombre max depots", tenant.limits?.maxDepots || 2);
       const maxStorageGb = prompt("Stockage max GB", tenant.limits?.maxStorageGb || 10);
+      const currentModules = { ...DEFAULT_MODULES, ...(tenant.modules || {}) };
+      const production = prompt("Module Production usine: oui ou non", currentModules.production ? "oui" : "non");
+      const sales = prompt("Module Ventes & Clients: oui ou non", currentModules.sales ? "oui" : "non");
+      const finance = prompt("Module Finance / Reporting: oui ou non", currentModules.finance ? "oui" : "non");
+      if ([production, sales, finance].some(value => value === null)) return;
       try {
         await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}`, {
           method: "PATCH",
           body: JSON.stringify({
             subscription: { planName },
-            limits: { maxUsers: Number(maxUsers), maxDepots: Number(maxDepots), maxStorageGb: Number(maxStorageGb) }
+            limits: { maxUsers: Number(maxUsers), maxDepots: Number(maxDepots), maxStorageGb: Number(maxStorageGb) },
+            modules: {
+              production: /^oui|yes|true|1$/i.test(production.trim()),
+              sales: /^oui|yes|true|1$/i.test(sales.trim()),
+              finance: /^oui|yes|true|1$/i.test(finance.trim())
+            }
           })
         });
         await refreshPlatformData();
@@ -3626,6 +3710,135 @@
       drawStockRows();
     }
 
+    function moduleDisabledHtml(label) {
+      return `<div class="card"><div class="section-body"><div class="empty">${escapeHtml(label)} n'est pas active pour cette entreprise.</div></div></div>`;
+    }
+
+    function renderProduction() {
+      if (!$("#productionView")) return;
+      if (!appModules().production) {
+        $("#productionView").innerHTML = moduleDisabledHtml("Production usine");
+        return;
+      }
+      const orders = state.productionOrders || [];
+      const factoryPoles = state.poles.filter(pole => pole.productionOrderId || pole.factoryStatus);
+      $("#productionView").innerHTML = `
+        <div class="grid stats">
+          ${metric("OF ouverts", orders.filter(order => !["Cloture"].includes(order.status)).length, "Fabrication en cours")}
+          ${metric("Poteaux usine", factoryPoles.length, "Generes par OF")}
+          ${metric("Stock usine", state.poles.filter(pole => pole.depot === "Stock Usine" || pole.factoryStatus === "En Stock Usine").length, "Disponibles")}
+        </div>
+        <div class="content-grid">
+          <div class="card">
+            <div class="section-head"><h3>Nouvel ordre de fabrication</h3><span class="badge info">OF</span></div>
+            <div class="section-body">
+              <form id="productionOrderForm" class="grid">
+                <div class="form-grid">
+                  <div class="field"><label for="ofPoleType">Type</label><select id="ofPoleType"><option>BETON</option><option>METALLIQUE</option></select></div>
+                  <div class="field"><label for="ofHeight">Hauteur</label><input id="ofHeight" type="number" min="1" value="12"></div>
+                  <div class="field"><label for="ofEffort">Resistance</label><input id="ofEffort" value="500 daN"></div>
+                  <div class="field"><label for="ofClass">Classe</label><input id="ofClass" placeholder="C40"></div>
+                  <div class="field"><label for="ofLot">Lot matiere</label><input id="ofLot" placeholder="LOT-2026-A"></div>
+                  <div class="field"><label for="ofQuantity">Quantite</label><input id="ofQuantity" type="number" min="1" value="1"></div>
+                  <div class="field"><label for="ofUnitCost">Cout unitaire</label><input id="ofUnitCost" type="number" min="0" value="0"></div>
+                </div>
+                <button class="btn primary" type="submit">Creer OF</button>
+              </form>
+            </div>
+          </div>
+          ${chartCard("Ordres de fabrication", `
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>OF</th><th>Type</th><th>Quantite</th><th>Lot</th><th>Statut</th><th>Action</th></tr></thead>
+                <tbody>${orders.map(order => `<tr><td><strong>${escapeHtml(order.orderNumber || order.id)}</strong></td><td>${escapeHtml(order.poleType || "")}</td><td>${order.quantity || 0}</td><td>${escapeHtml(order.rawMaterialLot || "-")}</td><td><span class="badge info">${escapeHtml(order.status || "-")}</span></td><td><button class="btn" type="button" onclick="advanceProductionOrder('${escapeAttr(order.id)}')">Avancer</button></td></tr>`).join("") || `<tr><td colspan="6"><div class="empty">Aucun OF pour ce tenant.</div></td></tr>`}</tbody>
+              </table>
+            </div>
+          `)}
+        </div>
+      `;
+      $("#productionOrderForm")?.addEventListener("submit", createProductionOrder);
+    }
+
+    function renderSales() {
+      if (!$("#salesView")) return;
+      if (!appModules().sales) {
+        $("#salesView").innerHTML = moduleDisabledHtml("Ventes & Clients");
+        return;
+      }
+      const clients = state.clients || [];
+      const sales = state.sales || [];
+      const availablePoles = state.poles.filter(pole => !pole.saleId && (["En Stock", "En Stock Usine"].includes(pole.status) || pole.factoryStatus === "En Stock Usine"));
+      $("#salesView").innerHTML = `
+        <div class="grid stats">
+          ${metric("Clients", clients.length, "Repertoire actif")}
+          ${metric("Ventes", sales.length, "Commandes/BL")}
+          ${metric("Poteaux vendables", availablePoles.length, "Stock disponible")}
+        </div>
+        <div class="content-grid">
+          <div class="card">
+            <div class="section-head"><h3>Client</h3><span class="badge info">CRM</span></div>
+            <div class="section-body">
+              <form id="clientForm" class="grid">
+                <div class="form-grid">
+                  <div class="field"><label for="clientName">Nom client</label><input id="clientName" required></div>
+                  <div class="field"><label for="clientType">Type</label><select id="clientType"><option>Entreprise BTP</option><option>Electrification</option><option>Particulier</option><option>Interne/Chantier</option></select></div>
+                  <div class="field"><label for="clientPhone">Telephone</label><input id="clientPhone"></div>
+                  <div class="field"><label for="clientEmail">Email</label><input id="clientEmail" type="email"></div>
+                </div>
+                <button class="btn primary" type="submit">Ajouter client</button>
+              </form>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-head"><h3>Nouvelle vente / BL</h3><span class="badge info">Commercial</span></div>
+            <div class="section-body">
+              <form id="saleForm" class="grid">
+                <div class="form-grid">
+                  <div class="field"><label for="saleClient">Client</label><select id="saleClient">${clients.map(client => `<option value="${escapeAttr(client.id)}">${escapeHtml(client.name)}</option>`).join("")}</select></div>
+                  <div class="field"><label for="salePole">Poteau</label><select id="salePole">${availablePoles.map(pole => `<option value="${escapeAttr(pole.id)}">${escapeHtml(pole.matricule || pole.id)} - ${escapeHtml(pole.type)}</option>`).join("")}</select></div>
+                  <div class="field"><label for="saleUnitPrice">Prix unitaire</label><input id="saleUnitPrice" type="number" min="0" value="0"></div>
+                  <div class="field"><label for="salePaymentTerms">Paiement</label><input id="salePaymentTerms" placeholder="30 jours"></div>
+                </div>
+                <button class="btn primary" type="submit">Creer vente</button>
+              </form>
+            </div>
+          </div>
+        </div>
+        ${chartCard("Historique ventes", `
+          <div class="table-wrap"><table><thead><tr><th>Vente</th><th>Client</th><th>Montant</th><th>Marge</th><th>Date</th></tr></thead><tbody>${sales.slice().reverse().map(sale => `<tr><td><strong>${escapeHtml(sale.saleNumber || sale.id)}</strong><br><span class="muted">${escapeHtml(sale.deliveryNoteNumber || "")}</span></td><td>${escapeHtml(clients.find(client => client.id === sale.clientId)?.name || sale.clientId || "-")}</td><td>${moneyXof(sale.totalAmount)}</td><td>${moneyXof(sale.marginAmount)}</td><td>${formatDate(sale.saleDate || sale.createdAt)}</td></tr>`).join("") || `<tr><td colspan="5"><div class="empty">Aucune vente enregistree.</div></td></tr>`}</tbody></table></div>
+        `)}
+      `;
+      $("#clientForm")?.addEventListener("submit", createClient);
+      $("#saleForm")?.addEventListener("submit", createSale);
+    }
+
+    function renderFinance() {
+      if (!$("#financeView")) return;
+      if (!appModules().finance) {
+        $("#financeView").innerHTML = moduleDisabledHtml("Finance");
+        return;
+      }
+      const sales = state.sales || [];
+      const totalSales = sales.reduce((sum, sale) => sum + Number(sale.totalAmount || 0), 0);
+      const margin = sales.reduce((sum, sale) => sum + Number(sale.marginAmount || 0), 0);
+      const volume = (state.saleItems || []).reduce((sum, item) => sum + Number(item.quantity || 1), 0);
+      $("#financeView").innerHTML = `
+        <div class="grid stats">
+          ${metric("Chiffre d'affaires", moneyXof(totalSales), "Toutes periodes chargees")}
+          ${metric("Poteaux vendus", volume, "Volume commercial")}
+          ${metric("Marge nette", moneyXof(margin), "CA - cout fabrication")}
+        </div>
+        ${chartCard("Bilan ventes", `
+          <div class="toolbar" style="justify-content:flex-start;margin-bottom:12px">
+            <button class="btn" type="button" onclick="loadSalesReport('today')">Aujourd'hui</button>
+            <button class="btn" type="button" onclick="loadSalesReport('week')">Semaine</button>
+            <button class="btn" type="button" onclick="loadSalesReport('month')">Mois</button>
+          </div>
+          <div id="financeReportBody"><div class="empty">Choisis une periode pour actualiser le bilan financier.</div></div>
+        `)}
+      `;
+    }
+
     async function validateProjectStock(projectId) {
       try {
         await ensureApiSession();
@@ -3637,6 +3850,122 @@
         toast("Demande stock validee et envoyee au terrain");
       } catch (error) {
         toast(error.message || "Validation stock impossible");
+      }
+    }
+
+    async function refreshTenantData() {
+      await loadBackendData();
+      renderNav();
+      setView(state.activeView || defaultViewForRole());
+    }
+
+    async function createProductionOrder(event) {
+      event.preventDefault();
+      try {
+        await ensureApiSession();
+        await apiFetch("/production/orders", {
+          method: "POST",
+          body: JSON.stringify({
+            poleType: $("#ofPoleType").value,
+            dimensions: {
+              height: Number($("#ofHeight").value || 0),
+              effort: $("#ofEffort").value.trim()
+            },
+            resistanceClass: $("#ofClass").value.trim(),
+            rawMaterialLot: $("#ofLot").value.trim(),
+            quantity: Number($("#ofQuantity").value || 1),
+            unitCost: Number($("#ofUnitCost").value || 0)
+          })
+        });
+        event.target.reset();
+        await refreshTenantData();
+        toast("Ordre de fabrication cree");
+      } catch (error) {
+        toast(error.message || "Creation OF impossible");
+      }
+    }
+
+    async function advanceProductionOrder(orderId) {
+      const order = (state.productionOrders || []).find(item => item.id === orderId);
+      if (!order) return;
+      const statuses = ["En fabrication", "En cure/sechage", "Controle Qualite Usine", "En Stock Usine", "Cloture"];
+      const currentIndex = statuses.indexOf(order.status);
+      const nextStatus = statuses[Math.min(statuses.length - 1, currentIndex + 1)];
+      try {
+        await ensureApiSession();
+        await apiFetch(`/production/orders/${encodeURIComponent(orderId)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: nextStatus })
+        });
+        await refreshTenantData();
+        toast(`OF passe a ${nextStatus}`);
+      } catch (error) {
+        toast(error.message || "Mise a jour OF impossible");
+      }
+    }
+
+    async function createClient(event) {
+      event.preventDefault();
+      try {
+        await ensureApiSession();
+        await apiFetch("/clients", {
+          method: "POST",
+          body: JSON.stringify({
+            name: $("#clientName").value.trim(),
+            clientType: $("#clientType").value,
+            phone: $("#clientPhone").value.trim(),
+            email: $("#clientEmail").value.trim()
+          })
+        });
+        event.target.reset();
+        await refreshTenantData();
+        toast("Client ajoute");
+      } catch (error) {
+        toast(error.message || "Creation client impossible");
+      }
+    }
+
+    async function createSale(event) {
+      event.preventDefault();
+      const clientId = $("#saleClient")?.value || "";
+      const poleId = $("#salePole")?.value || "";
+      if (!clientId || !poleId) return toast("Client et poteau requis");
+      try {
+        await ensureApiSession();
+        await apiFetch("/sales", {
+          method: "POST",
+          body: JSON.stringify({
+            clientId,
+            paymentTerms: $("#salePaymentTerms").value.trim(),
+            items: [{ poleId, unitPrice: Number($("#saleUnitPrice").value || 0) }]
+          })
+        });
+        event.target.reset();
+        await refreshTenantData();
+        toast("Vente et BL crees");
+      } catch (error) {
+        toast(error.message || "Creation vente impossible");
+      }
+    }
+
+    async function loadSalesReport(period = "month") {
+      try {
+        await ensureApiSession();
+        const report = await apiFetch(`/reports/sales?period=${encodeURIComponent(period)}`);
+        const body = $("#financeReportBody");
+        if (!body) return;
+        body.innerHTML = `
+          <div class="grid stats">
+            ${metric("Total ventes", moneyXof(report.kpis?.totalSales), "Periode selectionnee")}
+            ${metric("Volume vendu", report.kpis?.volumeSold || 0, "Poteaux")}
+            ${metric("Marge nette", moneyXof(report.kpis?.marginAmount), "CA - cout")}
+          </div>
+          <div class="table-wrap" style="margin-top:12px">
+            <table><thead><tr><th>Type</th><th>Volume</th><th>Total</th><th>Marge</th></tr></thead><tbody>${(report.byType || []).map(row => `<tr><td>${escapeHtml(row.type)}</td><td>${row.quantity}</td><td>${moneyXof(row.totalAmount)}</td><td>${moneyXof(row.marginAmount)}</td></tr>`).join("") || `<tr><td colspan="4"><div class="empty">Aucune vente sur cette periode.</div></td></tr>`}</tbody></table>
+          </div>
+        `;
+      } catch (error) {
+        toast(error.message || "Rapport ventes indisponible");
       }
     }
 
@@ -5925,6 +6254,8 @@
     window.setView = setView;
     window.assignPole = assignPole;
     window.validateProjectStock = validateProjectStock;
+    window.advanceProductionOrder = advanceProductionOrder;
+    window.loadSalesReport = loadSalesReport;
     window.takeOverProject = takeOverProject;
     window.requestProjectClosure = requestProjectClosure;
     window.validateProjectClosure = validateProjectClosure;

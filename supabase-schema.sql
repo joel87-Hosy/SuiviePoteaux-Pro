@@ -12,6 +12,7 @@ create table if not exists public.tenants (
   ville text,
   logo_url text,
   branding jsonb not null default '{}',
+  modules jsonb not null default '{"production":false,"sales":false,"finance":false}',
   status text not null default 'trial' check (status in ('active', 'trial', 'suspended')),
   archived_at timestamptz,
   created_at timestamptz not null default now(),
@@ -24,7 +25,7 @@ create table if not exists public.app_users (
   email text not null unique,
   password_hash text not null,
   name text not null,
-  role text not null check (role in ('platform_admin', 'super_admin', 'tenant_admin', 'magasinier', 'depot_manager', 'terrain', 'field_agent', 'controleur', 'quality_inspector')),
+  role text not null check (role in ('platform_admin', 'super_admin', 'tenant_admin', 'chef_production', 'commercial', 'direction_finance', 'magasinier', 'depot_manager', 'terrain', 'field_agent', 'controleur', 'quality_inspector')),
   active boolean not null default true,
   approved boolean not null default true,
   depot text,
@@ -77,6 +78,18 @@ create table if not exists public.poles (
   project_id text,
   lat numeric,
   lng numeric,
+  production_order_id text,
+  matricule text,
+  qr_code text,
+  factory_status text,
+  production_date timestamptz,
+  resistance_class text,
+  raw_material_lot text,
+  factory_unit_cost numeric not null default 0,
+  sold_at timestamptz,
+  sold_to_client_id text,
+  sale_id text,
+  delivery_note_number text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -230,15 +243,90 @@ create table if not exists public.platform_audit_logs (
   timestamp timestamptz not null default now()
 );
 
+create table if not exists public.production_orders (
+  id text primary key,
+  tenant_id text not null references public.tenants(id) on update cascade on delete restrict,
+  order_number text not null,
+  pole_type text not null,
+  dimensions jsonb not null default '{}',
+  resistance_class text,
+  raw_material_lot text,
+  quantity int not null check (quantity > 0),
+  unit_cost numeric not null default 0,
+  status text not null default 'En fabrication' check (status in ('En fabrication', 'En cure/sechage', 'Controle Qualite Usine', 'En Stock Usine', 'Cloture')),
+  created_by text references public.app_users(id) on update cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_id, order_number)
+);
+
+create table if not exists public.factory_quality_checks (
+  id text primary key,
+  tenant_id text not null references public.tenants(id) on update cascade on delete restrict,
+  production_order_id text references public.production_orders(id) on update cascade on delete cascade,
+  pole_id text references public.poles(id) on update cascade on delete set null,
+  inspector_id text references public.app_users(id) on update cascade,
+  result text not null check (result in ('Conforme', 'Non conforme', 'A reprendre')),
+  measurements jsonb not null default '{}',
+  notes text,
+  checked_at timestamptz not null default now()
+);
+
+create table if not exists public.clients (
+  id text primary key,
+  tenant_id text not null references public.tenants(id) on update cascade on delete restrict,
+  name text not null,
+  client_type text not null default 'Entreprise BTP' check (client_type in ('Entreprise BTP', 'Electrification', 'Particulier', 'Interne/Chantier')),
+  email text,
+  phone text,
+  address text,
+  payment_terms text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.sales (
+  id text primary key,
+  tenant_id text not null references public.tenants(id) on update cascade on delete restrict,
+  client_id text not null references public.clients(id) on update cascade on delete restrict,
+  sale_number text not null,
+  delivery_note_number text,
+  status text not null default 'Confirmee' check (status in ('Brouillon', 'Confirmee', 'Livree', 'Annulee', 'Payee')),
+  payment_status text not null default 'pending' check (payment_status in ('pending', 'partial', 'paid', 'overdue')),
+  payment_terms text,
+  total_amount numeric not null default 0,
+  total_cost numeric not null default 0,
+  margin_amount numeric not null default 0,
+  currency text not null default 'XOF',
+  sold_by text references public.app_users(id) on update cascade,
+  sale_date timestamptz not null default now(),
+  delivery_date timestamptz,
+  created_at timestamptz not null default now(),
+  unique (tenant_id, sale_number)
+);
+
+create table if not exists public.sale_items (
+  id text primary key,
+  tenant_id text not null references public.tenants(id) on update cascade on delete restrict,
+  sale_id text not null references public.sales(id) on update cascade on delete cascade,
+  pole_id text not null references public.poles(id) on update cascade on delete restrict,
+  unit_price numeric not null default 0,
+  unit_cost numeric not null default 0,
+  quantity int not null default 1 check (quantity > 0),
+  created_at timestamptz not null default now(),
+  unique (tenant_id, pole_id)
+);
+
 alter table public.poles drop constraint if exists poles_type_check;
 alter table public.app_users drop constraint if exists app_users_role_check;
-alter table public.app_users add constraint app_users_role_check check (role in ('platform_admin', 'super_admin', 'tenant_admin', 'magasinier', 'depot_manager', 'terrain', 'field_agent', 'controleur', 'quality_inspector'));
+alter table public.app_users add constraint app_users_role_check check (role in ('platform_admin', 'super_admin', 'tenant_admin', 'chef_production', 'commercial', 'direction_finance', 'magasinier', 'depot_manager', 'terrain', 'field_agent', 'controleur', 'quality_inspector'));
 alter table public.app_users add column if not exists tenant_id text references public.tenants(id) on update cascade on delete restrict;
 alter table public.app_users add column if not exists phone text;
 alter table public.app_users add column if not exists job_title text;
 alter table public.app_users add column if not exists profile_photo text;
 alter table public.app_users add column if not exists platform_role text;
 alter table public.tenants add column if not exists branding jsonb not null default '{}';
+alter table public.tenants add column if not exists modules jsonb not null default '{"production":false,"sales":false,"finance":false}';
 alter table public.tenants add column if not exists archived_at timestamptz;
 alter table public.poles add column if not exists assigned_team text;
 alter table public.projects add column if not exists tenant_id text references public.tenants(id) on update cascade on delete restrict;
@@ -247,6 +335,18 @@ alter table public.interventions add column if not exists tenant_id text referen
 alter table public.stock_movements add column if not exists tenant_id text references public.tenants(id) on update cascade on delete restrict;
 alter table public.audit_log add column if not exists tenant_id text references public.tenants(id) on update cascade on delete restrict;
 alter table public.poles add column if not exists project_id text;
+alter table public.poles add column if not exists production_order_id text;
+alter table public.poles add column if not exists matricule text;
+alter table public.poles add column if not exists qr_code text;
+alter table public.poles add column if not exists factory_status text;
+alter table public.poles add column if not exists production_date timestamptz;
+alter table public.poles add column if not exists resistance_class text;
+alter table public.poles add column if not exists raw_material_lot text;
+alter table public.poles add column if not exists factory_unit_cost numeric not null default 0;
+alter table public.poles add column if not exists sold_at timestamptz;
+alter table public.poles add column if not exists sold_to_client_id text;
+alter table public.poles add column if not exists sale_id text;
+alter table public.poles add column if not exists delivery_note_number text;
 alter table public.projects add column if not exists start_date date;
 alter table public.projects add column if not exists end_date date;
 alter table public.projects add column if not exists pole_count int not null default 0;
@@ -279,11 +379,30 @@ create index if not exists idx_activation_emails_status on public.activation_ema
 create index if not exists idx_poles_depot on public.poles(depot);
 create index if not exists idx_poles_assigned_team on public.poles(assigned_team);
 create index if not exists idx_poles_project on public.poles(project_id);
+create index if not exists idx_poles_production_order on public.poles(production_order_id);
+create index if not exists idx_poles_matricule on public.poles(matricule);
+create index if not exists idx_poles_qr_code on public.poles(qr_code);
+create index if not exists idx_poles_sale on public.poles(sale_id);
+create index if not exists idx_poles_sold_at on public.poles(sold_at desc);
 create index if not exists idx_projects_request_status on public.projects(request_status);
 create index if not exists idx_interventions_pole on public.interventions(pole_id);
 create index if not exists idx_interventions_agent on public.interventions(agent_id);
 create index if not exists idx_intervention_photos_intervention on public.intervention_photos(intervention_id);
 create index if not exists idx_audit_log_date on public.audit_log(date desc);
+create index if not exists idx_production_orders_tenant on public.production_orders(tenant_id);
+create index if not exists idx_production_orders_created_at on public.production_orders(created_at desc);
+create index if not exists idx_production_orders_status on public.production_orders(status);
+create index if not exists idx_factory_quality_checks_tenant on public.factory_quality_checks(tenant_id);
+create index if not exists idx_factory_quality_checks_pole on public.factory_quality_checks(pole_id);
+create index if not exists idx_clients_tenant on public.clients(tenant_id);
+create index if not exists idx_clients_name on public.clients(name);
+create index if not exists idx_sales_tenant on public.sales(tenant_id);
+create index if not exists idx_sales_sale_date on public.sales(sale_date desc);
+create index if not exists idx_sales_client on public.sales(client_id);
+create index if not exists idx_sales_status on public.sales(status);
+create index if not exists idx_sale_items_tenant on public.sale_items(tenant_id);
+create index if not exists idx_sale_items_sale on public.sale_items(sale_id);
+create index if not exists idx_sale_items_pole on public.sale_items(pole_id);
 
 alter table public.app_users enable row level security;
 alter table public.tenants enable row level security;
@@ -295,6 +414,11 @@ alter table public.transactions enable row level security;
 alter table public.system_banners enable row level security;
 alter table public.platform_audit_logs enable row level security;
 alter table public.activation_emails enable row level security;
+alter table public.production_orders enable row level security;
+alter table public.factory_quality_checks enable row level security;
+alter table public.clients enable row level security;
+alter table public.sales enable row level security;
+alter table public.sale_items enable row level security;
 alter table public.projects enable row level security;
 alter table public.poles enable row level security;
 alter table public.interventions enable row level security;
@@ -315,6 +439,11 @@ revoke all on table public.transactions from anon, authenticated;
 revoke all on table public.system_banners from anon, authenticated;
 revoke all on table public.platform_audit_logs from anon, authenticated;
 revoke all on table public.activation_emails from anon, authenticated;
+revoke all on table public.production_orders from anon, authenticated;
+revoke all on table public.factory_quality_checks from anon, authenticated;
+revoke all on table public.clients from anon, authenticated;
+revoke all on table public.sales from anon, authenticated;
+revoke all on table public.sale_items from anon, authenticated;
 revoke all on table public.projects from anon, authenticated;
 revoke all on table public.poles from anon, authenticated;
 revoke all on table public.interventions from anon, authenticated;

@@ -36,6 +36,7 @@ const TENANT_STATUSES = ["active", "trial", "suspended"];
 const PLATFORM_ROLES = ["platform_owner", "platform_support", "platform_billing", "platform_security"];
 const PLAN_NAMES = ["starter", "pro", "enterprise"];
 const BILLING_CYCLES = ["monthly", "annual"];
+const DEFAULT_TENANT_MODULES = { production: false, sales: false, finance: false };
 const tenantRoleAliases = {
   tenant_admin: "tenant_admin",
   depot_manager: "depot_manager",
@@ -58,8 +59,11 @@ const rateLimits = new Map();
 
 const rolePermissions = {
   platform_admin: ["read", "write_stock", "write_intervention", "validate", "admin", "platform_admin"],
-  super_admin: ["read", "write_stock", "write_intervention", "validate", "admin"],
-  tenant_admin: ["read", "write_stock", "write_intervention", "validate", "admin"],
+  super_admin: ["read", "write_stock", "write_intervention", "validate", "admin", "production", "sales", "finance"],
+  tenant_admin: ["read", "write_stock", "write_intervention", "validate", "admin", "production", "sales", "finance"],
+  chef_production: ["read", "write_stock", "production"],
+  commercial: ["read", "sales"],
+  direction_finance: ["read", "finance", "sales"],
   magasinier: ["read", "write_stock"],
   depot_manager: ["read", "write_stock"],
   terrain: ["read", "write_intervention"],
@@ -139,6 +143,11 @@ function seedDb() {
     ],
     stockMovements: [],
     auditLog: [],
+    productionOrders: [],
+    factoryQualityChecks: [],
+    clients: [],
+    sales: [],
+    saleItems: [],
     tenants: [
       {
         id: DEFAULT_TENANT_ID,
@@ -221,7 +230,7 @@ async function writeDb(db) {
 }
 
 async function readSupabaseDb() {
-  const [users, projects, poles, interventions, photos, stockMovements, auditLog, appSettings, tenants, subscriptions, tenantLimits, platformPlansRows, coupons, transactions, systemBanners, activationEmails, platformAuditLogs] = await Promise.all([
+  const [users, projects, poles, interventions, photos, stockMovements, auditLog, appSettings, tenants, subscriptions, tenantLimits, platformPlansRows, coupons, transactions, systemBanners, activationEmails, platformAuditLogs, productionOrders, factoryQualityChecks, clients, sales, saleItems] = await Promise.all([
     selectTable("app_users"),
     selectTable("projects"),
     selectTable("poles"),
@@ -238,7 +247,12 @@ async function readSupabaseDb() {
     selectTable("transactions"),
     selectTable("system_banners"),
     selectTable("activation_emails"),
-    selectTable("platform_audit_logs")
+    selectTable("platform_audit_logs"),
+    selectTable("production_orders"),
+    selectTable("factory_quality_checks"),
+    selectTable("clients"),
+    selectTable("sales"),
+    selectTable("sale_items")
   ]);
   return normalizeDb({
     users: users.map(row => ({
@@ -285,7 +299,19 @@ async function readSupabaseDb() {
       assignedTeam: row.assigned_team || "",
       projectId: row.project_id || "",
       lat: row.lat,
-      lng: row.lng
+      lng: row.lng,
+      productionOrderId: row.production_order_id || "",
+      matricule: row.matricule || "",
+      qrCode: row.qr_code || "",
+      factoryStatus: row.factory_status || "",
+      productionDate: row.production_date || "",
+      resistanceClass: row.resistance_class || "",
+      rawMaterialLot: row.raw_material_lot || "",
+      factoryUnitCost: Number(row.factory_unit_cost || 0),
+      soldAt: row.sold_at || "",
+      soldToClientId: row.sold_to_client_id || "",
+      saleId: row.sale_id || "",
+      deliveryNoteNumber: row.delivery_note_number || ""
     })),
     interventions: interventions.map(row => ({
       id: row.id,
@@ -399,6 +425,72 @@ async function readSupabaseDb() {
       timestamp: row.timestamp,
       payload: row.payload || {}
     })),
+    productionOrders: productionOrders.map(row => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      orderNumber: row.order_number,
+      poleType: row.pole_type,
+      dimensions: row.dimensions || {},
+      resistanceClass: row.resistance_class || "",
+      rawMaterialLot: row.raw_material_lot || "",
+      quantity: Number(row.quantity || 0),
+      unitCost: Number(row.unit_cost || 0),
+      status: row.status,
+      createdBy: row.created_by || "",
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    })),
+    factoryQualityChecks: factoryQualityChecks.map(row => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      productionOrderId: row.production_order_id || "",
+      poleId: row.pole_id || "",
+      inspectorId: row.inspector_id || "",
+      result: row.result,
+      measurements: row.measurements || {},
+      notes: row.notes || "",
+      checkedAt: row.checked_at
+    })),
+    clients: clients.map(row => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      name: row.name,
+      clientType: row.client_type || "",
+      email: row.email || "",
+      phone: row.phone || "",
+      address: row.address || "",
+      paymentTerms: row.payment_terms || "",
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    })),
+    sales: sales.map(row => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      clientId: row.client_id,
+      saleNumber: row.sale_number,
+      deliveryNoteNumber: row.delivery_note_number || "",
+      status: row.status,
+      paymentStatus: row.payment_status || "pending",
+      paymentTerms: row.payment_terms || "",
+      totalAmount: Number(row.total_amount || 0),
+      totalCost: Number(row.total_cost || 0),
+      marginAmount: Number(row.margin_amount || 0),
+      currency: row.currency || "XOF",
+      soldBy: row.sold_by || "",
+      saleDate: row.sale_date,
+      deliveryDate: row.delivery_date || "",
+      createdAt: row.created_at
+    })),
+    saleItems: saleItems.map(row => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      saleId: row.sale_id,
+      poleId: row.pole_id,
+      unitPrice: Number(row.unit_price || 0),
+      unitCost: Number(row.unit_cost || 0),
+      quantity: Number(row.quantity || 1),
+      createdAt: row.created_at
+    })),
     settings: appSettings.find(row => row.id === "default")?.value || DEFAULT_SETTINGS
   });
 }
@@ -466,7 +558,19 @@ async function writeSupabaseDb(db) {
       assigned_team: row.assignedTeam || null,
       project_id: row.projectId || null,
       lat: row.lat || null,
-      lng: row.lng || null
+      lng: row.lng || null,
+      production_order_id: row.productionOrderId || null,
+      matricule: row.matricule || null,
+      qr_code: row.qrCode || null,
+      factory_status: row.factoryStatus || null,
+      production_date: row.productionDate || null,
+      resistance_class: row.resistanceClass || null,
+      raw_material_lot: row.rawMaterialLot || null,
+      factory_unit_cost: Number(row.factoryUnitCost || 0),
+      sold_at: row.soldAt || null,
+      sold_to_client_id: row.soldToClientId || null,
+      sale_id: row.saleId || null,
+      delivery_note_number: row.deliveryNoteNumber || null
     }))),
     upsertTable("interventions", db.interventions.map(row => ({
       id: row.id,
@@ -525,6 +629,7 @@ async function writeSupabaseDb(db) {
       ville: row.ville || null,
       logo_url: row.logoUrl || null,
       branding: row.branding || {},
+      modules: { ...DEFAULT_TENANT_MODULES, ...(row.modules || row.branding?.modules || {}) },
       status: row.status,
       archived_at: row.archivedAt || null,
       created_at: row.createdAt || new Date().toISOString(),
@@ -603,6 +708,72 @@ async function writeSupabaseDb(db) {
       ip_address: row.ipAddress || null,
       payload: row.payload || {},
       timestamp: row.timestamp || new Date().toISOString()
+    }))),
+    upsertTable("production_orders", (db.productionOrders || []).map(row => ({
+      id: row.id,
+      tenant_id: row.tenantId || DEFAULT_TENANT_ID,
+      order_number: row.orderNumber,
+      pole_type: row.poleType,
+      dimensions: row.dimensions || {},
+      resistance_class: row.resistanceClass || null,
+      raw_material_lot: row.rawMaterialLot || null,
+      quantity: Number(row.quantity || 0),
+      unit_cost: Number(row.unitCost || 0),
+      status: row.status || "En fabrication",
+      created_by: row.createdBy || null,
+      created_at: row.createdAt || new Date().toISOString(),
+      updated_at: row.updatedAt || new Date().toISOString()
+    }))),
+    upsertTable("factory_quality_checks", (db.factoryQualityChecks || []).map(row => ({
+      id: row.id,
+      tenant_id: row.tenantId || DEFAULT_TENANT_ID,
+      production_order_id: row.productionOrderId || null,
+      pole_id: row.poleId || null,
+      inspector_id: row.inspectorId || null,
+      result: row.result,
+      measurements: row.measurements || {},
+      notes: row.notes || null,
+      checked_at: row.checkedAt || new Date().toISOString()
+    }))),
+    upsertTable("clients", (db.clients || []).map(row => ({
+      id: row.id,
+      tenant_id: row.tenantId || DEFAULT_TENANT_ID,
+      name: row.name,
+      client_type: row.clientType || null,
+      email: row.email || null,
+      phone: row.phone || null,
+      address: row.address || null,
+      payment_terms: row.paymentTerms || null,
+      created_at: row.createdAt || new Date().toISOString(),
+      updated_at: row.updatedAt || new Date().toISOString()
+    }))),
+    upsertTable("sales", (db.sales || []).map(row => ({
+      id: row.id,
+      tenant_id: row.tenantId || DEFAULT_TENANT_ID,
+      client_id: row.clientId,
+      sale_number: row.saleNumber,
+      delivery_note_number: row.deliveryNoteNumber || null,
+      status: row.status || "Confirmee",
+      payment_status: row.paymentStatus || "pending",
+      payment_terms: row.paymentTerms || null,
+      total_amount: Number(row.totalAmount || 0),
+      total_cost: Number(row.totalCost || 0),
+      margin_amount: Number(row.marginAmount || 0),
+      currency: row.currency || "XOF",
+      sold_by: row.soldBy || null,
+      sale_date: row.saleDate || new Date().toISOString(),
+      delivery_date: row.deliveryDate || null,
+      created_at: row.createdAt || new Date().toISOString()
+    }))),
+    upsertTable("sale_items", (db.saleItems || []).map(row => ({
+      id: row.id,
+      tenant_id: row.tenantId || DEFAULT_TENANT_ID,
+      sale_id: row.saleId,
+      pole_id: row.poleId,
+      unit_price: Number(row.unitPrice || 0),
+      unit_cost: Number(row.unitCost || 0),
+      quantity: Number(row.quantity || 1),
+      created_at: row.createdAt || new Date().toISOString()
     })))
   ]);
   const photoRows = db.interventions.flatMap(row => (row.photos || [])
@@ -646,6 +817,7 @@ function normalizeTenantRecord(tenant = {}) {
     ville: tenant.ville || "",
     logoUrl: tenant.logoUrl || tenant.logo_url || "",
     branding: tenant.branding || {},
+    modules: { ...DEFAULT_TENANT_MODULES, ...(tenant.modules || tenant.branding?.modules || {}) },
     status: TENANT_STATUSES.includes(tenant.status) ? tenant.status : "trial",
     archivedAt: tenant.archivedAt || tenant.archived_at || "",
     createdAt: tenant.createdAt || tenant.created_at || now,
@@ -695,6 +867,11 @@ function normalizeDb(db) {
     interventions: (db.interventions || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
     stockMovements: (db.stockMovements || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
     auditLog: (db.auditLog || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
+    productionOrders: (db.productionOrders || db.production_orders || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
+    factoryQualityChecks: (db.factoryQualityChecks || db.factory_quality_checks || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
+    clients: (db.clients || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
+    sales: (db.sales || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
+    saleItems: (db.saleItems || db.sale_items || []).map(item => ({ ...item, tenantId: item.tenantId || item.tenant_id || defaultTenantId })),
     tenants,
     subscriptions: (db.subscriptions || []).map(normalizeSubscriptionRecord),
     tenantLimits: (db.tenantLimits || db.tenant_limits || []).map(item => normalizeLimitRecord(item, item.tenantId || item.tenant_id || defaultTenantId)),
@@ -730,9 +907,9 @@ function hasPermission(userRecord, permission) {
 }
 
 function manageableRoles(actor) {
-  if (actor?.role === "tenant_admin") return ["tenant_admin", "depot_manager", "field_agent", "quality_inspector"];
-  if (actor?.role === "super_admin") return ["super_admin", "magasinier", "terrain", "controleur"];
-  if (isPlatformAdmin(actor)) return ["tenant_admin", "depot_manager", "field_agent", "quality_inspector"];
+  if (actor?.role === "tenant_admin") return ["tenant_admin", "depot_manager", "field_agent", "quality_inspector", "chef_production", "commercial", "direction_finance"];
+  if (actor?.role === "super_admin") return ["super_admin", "magasinier", "terrain", "controleur", "chef_production", "commercial", "direction_finance"];
+  if (isPlatformAdmin(actor)) return ["tenant_admin", "depot_manager", "field_agent", "quality_inspector", "chef_production", "commercial", "direction_finance"];
   return [];
 }
 
@@ -742,6 +919,23 @@ function isPlatformAdmin(userRecord) {
 
 function isFieldAgent(userRecord) {
   return ["terrain", "field_agent"].includes(userRecord?.role);
+}
+
+function tenantModules(db, actorOrTenantId) {
+  const tenantId = typeof actorOrTenantId === "string" ? actorOrTenantId : actorOrTenantId?.tenantId;
+  const tenant = (db.tenants || []).find(item => item.id === tenantId);
+  return { ...DEFAULT_TENANT_MODULES, ...(tenant?.modules || tenant?.branding?.modules || {}) };
+}
+
+function tenantModuleEnabled(db, actor, moduleName) {
+  if (isPlatformAdmin(actor)) return true;
+  return Boolean(tenantModules(db, actor)[moduleName]);
+}
+
+function requireTenantModule(db, req, res, actor, moduleName) {
+  if (tenantModuleEnabled(db, actor, moduleName)) return true;
+  sendError(req, res, 403, `Module ${moduleName} non active pour cette entreprise`);
+  return false;
 }
 
 function requirePlatformAdmin(req, res, actor) {
@@ -765,6 +959,13 @@ function tenantPayload(db, actor, extra = {}) {
     poles: scopedRecords(actor, db.poles),
     interventions: scopedRecords(actor, db.interventions),
     stockMovements: scopedRecords(actor, db.stockMovements || []),
+    productionOrders: scopedRecords(actor, db.productionOrders || []),
+    factoryQualityChecks: scopedRecords(actor, db.factoryQualityChecks || []),
+    clients: scopedRecords(actor, db.clients || []),
+    sales: scopedRecords(actor, db.sales || []),
+    saleItems: scopedRecords(actor, db.saleItems || []),
+    tenant: isPlatformAdmin(actor) ? null : (db.tenants || []).find(item => item.id === actor.tenantId) || null,
+    modules: tenantModules(db, actor),
     auditLog: hasPermission(actor, "admin") ? scopedRecords(actor, db.auditLog || []) : []
   };
 }
@@ -1001,6 +1202,109 @@ function stockMovement(db, actor, poleId, movementType, fromDepot, toDepot, payl
   });
 }
 
+function nextSequenceId(rows, prefix, field = "id") {
+  const year = new Date().getFullYear();
+  const pattern = new RegExp(`^${prefix}-${year}-(\\d+)$`);
+  const max = (rows || [])
+    .map(item => pattern.exec(String(item[field] || item.id || ""))?.[1])
+    .filter(Boolean)
+    .map(Number)
+    .reduce((acc, value) => Math.max(acc, value), 0);
+  return `${prefix}-${year}-${String(max + 1).padStart(4, "0")}`;
+}
+
+function nextProductionOrderNumber(db) {
+  return nextSequenceId(db.productionOrders || [], "OF", "orderNumber");
+}
+
+function nextSaleNumber(db) {
+  return nextSequenceId(db.sales || [], "SALE", "saleNumber");
+}
+
+function nextDeliveryNoteNumber(db) {
+  return nextSequenceId(db.sales || [], "BL", "deliveryNoteNumber");
+}
+
+function poleProductionId(orderNumber, index) {
+  return `${orderNumber}-P${String(index).padStart(3, "0")}`;
+}
+
+function canAccessProduction(actor) {
+  return hasPermission(actor, "production") || hasPermission(actor, "admin");
+}
+
+function canAccessSales(actor) {
+  return hasPermission(actor, "sales") || hasPermission(actor, "admin");
+}
+
+function canAccessFinance(actor) {
+  return hasPermission(actor, "finance") || hasPermission(actor, "admin");
+}
+
+function parsePeriod(url) {
+  const now = new Date();
+  const period = url.searchParams.get("period") || "";
+  let startDate = url.searchParams.get("startDate") || "";
+  let endDate = url.searchParams.get("endDate") || "";
+  if (!startDate || !endDate) {
+    const start = new Date(now);
+    if (period === "today") {
+      start.setHours(0, 0, 0, 0);
+    } else if (period === "week") {
+      start.setDate(now.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+    } else {
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+    }
+    startDate = startDate || start.toISOString();
+    endDate = endDate || now.toISOString();
+  }
+  return { start: new Date(startDate), end: new Date(endDate) };
+}
+
+function saleReport(db, actor, url) {
+  const { start, end } = parsePeriod(url);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+    throw Object.assign(new Error("Periode de rapport invalide"), { statusCode: 400 });
+  }
+  const sales = scopedRecords(actor, db.sales || []).filter(sale => {
+    const saleDate = new Date(sale.saleDate || sale.createdAt || 0);
+    return saleDate >= start && saleDate <= end && sale.status !== "Annulee";
+  });
+  const saleIds = new Set(sales.map(sale => sale.id));
+  const items = scopedRecords(actor, db.saleItems || []).filter(item => saleIds.has(item.saleId));
+  const byType = {};
+  for (const item of items) {
+    const pole = (db.poles || []).find(candidate => candidate.id === item.poleId);
+    const type = pole?.type || "INCONNU";
+    if (!byType[type]) byType[type] = { type, quantity: 0, totalAmount: 0, marginAmount: 0 };
+    byType[type].quantity += Number(item.quantity || 1);
+    byType[type].totalAmount += Number(item.unitPrice || 0) * Number(item.quantity || 1);
+    byType[type].marginAmount += (Number(item.unitPrice || 0) - Number(item.unitCost || 0)) * Number(item.quantity || 1);
+  }
+  const topClientsMap = new Map();
+  for (const sale of sales) {
+    const client = (db.clients || []).find(item => item.id === sale.clientId);
+    const current = topClientsMap.get(sale.clientId) || { clientId: sale.clientId, name: client?.name || "Client inconnu", totalAmount: 0, volume: 0 };
+    current.totalAmount += Number(sale.totalAmount || 0);
+    current.volume += items.filter(item => item.saleId === sale.id).reduce((sum, item) => sum + Number(item.quantity || 1), 0);
+    topClientsMap.set(sale.clientId, current);
+  }
+  return {
+    period: { startDate: start.toISOString(), endDate: end.toISOString() },
+    kpis: {
+      totalSales: sales.reduce((sum, sale) => sum + Number(sale.totalAmount || 0), 0),
+      volumeSold: items.reduce((sum, item) => sum + Number(item.quantity || 1), 0),
+      totalCost: sales.reduce((sum, sale) => sum + Number(sale.totalCost || 0), 0),
+      marginAmount: sales.reduce((sum, sale) => sum + Number(sale.marginAmount || 0), 0)
+    },
+    byType: Object.values(byType),
+    topClients: Array.from(topClientsMap.values()).sort((a, b) => b.totalAmount - a.totalAmount).slice(0, 10),
+    sales
+  };
+}
+
 function tenantUsage(db, tenantId) {
   const users = db.users.filter(userRecord => userRecord.tenantId === tenantId && userRecord.role !== "platform_admin");
   const poles = db.poles.filter(pole => pole.tenantId === tenantId);
@@ -1154,6 +1458,7 @@ function createTenantOnboarding(db, actor, body, req) {
     pays: String(company.pays || "").trim(),
     ville: String(company.ville || "").trim(),
     logoUrl: String(company.logoUrl || "").trim(),
+    modules: { ...DEFAULT_TENANT_MODULES, ...(body.modules || {}) },
     status: trialDays ? "trial" : "active",
     createdAt: now.toISOString(),
     updatedAt: now.toISOString()
@@ -1460,6 +1765,14 @@ async function handleApi(req, res, url) {
         ...(tenant.branding || {}),
         ...(body.branding || {})
       };
+      if (body.modules) {
+        tenant.modules = {
+          ...tenantModules(db, tenantId),
+          production: Boolean(body.modules.production),
+          sales: Boolean(body.modules.sales),
+          finance: Boolean(body.modules.finance)
+        };
+      }
       tenant.updatedAt = new Date().toISOString();
       const subscription = db.subscriptions.find(item => item.tenantId === tenantId);
       if (subscription && body.subscription) {
@@ -1670,6 +1983,11 @@ async function handleApi(req, res, url) {
     const poles = scopedRecords(actor, db.poles);
     const interventions = scopedRecords(actor, db.interventions);
     const stockMovements = scopedRecords(actor, db.stockMovements || []);
+    const productionOrders = scopedRecords(actor, db.productionOrders || []);
+    const factoryQualityChecks = scopedRecords(actor, db.factoryQualityChecks || []);
+    const clients = scopedRecords(actor, db.clients || []);
+    const sales = scopedRecords(actor, db.sales || []);
+    const saleItems = scopedRecords(actor, db.saleItems || []);
     const auditLog = scopedRecords(actor, db.auditLog || []);
     const terrainUsers = users.filter(userRecord => ["terrain", "field_agent"].includes(userRecord.role)).map(publicUser);
     return sendJson(res, 200, {
@@ -1679,6 +1997,13 @@ async function handleApi(req, res, url) {
       poles,
       interventions,
       stockMovements,
+      productionOrders,
+      factoryQualityChecks,
+      clients,
+      sales,
+      saleItems,
+      tenant: isPlatformAdmin(actor) ? null : (db.tenants || []).find(item => item.id === actor.tenantId) || null,
+      modules: tenantModules(db, actor),
       auditLog: hasPermission(actor, "admin") ? auditLog : [],
       settings: db.settings || DEFAULT_SETTINGS,
       users: hasPermission(actor, "admin") ? users.map(publicUser) : [],
@@ -1755,6 +2080,311 @@ async function handleApi(req, res, url) {
     audit(db, actor, "user.update", { userId: target.id, fields: Object.keys(body).filter(key => key !== "password") });
     await writeDb(db);
     return sendJson(res, 200, { user: publicUser(target), users: scopedRecords(actor, db.users.filter(userRecord => userRecord.role !== "platform_admin")).map(publicUser) });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/production/orders") {
+    if (!requireTenantModule(db, req, res, actor, "production")) return;
+    if (!canAccessProduction(actor)) return sendError(res, 403, "Permission production requise");
+    return sendJson(res, 200, { productionOrders: scopedRecords(actor, db.productionOrders || []) });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/production/orders") {
+    if (!requireTenantModule(db, req, res, actor, "production")) return;
+    if (!canAccessProduction(actor)) return sendError(res, 403, "Permission production requise");
+    const body = await readBody(req);
+    const quantity = Number(body.quantity || 0);
+    const poleType = String(body.poleType || body.type || "").trim().toUpperCase();
+    if (!poleType || !quantity || quantity < 1) return sendError(res, 400, "Type de poteau et quantite requis");
+    db.productionOrders = db.productionOrders || [];
+    db.poles = db.poles || [];
+    const now = new Date().toISOString();
+    const orderNumber = body.orderNumber || nextProductionOrderNumber(db);
+    if (db.productionOrders.some(item => item.orderNumber === orderNumber && tenantMatches(actor, item))) {
+      return sendError(res, 409, "Ordre de fabrication deja existant");
+    }
+    const order = {
+      id: body.id || `of-${crypto.randomUUID().slice(0, 8)}`,
+      tenantId: actor.tenantId || DEFAULT_TENANT_ID,
+      orderNumber,
+      poleType,
+      dimensions: body.dimensions || {},
+      resistanceClass: String(body.resistanceClass || "").trim(),
+      rawMaterialLot: String(body.rawMaterialLot || "").trim(),
+      quantity,
+      unitCost: Number(body.unitCost || body.factoryUnitCost || 0),
+      status: body.status || "En fabrication",
+      createdBy: actor.id,
+      createdAt: now,
+      updatedAt: now
+    };
+    const createdPoles = [];
+    for (let index = 1; index <= quantity; index++) {
+      const matricule = poleProductionId(orderNumber, index);
+      const id = db.poles.some(item => item.id === matricule) ? `POT-${crypto.randomUUID().slice(0, 8).toUpperCase()}` : matricule;
+      const pole = {
+        id,
+        tenantId: order.tenantId,
+        type: poleType,
+        height: Number(order.dimensions.height || body.height || 0),
+        effort: String(body.effort || order.dimensions.effort || ""),
+        weight: Number(body.weight || order.dimensions.weight || 0),
+        maker: String(body.maker || `Usine / ${order.rawMaterialLot || orderNumber}`),
+        status: "En fabrication",
+        depot: "Usine",
+        assignedTeam: "",
+        projectId: "",
+        productionOrderId: order.id,
+        matricule,
+        qrCode: id,
+        factoryStatus: "En fabrication",
+        productionDate: now,
+        resistanceClass: order.resistanceClass,
+        rawMaterialLot: order.rawMaterialLot,
+        factoryUnitCost: order.unitCost,
+        soldAt: "",
+        soldToClientId: "",
+        saleId: "",
+        deliveryNoteNumber: ""
+      };
+      db.poles.push(pole);
+      createdPoles.push(pole);
+      stockMovement(db, actor, pole.id, "Fabrication usine", "", "Usine", { productionOrderId: order.id, orderNumber });
+    }
+    db.productionOrders.push(order);
+    audit(db, actor, "production_order.create", { orderId: order.id, orderNumber, quantity });
+    await writeDb(db);
+    return sendJson(res, 201, tenantPayload(db, actor, { productionOrder: order, createdPoles }));
+  }
+
+  const productionOrderMatch = /^\/api\/production\/orders\/([^/]+)$/.exec(url.pathname);
+  if (req.method === "PATCH" && productionOrderMatch) {
+    if (!requireTenantModule(db, req, res, actor, "production")) return;
+    if (!canAccessProduction(actor)) return sendError(res, 403, "Permission production requise");
+    const order = (db.productionOrders || []).find(item => item.id === decodeURIComponent(productionOrderMatch[1]));
+    if (!order) return sendError(res, 404, "Ordre de fabrication introuvable");
+    if (!tenantMatches(actor, order)) return sendError(res, 403, "Tenant non autorise");
+    const body = await readBody(req);
+    const allowedStatuses = ["En fabrication", "En cure/sechage", "Controle Qualite Usine", "En Stock Usine", "Cloture"];
+    if (body.status !== undefined) {
+      if (!allowedStatuses.includes(body.status)) return sendError(res, 400, "Statut de production invalide");
+      order.status = body.status;
+      for (const pole of db.poles.filter(item => item.productionOrderId === order.id && tenantMatches(actor, item))) {
+        pole.factoryStatus = body.status;
+        if (body.status === "En Stock Usine" || body.status === "Cloture") {
+          pole.status = "En Stock";
+          pole.depot = "Stock Usine";
+        } else {
+          pole.status = body.status;
+          pole.depot = "Usine";
+        }
+      }
+    }
+    if (body.unitCost !== undefined) order.unitCost = Number(body.unitCost || 0);
+    order.updatedAt = new Date().toISOString();
+    audit(db, actor, "production_order.update", { orderId: order.id, fields: Object.keys(body || {}) });
+    await writeDb(db);
+    return sendJson(res, 200, tenantPayload(db, actor, { productionOrder: order }));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/production/quality-checks") {
+    if (!requireTenantModule(db, req, res, actor, "production")) return;
+    if (!canAccessProduction(actor) && !hasPermission(actor, "validate")) return sendError(res, 403, "Permission controle usine requise");
+    const body = await readBody(req);
+    const result = ["Conforme", "Non conforme", "A reprendre"].includes(body.result) ? body.result : "";
+    const pole = (db.poles || []).find(item => item.id === body.poleId);
+    if (!body.productionOrderId && !pole) return sendError(res, 400, "OF ou poteau requis");
+    if (pole && !tenantMatches(actor, pole)) return sendError(res, 403, "Tenant non autorise");
+    if (!result) return sendError(res, 400, "Resultat controle invalide");
+    const check = {
+      id: body.id || `qc-${crypto.randomUUID().slice(0, 8)}`,
+      tenantId: actor.tenantId || pole?.tenantId || DEFAULT_TENANT_ID,
+      productionOrderId: String(body.productionOrderId || pole?.productionOrderId || ""),
+      poleId: String(body.poleId || ""),
+      inspectorId: actor.id,
+      result,
+      measurements: body.measurements || {},
+      notes: String(body.notes || ""),
+      checkedAt: new Date().toISOString()
+    };
+    db.factoryQualityChecks = db.factoryQualityChecks || [];
+    db.factoryQualityChecks.push(check);
+    if (pole) pole.factoryStatus = result === "Conforme" ? "En Stock Usine" : "Controle Qualite Usine";
+    audit(db, actor, "factory_quality_check.create", { checkId: check.id, poleId: check.poleId, result });
+    await writeDb(db);
+    return sendJson(res, 201, tenantPayload(db, actor, { factoryQualityCheck: check }));
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/clients") {
+    if (!requireTenantModule(db, req, res, actor, "sales")) return;
+    if (!canAccessSales(actor) && !canAccessFinance(actor)) return sendError(res, 403, "Permission ventes requise");
+    return sendJson(res, 200, { clients: scopedRecords(actor, db.clients || []) });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/clients") {
+    if (!requireTenantModule(db, req, res, actor, "sales")) return;
+    if (!canAccessSales(actor)) return sendError(res, 403, "Permission commerciale requise");
+    const body = await readBody(req);
+    const name = String(body.name || "").trim();
+    if (!name) return sendError(res, 400, "Nom client requis");
+    const client = {
+      id: body.id || `client-${crypto.randomUUID().slice(0, 8)}`,
+      tenantId: actor.tenantId || DEFAULT_TENANT_ID,
+      name,
+      clientType: String(body.clientType || "Entreprise BTP"),
+      email: String(body.email || "").trim().toLowerCase(),
+      phone: String(body.phone || "").trim(),
+      address: String(body.address || "").trim(),
+      paymentTerms: String(body.paymentTerms || "").trim(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    db.clients = db.clients || [];
+    db.clients.push(client);
+    audit(db, actor, "client.create", { clientId: client.id, name });
+    await writeDb(db);
+    return sendJson(res, 201, { client, clients: scopedRecords(actor, db.clients) });
+  }
+
+  const clientHistoryMatch = /^\/api\/clients\/([^/]+)\/history$/.exec(url.pathname);
+  if (req.method === "GET" && clientHistoryMatch) {
+    if (!requireTenantModule(db, req, res, actor, "sales")) return;
+    if (!canAccessSales(actor) && !canAccessFinance(actor)) return sendError(res, 403, "Permission ventes requise");
+    const client = (db.clients || []).find(item => item.id === decodeURIComponent(clientHistoryMatch[1]));
+    if (!client) return sendError(res, 404, "Client introuvable");
+    if (!tenantMatches(actor, client)) return sendError(res, 403, "Tenant non autorise");
+    const sales = (db.sales || []).filter(item => item.clientId === client.id && tenantMatches(actor, item));
+    const saleIds = new Set(sales.map(item => item.id));
+    const saleItems = (db.saleItems || []).filter(item => saleIds.has(item.saleId) && tenantMatches(actor, item));
+    const poles = (db.poles || []).filter(item => saleItems.some(saleItem => saleItem.poleId === item.id) && tenantMatches(actor, item));
+    return sendJson(res, 200, { client, sales, saleItems, poles });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/sales") {
+    if (!requireTenantModule(db, req, res, actor, "sales")) return;
+    if (!canAccessSales(actor) && !canAccessFinance(actor)) return sendError(res, 403, "Permission ventes requise");
+    const { start, end } = parsePeriod(url);
+    const sales = scopedRecords(actor, db.sales || []).filter(sale => {
+      const saleDate = new Date(sale.saleDate || sale.createdAt || 0);
+      return (!url.searchParams.has("startDate") || saleDate >= start) && (!url.searchParams.has("endDate") || saleDate <= end);
+    });
+    return sendJson(res, 200, { sales });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/sales") {
+    if (!requireTenantModule(db, req, res, actor, "sales")) return;
+    if (!canAccessSales(actor)) return sendError(res, 403, "Permission commerciale requise");
+    const body = await readBody(req);
+    const client = (db.clients || []).find(item => item.id === body.clientId);
+    if (!client) return sendError(res, 404, "Client introuvable");
+    if (!tenantMatches(actor, client)) return sendError(res, 403, "Tenant non autorise");
+    const requestedItems = Array.isArray(body.items) ? body.items : [];
+    if (!requestedItems.length) return sendError(res, 400, "Au moins un poteau est requis");
+    const now = new Date().toISOString();
+    const sale = {
+      id: body.id || `sale-${crypto.randomUUID().slice(0, 8)}`,
+      tenantId: actor.tenantId || DEFAULT_TENANT_ID,
+      clientId: client.id,
+      saleNumber: body.saleNumber || nextSaleNumber(db),
+      deliveryNoteNumber: body.deliveryNoteNumber || nextDeliveryNoteNumber(db),
+      status: body.status || "Confirmee",
+      paymentStatus: body.paymentStatus || "pending",
+      paymentTerms: String(body.paymentTerms || client.paymentTerms || ""),
+      totalAmount: 0,
+      totalCost: 0,
+      marginAmount: 0,
+      currency: body.currency || "XOF",
+      soldBy: actor.id,
+      saleDate: body.saleDate || now,
+      deliveryDate: body.deliveryDate || "",
+      createdAt: now
+    };
+    db.sales = db.sales || [];
+    db.saleItems = db.saleItems || [];
+    if (db.sales.some(item => item.saleNumber === sale.saleNumber && tenantMatches(actor, item))) {
+      return sendError(res, 409, "Numero de vente deja existant");
+    }
+    const createdItems = [];
+    for (const item of requestedItems) {
+      const pole = db.poles.find(candidate => candidate.id === item.poleId || candidate.qrCode === item.qrCode || candidate.matricule === item.matricule);
+      if (!pole) return sendError(res, 404, `Poteau introuvable: ${item.poleId || item.qrCode || item.matricule}`);
+      if (!tenantMatches(actor, pole)) return sendError(res, 403, "Tenant non autorise");
+      if (pole.saleId || pole.soldAt || pole.status === "Vendu") return sendError(res, 409, `Poteau deja vendu: ${pole.id}`);
+      if (!["En Stock", "En Stock Usine"].includes(pole.status) && pole.factoryStatus !== "En Stock Usine") return sendError(res, 409, `Poteau non disponible a la vente: ${pole.id}`);
+      const quantity = Number(item.quantity || 1);
+      const unitPrice = Number(item.unitPrice || 0);
+      const unitCost = Number(item.unitCost ?? pole.factoryUnitCost ?? 0);
+      if (quantity < 1 || unitPrice < 0) return sendError(res, 400, "Quantite ou prix invalide");
+      const saleItem = {
+        id: item.id || `sale-item-${crypto.randomUUID().slice(0, 8)}`,
+        tenantId: sale.tenantId,
+        saleId: sale.id,
+        poleId: pole.id,
+        unitPrice,
+        unitCost,
+        quantity,
+        createdAt: now
+      };
+      createdItems.push(saleItem);
+      sale.totalAmount += unitPrice * quantity;
+      sale.totalCost += unitCost * quantity;
+      pole.status = "Vendu";
+      pole.soldAt = sale.saleDate;
+      pole.soldToClientId = client.id;
+      pole.saleId = sale.id;
+      pole.deliveryNoteNumber = sale.deliveryNoteNumber;
+      stockMovement(db, actor, pole.id, "Vente / BL", pole.depot, "Client", { clientId: client.id, saleId: sale.id, deliveryNoteNumber: sale.deliveryNoteNumber });
+    }
+    sale.marginAmount = sale.totalAmount - sale.totalCost;
+    db.sales.push(sale);
+    db.saleItems.push(...createdItems);
+    audit(db, actor, "sale.create", { saleId: sale.id, clientId: client.id, poles: createdItems.map(item => item.poleId), totalAmount: sale.totalAmount });
+    await writeDb(db);
+    return sendJson(res, 201, tenantPayload(db, actor, { sale, createdSaleItems: createdItems }));
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/reports/sales") {
+    if (!requireTenantModule(db, req, res, actor, "finance")) return;
+    if (!canAccessFinance(actor)) return sendError(res, 403, "Permission finance requise");
+    try {
+      return sendJson(res, 200, saleReport(db, actor, url));
+    } catch (error) {
+      return sendError(res, error.statusCode || 500, error.message || "Rapport indisponible");
+    }
+  }
+
+  const poleTraceMatch = /^\/api\/poles\/([^/]+)\/trace$/.exec(url.pathname);
+  if (req.method === "GET" && poleTraceMatch) {
+    if (!tenantModuleEnabled(db, actor, "production") && !tenantModuleEnabled(db, actor, "sales")) return sendError(req, res, 403, "Module tracabilite usine/vente non active pour cette entreprise");
+    const key = decodeURIComponent(poleTraceMatch[1]);
+    const pole = (db.poles || []).find(item => item.id === key || item.qrCode === key || item.matricule === key);
+    if (!pole) return sendError(res, 404, "Poteau introuvable");
+    if (!tenantMatches(actor, pole)) return sendError(res, 403, "Tenant non autorise");
+    const productionOrder = (db.productionOrders || []).find(item => item.id === pole.productionOrderId && tenantMatches(actor, item)) || null;
+    const qualityChecks = (db.factoryQualityChecks || []).filter(item => item.poleId === pole.id && tenantMatches(actor, item));
+    const sale = pole.saleId ? (db.sales || []).find(item => item.id === pole.saleId && tenantMatches(actor, item)) || null : null;
+    const client = sale ? (db.clients || []).find(item => item.id === sale.clientId && tenantMatches(actor, item)) || null : null;
+    const interventions = (db.interventions || []).filter(item => item.poleId === pole.id && tenantMatches(actor, item));
+    const stockMovements = (db.stockMovements || []).filter(item => item.poleId === pole.id && tenantMatches(actor, item));
+    return sendJson(res, 200, { pole, productionOrder, qualityChecks, sale, client, interventions, stockMovements });
+  }
+
+  const poleStatusMatch = /^\/api\/poles\/([^/]+)\/status$/.exec(url.pathname);
+  if (req.method === "PATCH" && poleStatusMatch) {
+    if (!hasPermission(actor, "write_stock") && !canAccessProduction(actor)) return sendError(res, 403, "Permission stock ou production requise");
+    if (!hasPermission(actor, "write_stock") && !requireTenantModule(db, req, res, actor, "production")) return;
+    const pole = db.poles.find(item => item.id === decodeURIComponent(poleStatusMatch[1]));
+    if (!pole) return sendError(res, 404, "Poteau introuvable");
+    if (!tenantMatches(actor, pole)) return sendError(res, 403, "Tenant non autorise");
+    const body = await readBody(req);
+    const beforeDepot = pole.depot;
+    const beforeStatus = pole.status;
+    if (body.status !== undefined) pole.status = String(body.status);
+    if (body.factoryStatus !== undefined) pole.factoryStatus = String(body.factoryStatus);
+    if (body.depot !== undefined) pole.depot = String(body.depot || "");
+    stockMovement(db, actor, pole.id, "Changement statut poteau", beforeDepot, pole.depot, { fromStatus: beforeStatus, toStatus: pole.status, factoryStatus: pole.factoryStatus || "" });
+    audit(db, actor, "pole.status.update", { poleId: pole.id, fromStatus: beforeStatus, toStatus: pole.status });
+    await writeDb(db);
+    return sendJson(res, 200, { pole });
   }
 
   if (req.method === "GET" && url.pathname === "/api/poles") {
