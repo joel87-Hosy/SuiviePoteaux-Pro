@@ -56,13 +56,38 @@ function ensureRoom(count = 6) {
 }
 
 addPage("Guide workflow et utilisation - SuiviPoteaux Pro");
-addParagraph("Ce document decrit le workflow complet de l'application SuiviPoteaux Pro et explique l'utilisation de chaque compte selon son role. Il sert de guide operationnel pour les projets d'implantation, le stock, le terrain, le controle qualite, la carte GPS, les rapports PDF et la cloture.");
+addParagraph("Ce document decrit le workflow complet de l'application SuiviPoteaux Pro et explique l'utilisation de chaque compte selon son role. Il sert de guide operationnel pour l'administration SaaS, les entreprises clientes, les projets d'implantation, le stock, le terrain, le controle qualite, la carte GPS, les rapports PDF, les modules optionnels usine/vente/finance et la cloture.");
 addHeading("Objectif de l'application");
 addBullet("Suivre les projets d'implantation de poteaux depuis la creation jusqu'a la cloture.");
 addBullet("Gerer les stocks de poteaux, leurs mouvements, leurs affectations et leurs QR codes.");
 addBullet("Permettre au technicien terrain de saisir les poses avec GPS, photos et signature.");
 addBullet("Permettre au controleur et a l'admin de valider la conformite ou declarer une anomalie.");
 addBullet("Generer les rapports PDF et conserver une tracabilite audit/stock.");
+addBullet("Isoler strictement les donnees de chaque entreprise cliente avec le tenant_id.");
+addBullet("Activer seulement les modules utiles a chaque entreprise: workflow standard, production usine, ventes clients et finance.");
+
+addPage("Administration SaaS et entreprises clientes");
+addHeading("Compte plateforme");
+addBullet("Le compte platform@itc.local est reserve a l'equipe proprietaire du SaaS.");
+addBullet("Il gere les entreprises clientes, les abonnements, les quotas, les modules optionnels, la facturation, les alertes et les logs plateforme.");
+addBullet("Il ne doit pas etre confondu avec le compte super admin metier d'une entreprise.");
+
+addHeading("Creation d'une entreprise");
+[
+  "Le Super Admin SaaS ouvre Admin SaaS.",
+  "Il renseigne la societe: raison sociale, slug, secteur, pays, ville et logo.",
+  "Il renseigne l'admin client: prenom, nom, email professionnel et telephone.",
+  "Il choisit le plan, la facturation, l'essai et les quotas.",
+  "Il coche uniquement les modules dont l'entreprise a besoin: Production usine, Ventes clients et Finance.",
+  "Au submit, le tenant est cree, le compte admin de l'entreprise est genere et un email d'activation est place en file.",
+  "L'admin de cette entreprise se connecte ensuite et cree ses propres comptes utilisateurs."
+].forEach((text, index) => addNumber(index + 1, text));
+
+addHeading("Isolation multi-tenant");
+addBullet("Chaque entreprise possede ses propres utilisateurs, projets, poteaux, fiches, clients, ventes, OF et rapports.");
+addBullet("Un utilisateur d'une entreprise ne peut pas ouvrir l'interface ou les donnees d'une autre entreprise.");
+addBullet("Les routes sensibles controlent le role et le tenant_id avant chaque action.");
+addBullet("Une entreprise suspendue ne peut plus acceder a son espace tant qu'elle n'est pas reactivee.");
 
 addPage("Workflow general");
 addHeading("Flux principal");
@@ -88,6 +113,11 @@ addBullet("En implantation: poses en cours.");
 addBullet("Cloture demandee: le technicien a termine et demande validation finale.");
 addBullet("Cloture: validation finale effectuee par l'admin.");
 
+addHeading("Entreprise sans modules optionnels");
+addParagraph("Si le Super Admin SaaS ne coche pas Production usine, Ventes clients ou Finance pendant la creation de l'entreprise, celle-ci conserve le workflow standard: Depot et Stock, Projets, Operations terrain, Carte GPS, Controle qualite, Rapports PDF et Admin Utilisateurs.");
+addBullet("Les onglets Production usine, Ventes & Clients et Finance restent masques.");
+addBullet("Les API de ces modules repondent 403 si elles sont appelees directement.");
+
 addPage("Role Administrateur");
 addHeading("Responsabilites");
 addBullet("Creer les projets d'implantation.");
@@ -96,6 +126,7 @@ addBullet("Affecter les roles, depots et equipes.");
 addBullet("Consulter les projets, stocks, fiches, anomalies, audit et rapports.");
 addBullet("Valider la cloture des projets.");
 addBullet("Gerer les parametres application.");
+addBullet("Utiliser l'Assistant pour voir les priorites: retards, demandes stock, anomalies, clotures et photos finales manquantes.");
 
 addHeading("Guide d'utilisation admin");
 [
@@ -110,6 +141,7 @@ addHeading("Guide d'utilisation admin");
 
 addHeading("Onglets principaux admin");
 addBullet("Tableau de bord: indicateurs globaux.");
+addBullet("Assistant: recommandations contextuelles et actions rapides selon le role.");
 addBullet("Mon profil: informations du compte, photo et mot de passe.");
 addBullet("Projets: creation, modification, suppression hors projet cloture.");
 addBullet("Cloture projets: validation finale.");
@@ -118,6 +150,50 @@ addBullet("Carte GPS: positions des poteaux avec coordonnees valides.");
 addBullet("Rapports PDF: fiches et rapports projets.");
 addBullet("Admin Utilisateurs: creation et gestion des comptes.");
 addBullet("FAQ & Politiques: guide et regles.");
+
+addPage("Modules optionnels par entreprise");
+addHeading("Activation des modules");
+addParagraph("Les modules optionnels sont pilotes par le Super Admin SaaS depuis le tenant. Ils sont independants: une entreprise peut activer seulement Production, seulement Ventes, seulement Finance, ou les trois.");
+
+addHeading("Production usine");
+addBullet("Ajoute l'onglet Production usine.");
+addBullet("Permet de creer des Ordres de Fabrication pour poteaux beton ou metalliques.");
+addBullet("Genere automatiquement un matricule et un QR code par poteau produit.");
+addBullet("Suit les statuts: En fabrication, En cure/sechage, Controle Qualite Usine, En Stock Usine, Cloture.");
+addBullet("Role principal: chef_production. Les admins metier peuvent aussi y acceder.");
+
+addHeading("Ventes & Clients");
+addBullet("Ajoute l'onglet Ventes & Clients.");
+addBullet("Permet de creer le repertoire clients, les commandes et les bons de livraison.");
+addBullet("Les poteaux vendus passent au statut Vendu et restent tracables par QR code.");
+addBullet("Role principal: commercial.");
+
+addHeading("Finance");
+addBullet("Ajoute l'onglet Finance.");
+addBullet("Permet de consulter les bilans par periode, le chiffre d'affaires, le volume vendu et la marge nette.");
+addBullet("Role principal: direction_finance.");
+
+addPage("Workflow Production, Ventes et Finance");
+addHeading("Fabrication usine");
+[
+  "Le chef production cree un ordre de fabrication avec type, dimensions, classe, lot matiere, quantite et cout unitaire.",
+  "L'application cree les poteaux associes et genere les matricules/QR codes.",
+  "L'OF avance de En fabrication vers En cure/sechage, Controle Qualite Usine puis En Stock Usine.",
+  "Quand l'OF arrive en Stock Usine, les poteaux deviennent disponibles."
+].forEach((text, index) => addNumber(index + 1, text));
+
+addHeading("Vente et bon de livraison");
+[
+  "Le commercial cree ou selectionne un client.",
+  "Il selectionne un poteau disponible ou utilise le scan QR.",
+  "Il renseigne le prix unitaire et les conditions de paiement.",
+  "L'application cree la vente et le BL, puis marque le poteau comme Vendu.",
+  "La fiche de tracabilite affiche ensuite fabrication, controles, vente, client et statut terrain."
+].forEach((text, index) => addNumber(index + 1, text));
+
+addHeading("Reporting financier");
+addBullet("La direction finance filtre par aujourd'hui, semaine, mois ou plage de dates.");
+addBullet("Le bilan calcule total ventes, volume vendu, cout, marge nette, repartition beton/metallique et top clients.");
 
 addPage("Role Gestionnaire depot");
 addHeading("Responsabilites");
@@ -173,6 +249,8 @@ addBullet("Marquage constructeur.");
 addBullet("Levage et aplomb.");
 addBullet("Massif beton / calage.");
 addBullet("Apres implantation: photo obligatoire pour finaliser la fiche.");
+addBullet("Dans le rapport PDF de cloture projet, seule la derniere photo Apres implantation de chaque poteau est utilisee.");
+addBullet("Les autres photos restent conservees dans la fiche terrain mais ne sont pas reprises dans le rapport projet cloture.");
 
 addPage("Role Controleur qualite");
 addHeading("Responsabilites");
@@ -216,7 +294,14 @@ addPage("Rapports PDF, securite et bonnes pratiques");
 addHeading("Rapports PDF");
 addBullet("Les fiches PDF contiennent les informations de pose, GPS, photos, signatures et observations.");
 addBullet("Le rapport projet est disponible apres cloture validee par l'admin.");
+addBullet("Le rapport projet utilise uniquement la derniere photo Apres implantation par poteau.");
 addBullet("Le rapport peut etre telecharge ou imprime pour l'attachement.");
+
+addHeading("Assistant intelligent et navigation");
+addBullet("L'onglet Assistant analyse les donnees chargees et propose les priorites selon le role connecte.");
+addBullet("Il signale les demandes stock, retards planning, clotures, anomalies, photos finales manquantes, ventes et synchronisations en attente.");
+addBullet("La recherche globale comprend les codes poteaux, projets, equipes, clients et ventes.");
+addBullet("Le bouton Retour en haut de l'interface revient a la page precedente autorisee.");
 
 addHeading("Securite");
 addBullet("Les comptes sont crees par l'admin depuis Admin Utilisateurs.");

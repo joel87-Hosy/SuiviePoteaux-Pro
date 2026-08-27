@@ -6,7 +6,7 @@ endobj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
 endobj
 3 0 obj
-<< /Length 1122 >>
+<< /Length 1519 >>
 stream
 BT
 50 790 Td
@@ -17,13 +17,16 @@ BT
 (Ce document decrit le workflow complet de l'application SuiviPoteaux Pro et explique) Tj
 0 -14 Td
 /F1 10 Tf
-(l'utilisation de chaque compte selon son role. Il sert de guide operationnel pour les) Tj
+(l'utilisation de chaque compte selon son role. Il sert de guide operationnel pour) Tj
 0 -14 Td
 /F1 10 Tf
-(projets d'implantation, le stock, le terrain, le controle qualite, la carte GPS, les) Tj
+(l'administration SaaS, les entreprises clientes, les projets d'implantation, le stock, le) Tj
 0 -14 Td
 /F1 10 Tf
-(rapports PDF et la cloture.) Tj
+(terrain, le controle qualite, la carte GPS, les rapports PDF, les modules optionnels) Tj
+0 -14 Td
+/F1 10 Tf
+(usine/vente/finance et la cloture.) Tj
 0 -14 Td
 0 -7 Td
 /F2 14 Tf
@@ -44,17 +47,115 @@ BT
 /F1 10 Tf
 (- Generer les rapports PDF et conserver une tracabilite audit/stock.) Tj
 0 -14 Td
+/F1 10 Tf
+(- Isoler strictement les donnees de chaque entreprise cliente avec le tenant_id.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Activer seulement les modules utiles a chaque entreprise: workflow standard, production) Tj
+0 -14 Td
+/F1 10 Tf
+(  usine, ventes clients et finance.) Tj
+0 -14 Td
 ET
 BT /F1 8 Tf 50 32 Td
-(Page 1 / 8 - SuiviPoteaux Pro) Tj
+(Page 1 / 11 - SuiviPoteaux Pro) Tj
 ET
 endstream
 endobj
 4 0 obj
-<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
+<< /Type /Page /Parent 25 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R >>
 endobj
 5 0 obj
-<< /Length 1902 >>
+<< /Length 2078 >>
+stream
+BT
+50 790 Td
+/F2 18 Tf
+(Administration SaaS et entreprises clientes) Tj
+0 -36 Td
+/F2 14 Tf
+(Compte plateforme) Tj
+0 -26 Td
+/F1 10 Tf
+(- Le compte platform@itc.local est reserve a l'equipe proprietaire du SaaS.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Il gere les entreprises clientes, les abonnements, les quotas, les modules optionnels,) Tj
+0 -14 Td
+/F1 10 Tf
+(  la facturation, les alertes et les logs plateforme.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Il ne doit pas etre confondu avec le compte super admin metier d'une entreprise.) Tj
+0 -14 Td
+/F2 14 Tf
+(Creation d'une entreprise) Tj
+0 -26 Td
+/F1 10 Tf
+(1. Le Super Admin SaaS ouvre Admin SaaS.) Tj
+0 -14 Td
+/F1 10 Tf
+(2. Il renseigne la societe: raison sociale, slug, secteur, pays, ville et logo.) Tj
+0 -14 Td
+/F1 10 Tf
+(3. Il renseigne l'admin client: prenom, nom, email professionnel et telephone.) Tj
+0 -14 Td
+/F1 10 Tf
+(4. Il choisit le plan, la facturation, l'essai et les quotas.) Tj
+0 -14 Td
+/F1 10 Tf
+(5. Il coche uniquement les modules dont l'entreprise a besoin: Production usine, Ventes) Tj
+0 -14 Td
+/F1 10 Tf
+(   clients et Finance.) Tj
+0 -14 Td
+/F1 10 Tf
+(6. Au submit, le tenant est cree, le compte admin de l'entreprise est genere et un email) Tj
+0 -14 Td
+/F1 10 Tf
+(   d'activation est place en file.) Tj
+0 -14 Td
+/F1 10 Tf
+(7. L'admin de cette entreprise se connecte ensuite et cree ses propres comptes) Tj
+0 -14 Td
+/F1 10 Tf
+(   utilisateurs.) Tj
+0 -14 Td
+/F2 14 Tf
+(Isolation multi-tenant) Tj
+0 -26 Td
+/F1 10 Tf
+(- Chaque entreprise possede ses propres utilisateurs, projets, poteaux, fiches, clients,) Tj
+0 -14 Td
+/F1 10 Tf
+(  ventes, OF et rapports.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Un utilisateur d'une entreprise ne peut pas ouvrir l'interface ou les donnees d'une) Tj
+0 -14 Td
+/F1 10 Tf
+(  autre entreprise.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Les routes sensibles controlent le role et le tenant_id avant chaque action.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Une entreprise suspendue ne peut plus acceder a son espace tant qu'elle n'est pas) Tj
+0 -14 Td
+/F1 10 Tf
+(  reactivee.) Tj
+0 -14 Td
+ET
+BT /F1 8 Tf 50 32 Td
+(Page 2 / 11 - SuiviPoteaux Pro) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 25 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 2509 >>
 stream
 BT
 50 790 Td
@@ -130,17 +231,36 @@ BT
 /F1 10 Tf
 (- Cloture: validation finale effectuee par l'admin.) Tj
 0 -14 Td
+/F2 14 Tf
+(Entreprise sans modules optionnels) Tj
+0 -26 Td
+/F1 10 Tf
+(Si le Super Admin SaaS ne coche pas Production usine, Ventes clients ou Finance pendant la) Tj
+0 -14 Td
+/F1 10 Tf
+(creation de l'entreprise, celle-ci conserve le workflow standard: Depot et Stock, Projets,) Tj
+0 -14 Td
+/F1 10 Tf
+(Operations terrain, Carte GPS, Controle qualite, Rapports PDF et Admin Utilisateurs.) Tj
+0 -14 Td
+0 -7 Td
+/F1 10 Tf
+(- Les onglets Production usine, Ventes & Clients et Finance restent masques.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Les API de ces modules repondent 403 si elles sont appelees directement.) Tj
+0 -14 Td
 ET
 BT /F1 8 Tf 50 32 Td
-(Page 2 / 8 - SuiviPoteaux Pro) Tj
+(Page 3 / 11 - SuiviPoteaux Pro) Tj
 ET
 endstream
 endobj
-6 0 obj
-<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 5 0 R >>
+8 0 obj
+<< /Type /Page /Parent 25 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 7 0 R >>
 endobj
-7 0 obj
-<< /Length 2095 >>
+9 0 obj
+<< /Length 2370 >>
 stream
 BT
 50 790 Td
@@ -167,6 +287,12 @@ BT
 0 -14 Td
 /F1 10 Tf
 (- Gerer les parametres application.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Utiliser l'Assistant pour voir les priorites: retards, demandes stock, anomalies,) Tj
+0 -14 Td
+/F1 10 Tf
+(  clotures et photos finales manquantes.) Tj
 0 -14 Td
 /F2 14 Tf
 (Guide d'utilisation admin) Tj
@@ -202,6 +328,9 @@ BT
 (- Tableau de bord: indicateurs globaux.) Tj
 0 -14 Td
 /F1 10 Tf
+(- Assistant: recommandations contextuelles et actions rapides selon le role.) Tj
+0 -14 Td
+/F1 10 Tf
 (- Mon profil: informations du compte, photo et mot de passe.) Tj
 0 -14 Td
 /F1 10 Tf
@@ -227,15 +356,167 @@ BT
 0 -14 Td
 ET
 BT /F1 8 Tf 50 32 Td
-(Page 3 / 8 - SuiviPoteaux Pro) Tj
+(Page 4 / 11 - SuiviPoteaux Pro) Tj
 ET
 endstream
 endobj
-8 0 obj
-<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 7 0 R >>
+10 0 obj
+<< /Type /Page /Parent 25 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 9 0 R >>
 endobj
-9 0 obj
-<< /Length 1461 >>
+11 0 obj
+<< /Length 1677 >>
+stream
+BT
+50 790 Td
+/F2 18 Tf
+(Modules optionnels par entreprise) Tj
+0 -36 Td
+/F2 14 Tf
+(Activation des modules) Tj
+0 -26 Td
+/F1 10 Tf
+(Les modules optionnels sont pilotes par le Super Admin SaaS depuis le tenant. Ils sont) Tj
+0 -14 Td
+/F1 10 Tf
+(independants: une entreprise peut activer seulement Production, seulement Ventes, seulement) Tj
+0 -14 Td
+/F1 10 Tf
+(Finance, ou les trois.) Tj
+0 -14 Td
+0 -7 Td
+/F2 14 Tf
+(Production usine) Tj
+0 -26 Td
+/F1 10 Tf
+(- Ajoute l'onglet Production usine.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Permet de creer des Ordres de Fabrication pour poteaux beton ou metalliques.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Genere automatiquement un matricule et un QR code par poteau produit.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Suit les statuts: En fabrication, En cure/sechage, Controle Qualite Usine, En Stock) Tj
+0 -14 Td
+/F1 10 Tf
+(  Usine, Cloture.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Role principal: chef_production. Les admins metier peuvent aussi y acceder.) Tj
+0 -14 Td
+/F2 14 Tf
+(Ventes & Clients) Tj
+0 -26 Td
+/F1 10 Tf
+(- Ajoute l'onglet Ventes & Clients.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Permet de creer le repertoire clients, les commandes et les bons de livraison.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Les poteaux vendus passent au statut Vendu et restent tracables par QR code.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Role principal: commercial.) Tj
+0 -14 Td
+/F2 14 Tf
+(Finance) Tj
+0 -26 Td
+/F1 10 Tf
+(- Ajoute l'onglet Finance.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Permet de consulter les bilans par periode, le chiffre d'affaires, le volume vendu et la) Tj
+0 -14 Td
+/F1 10 Tf
+(  marge nette.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Role principal: direction_finance.) Tj
+0 -14 Td
+ET
+BT /F1 8 Tf 50 32 Td
+(Page 5 / 11 - SuiviPoteaux Pro) Tj
+ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 25 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 11 0 R >>
+endobj
+13 0 obj
+<< /Length 1558 >>
+stream
+BT
+50 790 Td
+/F2 18 Tf
+(Workflow Production, Ventes et Finance) Tj
+0 -36 Td
+/F2 14 Tf
+(Fabrication usine) Tj
+0 -26 Td
+/F1 10 Tf
+(1. Le chef production cree un ordre de fabrication avec type, dimensions, classe, lot) Tj
+0 -14 Td
+/F1 10 Tf
+(   matiere, quantite et cout unitaire.) Tj
+0 -14 Td
+/F1 10 Tf
+(2. L'application cree les poteaux associes et genere les matricules/QR codes.) Tj
+0 -14 Td
+/F1 10 Tf
+(3. L'OF avance de En fabrication vers En cure/sechage, Controle Qualite Usine puis En) Tj
+0 -14 Td
+/F1 10 Tf
+(   Stock Usine.) Tj
+0 -14 Td
+/F1 10 Tf
+(4. Quand l'OF arrive en Stock Usine, les poteaux deviennent disponibles.) Tj
+0 -14 Td
+/F2 14 Tf
+(Vente et bon de livraison) Tj
+0 -26 Td
+/F1 10 Tf
+(1. Le commercial cree ou selectionne un client.) Tj
+0 -14 Td
+/F1 10 Tf
+(2. Il selectionne un poteau disponible ou utilise le scan QR.) Tj
+0 -14 Td
+/F1 10 Tf
+(3. Il renseigne le prix unitaire et les conditions de paiement.) Tj
+0 -14 Td
+/F1 10 Tf
+(4. L'application cree la vente et le BL, puis marque le poteau comme Vendu.) Tj
+0 -14 Td
+/F1 10 Tf
+(5. La fiche de tracabilite affiche ensuite fabrication, controles, vente, client et) Tj
+0 -14 Td
+/F1 10 Tf
+(   statut terrain.) Tj
+0 -14 Td
+/F2 14 Tf
+(Reporting financier) Tj
+0 -26 Td
+/F1 10 Tf
+(- La direction finance filtre par aujourd'hui, semaine, mois ou plage de dates.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Le bilan calcule total ventes, volume vendu, cout, marge nette, repartition) Tj
+0 -14 Td
+/F1 10 Tf
+(  beton/metallique et top clients.) Tj
+0 -14 Td
+ET
+BT /F1 8 Tf 50 32 Td
+(Page 6 / 11 - SuiviPoteaux Pro) Tj
+ET
+endstream
+endobj
+14 0 obj
+<< /Type /Page /Parent 25 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 13 0 R >>
+endobj
+15 0 obj
+<< /Length 1462 >>
 stream
 BT
 50 790 Td
@@ -301,15 +582,15 @@ BT
 0 -14 Td
 ET
 BT /F1 8 Tf 50 32 Td
-(Page 4 / 8 - SuiviPoteaux Pro) Tj
+(Page 7 / 11 - SuiviPoteaux Pro) Tj
 ET
 endstream
 endobj
-10 0 obj
-<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 9 0 R >>
+16 0 obj
+<< /Type /Page /Parent 25 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 15 0 R >>
 endobj
-11 0 obj
-<< /Length 1820 >>
+17 0 obj
+<< /Length 2155 >>
 stream
 BT
 50 790 Td
@@ -391,17 +672,29 @@ BT
 /F1 10 Tf
 (- Apres implantation: photo obligatoire pour finaliser la fiche.) Tj
 0 -14 Td
+/F1 10 Tf
+(- Dans le rapport PDF de cloture projet, seule la derniere photo Apres implantation de) Tj
+0 -14 Td
+/F1 10 Tf
+(  chaque poteau est utilisee.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Les autres photos restent conservees dans la fiche terrain mais ne sont pas reprises) Tj
+0 -14 Td
+/F1 10 Tf
+(  dans le rapport projet cloture.) Tj
+0 -14 Td
 ET
 BT /F1 8 Tf 50 32 Td
-(Page 5 / 8 - SuiviPoteaux Pro) Tj
+(Page 8 / 11 - SuiviPoteaux Pro) Tj
 ET
 endstream
 endobj
-12 0 obj
-<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 11 0 R >>
+18 0 obj
+<< /Type /Page /Parent 25 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 17 0 R >>
 endobj
-13 0 obj
-<< /Length 1122 >>
+19 0 obj
+<< /Length 1123 >>
 stream
 BT
 50 790 Td
@@ -452,15 +745,15 @@ BT
 0 -14 Td
 ET
 BT /F1 8 Tf 50 32 Td
-(Page 6 / 8 - SuiviPoteaux Pro) Tj
+(Page 9 / 11 - SuiviPoteaux Pro) Tj
 ET
 endstream
 endobj
-14 0 obj
-<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 13 0 R >>
+20 0 obj
+<< /Type /Page /Parent 25 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 19 0 R >>
 endobj
-15 0 obj
-<< /Length 1268 >>
+21 0 obj
+<< /Length 1270 >>
 stream
 BT
 50 790 Td
@@ -520,15 +813,15 @@ BT
 0 -14 Td
 ET
 BT /F1 8 Tf 50 32 Td
-(Page 7 / 8 - SuiviPoteaux Pro) Tj
+(Page 10 / 11 - SuiviPoteaux Pro) Tj
 ET
 endstream
 endobj
-16 0 obj
-<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 15 0 R >>
+22 0 obj
+<< /Type /Page /Parent 25 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 21 0 R >>
 endobj
-17 0 obj
-<< /Length 1409 >>
+23 0 obj
+<< /Length 2138 >>
 stream
 BT
 50 790 Td
@@ -548,7 +841,31 @@ BT
 (- Le rapport projet est disponible apres cloture validee par l'admin.) Tj
 0 -14 Td
 /F1 10 Tf
+(- Le rapport projet utilise uniquement la derniere photo Apres implantation par poteau.) Tj
+0 -14 Td
+/F1 10 Tf
 (- Le rapport peut etre telecharge ou imprime pour l'attachement.) Tj
+0 -14 Td
+/F2 14 Tf
+(Assistant intelligent et navigation) Tj
+0 -26 Td
+/F1 10 Tf
+(- L'onglet Assistant analyse les donnees chargees et propose les priorites selon le role) Tj
+0 -14 Td
+/F1 10 Tf
+(  connecte.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Il signale les demandes stock, retards planning, clotures, anomalies, photos finales) Tj
+0 -14 Td
+/F1 10 Tf
+(  manquantes, ventes et synchronisations en attente.) Tj
+0 -14 Td
+/F1 10 Tf
+(- La recherche globale comprend les codes poteaux, projets, equipes, clients et ventes.) Tj
+0 -14 Td
+/F1 10 Tf
+(- Le bouton Retour en haut de l'interface revient a la page precedente autorisee.) Tj
 0 -14 Td
 /F2 14 Tf
 (Securite) Tj
@@ -588,44 +905,50 @@ BT
 0 -14 Td
 ET
 BT /F1 8 Tf 50 32 Td
-(Page 8 / 8 - SuiviPoteaux Pro) Tj
+(Page 11 / 11 - SuiviPoteaux Pro) Tj
 ET
 endstream
 endobj
-18 0 obj
-<< /Type /Page /Parent 19 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 17 0 R >>
+24 0 obj
+<< /Type /Page /Parent 25 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 23 0 R >>
 endobj
-19 0 obj
-<< /Type /Pages /Kids [4 0 R 6 0 R 8 0 R 10 0 R 12 0 R 14 0 R 16 0 R 18 0 R] /Count 8 >>
+25 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R 8 0 R 10 0 R 12 0 R 14 0 R 16 0 R 18 0 R 20 0 R 22 0 R 24 0 R] /Count 11 >>
 endobj
-20 0 obj
-<< /Type /Catalog /Pages 19 0 R >>
+26 0 obj
+<< /Type /Catalog /Pages 25 0 R >>
 endobj
 xref
-0 21
+0 27
 0000000000 65535 f 
 0000000009 00000 n 
 0000000079 00000 n 
 0000000154 00000 n 
-0000001328 00000 n 
-0000001465 00000 n 
-0000003419 00000 n 
-0000003556 00000 n 
-0000005703 00000 n 
-0000005840 00000 n 
-0000007353 00000 n 
-0000007491 00000 n 
-0000009364 00000 n 
-0000009503 00000 n 
-0000010678 00000 n 
-0000010817 00000 n 
-0000012138 00000 n 
-0000012277 00000 n 
-0000013739 00000 n 
-0000013878 00000 n 
-0000013983 00000 n 
+0000001725 00000 n 
+0000001862 00000 n 
+0000003992 00000 n 
+0000004129 00000 n 
+0000006690 00000 n 
+0000006827 00000 n 
+0000009249 00000 n 
+0000009387 00000 n 
+0000011117 00000 n 
+0000011256 00000 n 
+0000012867 00000 n 
+0000013006 00000 n 
+0000014521 00000 n 
+0000014660 00000 n 
+0000016868 00000 n 
+0000017007 00000 n 
+0000018183 00000 n 
+0000018322 00000 n 
+0000019645 00000 n 
+0000019784 00000 n 
+0000021975 00000 n 
+0000022114 00000 n 
+0000022241 00000 n 
 trailer
-<< /Size 21 /Root 20 0 R >>
+<< /Size 27 /Root 26 0 R >>
 startxref
-14034
+22292
 %%EOF
