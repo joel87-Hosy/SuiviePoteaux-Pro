@@ -932,6 +932,39 @@
       gap: 10px;
     }
 
+    .report-project-group {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--panel-soft) 58%, transparent);
+    }
+
+    .report-project-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .report-team-group {
+      display: grid;
+      gap: 8px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+
+    .report-team-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
     .report-row {
       display: flex;
       align-items: center;
@@ -941,6 +974,75 @@
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--panel);
+    }
+
+    .report-row.open {
+      align-items: flex-start;
+      border-color: color-mix(in srgb, var(--primary) 34%, var(--line));
+      box-shadow: 0 14px 34px rgba(15, 118, 110, .10);
+    }
+
+    .report-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .control-preview {
+      display: grid;
+      grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr);
+      gap: 14px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .control-photo {
+      min-height: 220px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-soft);
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .control-photo img {
+      width: 100%;
+      height: 100%;
+      max-height: 320px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .control-facts {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .control-fact {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--panel-soft) 62%, transparent);
+    }
+
+    .control-fact span {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .control-fact strong {
+      overflow-wrap: anywhere;
+      font-size: 13px;
     }
 
     .drawer {
@@ -1358,6 +1460,9 @@
       .topbar { align-items: flex-start; flex-direction: column; }
       .toolbar { justify-content: flex-start; width: 100%; }
       .content-grid, .stats, .filters, .form-grid, .photo-grid { grid-template-columns: 1fr; }
+      .report-project-head, .report-team-head { align-items: flex-start; flex-direction: column; }
+      .report-row { align-items: stretch; flex-direction: column; }
+      .control-preview, .control-facts { grid-template-columns: 1fr; }
       .drawer-panel { padding: 14px; }
       table { min-width: 680px; }
       #map { height: calc(100vh - 230px); min-height: 440px; }
@@ -2021,6 +2126,7 @@
     let apiUser = null;
     let apiPermissions = [];
     let viewHistory = [];
+    let selectedReportId = "";
     let platformState = {
       overview: null,
       tenants: [],
@@ -2361,7 +2467,7 @@
 
     function statusClass(status) {
       if (status === "Valide" || status === "Cloture") return "ok";
-      if (status === "Anomalie") return "danger";
+      if (status === "Anomalie" || status === "Correction demandee") return "danger";
       if (status.includes("attente") || status === "En Transit" || status === "Cloture demandee") return "warn";
       return "info";
     }
@@ -3175,6 +3281,7 @@
       const lateProjects = state.projects.filter(project => projectTiming(project).badge === "danger" && project.status !== "Cloture");
       const finalPhotoMissing = state.interventions.filter(item => !item.draft && !(item.photos || []).some(photo => /apres implantation/i.test(photo.step || "")));
       const assignedToMe = terrainAssignablePoles();
+      const correctionsToHandle = correctionRequestsForCurrentTerrain();
       const modules = appModules();
 
       if (isPlatformRole()) {
@@ -3192,6 +3299,10 @@
       if ((can("validate") || can("admin")) && anomalies.length) insights.push({ id: "anomalies", severity: "danger", title: "Anomalies ouvertes", message: `${anomalies.length} anomalie(s) doivent etre corrigees ou justifiees.`, view: "reports", actionLabel: "Voir" });
       if ((can("write_intervention") || can("admin")) && lateProjects.length) insights.push({ id: "late-projects", severity: "danger", title: "Planning en retard", message: `${lateProjects.length} projet(s) depassent leur date de fin prevue.`, view: "projects", actionLabel: "Prioriser" });
       if (can("write_intervention") && assignedToMe.length) insights.push({ id: "assigned-poles", severity: "info", title: "Poteaux a poser", message: `${assignedToMe.length} poteau(x) sont attribues a votre equipe.`, action: "openField", actionLabel: "Nouvelle fiche" });
+      if (can("write_intervention") && correctionsToHandle.length) {
+        const actions = [...new Set(correctionsToHandle.map(item => item.anomalyAction || "Reprendre implantation"))].join(", ");
+        insights.unshift({ id: "correction-demanded", severity: "danger", title: "Correction demandee", message: `${correctionsToHandle.length} poteau(x) rejetes par le controleur: ${actions}.`, view: "field", actionLabel: "Corriger" });
+      }
       if (can("admin") && finalPhotoMissing.length) insights.push({ id: "missing-final-photo", severity: "warn", title: "Photos finales manquantes", message: `${finalPhotoMissing.length} fiche(s) n'ont pas de photo Apres implantation pour le rapport de cloture.`, view: "reports", actionLabel: "Verifier" });
       if (modules.production && can("production") && !(state.productionOrders || []).length) insights.push({ id: "first-of", severity: "info", title: "Production prete", message: "Le module usine est actif. Creez le premier ordre de fabrication pour generer matricules et QR.", view: "production", actionLabel: "Creer OF" });
       if (modules.sales && can("sales") && !(state.clients || []).length) insights.push({ id: "first-client", severity: "info", title: "CRM a initialiser", message: "Ajoutez vos premiers clients avant de creer les ventes et bons de livraison.", view: "sales", actionLabel: "Ajouter" });
@@ -3481,10 +3592,15 @@
       const pendingStock = state.projects.filter(project => project.requestStatus === "En attente gestionnaire");
       const closing = state.projects.filter(project => project.status === "Cloture demandee");
       const anomalies = state.interventions.filter(item => item.validation === "Anomalie" || item.anomalyStatus);
+      const corrections = correctionRequestsForCurrentTerrain();
       const lateProjects = state.projects.filter(project => projectTiming(project).badge === "danger" && project.status !== "Cloture");
       if (can("write_stock") && pendingStock.length) notices.push(["Demande stock", `${pendingStock.length} projet(s) attendent une validation magasinier`, "warn"]);
       if (can("admin") && closing.length) notices.push(["Cloture", `${closing.length} projet(s) sont a valider`, "warn"]);
       if ((can("validate") || can("admin")) && anomalies.length) notices.push(["Anomalies", `${anomalies.length} anomalie(s) a traiter`, "danger"]);
+      if (can("write_intervention") && corrections.length) {
+        const actions = [...new Set(corrections.map(item => item.anomalyAction || "Reprendre implantation"))].join(", ");
+        notices.push(["Correction demandee", `${corrections.length} poteau(x): ${actions}`, "danger"]);
+      }
       if ((can("write_intervention") || can("admin")) && lateProjects.length) notices.push(["Planning", `${lateProjects.length} projet(s) en retard`, "danger"]);
       if (state.offlineQueue?.length) notices.push(["Synchronisation", `${state.offlineQueue.length} operation(s) hors ligne`, "info"]);
       return notices;
@@ -3585,9 +3701,13 @@
     }
 
     function projectValidationStats(project) {
-      const interventions = projectInterventions(project);
+      const latestByPole = new Map();
+      projectInterventions(project)
+        .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0))
+        .forEach(item => latestByPole.set(item.poleId, item));
+      const interventions = Array.from(latestByPole.values());
       const valid = interventions.filter(item => item.validation === "Valide").length;
-      const anomalies = interventions.filter(item => item.validation === "Anomalie").length;
+      const anomalies = interventions.filter(item => item.validation === "Anomalie" && item.anomalyStatus !== "Corrigee").length;
       const pending = Math.max(0, interventions.length - valid - anomalies);
       return { interventions, valid, anomalies, pending };
     }
@@ -3915,11 +4035,107 @@
 
     function terrainAssignablePoles() {
       return state.poles.filter(p => {
-        if (p.status !== "En Transit" || !isPoleAssignedToCurrentTerrain(p)) return false;
+        if (!["En Transit", "Correction demandee"].includes(p.status) || !isPoleAssignedToCurrentTerrain(p)) return false;
         if (!p.projectId) return true;
         const project = state.projects.find(item => item.id === p.projectId);
         return project && ["Pris en main", "En implantation"].includes(project.status);
       });
+    }
+
+    function correctionRequestsForCurrentTerrain() {
+      const team = currentTerrainTeam();
+      return state.interventions
+        .filter(item => item.validation === "Anomalie" && item.anomalyStatus === "Correction demandee")
+        .filter(item => {
+          const pole = state.poles.find(candidate => candidate.id === item.poleId);
+          return !isFieldRole(apiUser) || String(pole?.assignedTeam || item.agent || "").trim() === team;
+        })
+        .sort((a, b) => new Date(b.validatedAt || b.date || 0) - new Date(a.validatedAt || a.date || 0));
+    }
+
+    function markCorrectionResolvedLocal(intervention) {
+      if (!intervention?.poleId || intervention.draft) return;
+      state.interventions
+        .filter(item => item.poleId === intervention.poleId && item.validation === "Anomalie" && item.anomalyStatus === "Correction demandee")
+        .forEach(item => {
+          item.anomalyStatus = "Corrigee";
+          item.correctedAt = intervention.date;
+          item.correctionReportId = intervention.id;
+        });
+    }
+
+    function finalImplantationPhoto(intervention) {
+      return (intervention?.photos || [])
+        .filter(item => /apres implantation/i.test(item.step || ""))
+        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0] || null;
+    }
+
+    function toggleReportDetails(reportId) {
+      selectedReportId = selectedReportId === reportId ? "" : reportId;
+      renderReports();
+    }
+
+    function reportControlDetails(intervention, pole) {
+      const project = state.projects.find(item => item.id === intervention.projectId) || {};
+      const photo = finalImplantationPhoto(intervention);
+      const photoMarkup = photo?.url || photo?.data
+        ? `<img src="${escapeAttr(photo.url || photo.data)}" alt="Photo finale apres implantation du poteau ${escapeAttr(intervention.poleId)}">`
+        : `<div>Aucune photo finale<br>Apres implantation</div>`;
+      return `
+        <div class="control-preview">
+          <div class="control-photo">${photoMarkup}</div>
+          <div>
+            <div class="control-facts">
+              <div class="control-fact"><span>Poteau</span><strong>${escapeHtml(intervention.poleId)}</strong></div>
+              <div class="control-fact"><span>Projet</span><strong>${escapeHtml(project.name || intervention.projectId || "N/A")}</strong></div>
+              <div class="control-fact"><span>Equipe</span><strong>${escapeHtml(pole.assignedTeam || intervention.agent || project.assignedTeam || "N/A")}</strong></div>
+              <div class="control-fact"><span>Date pose</span><strong>${formatDate(intervention.date)}</strong></div>
+              <div class="control-fact"><span>GPS</span><strong>${escapeHtml(`${intervention.lat || "N/A"}, ${intervention.lng || "N/A"}`)}</strong></div>
+              <div class="control-fact"><span>Sol / Profondeur</span><strong>${escapeHtml(`${intervention.soil || "N/A"} / ${intervention.depth || "N/A"} m`)}</strong></div>
+              <div class="control-fact"><span>Signature equipe</span><strong>${escapeHtml(intervention.teamSignature || "N/A")}</strong></div>
+              <div class="control-fact"><span>Statut</span><strong>${escapeHtml(intervention.validation || "N/A")}</strong></div>
+            </div>
+            <p class="muted" style="margin:12px 0 0">${escapeHtml(intervention.notes || "Aucune note terrain renseignee.")}</p>
+            ${intervention.anomalyReason ? `<p style="margin:10px 0 0"><span class="badge danger">${escapeHtml(intervention.anomalyAction || "Correction demandee")}</span> ${escapeHtml(intervention.anomalyReason)}</p>` : ""}
+            ${can("validate") ? `
+              <div class="toolbar" style="margin-top:12px">
+                ${intervention.validation !== "Valide" ? `<button class="btn primary" type="button" onclick="validateReport('${escapeAttr(intervention.id)}', 'Valide')">Valider conforme</button>` : ""}
+                ${intervention.validation !== "Anomalie" ? `
+                  <button class="btn" type="button" onclick="rejectReport('${escapeAttr(intervention.id)}', 'Reprendre implantation')">Reprendre implantation</button>
+                  <button class="btn" type="button" onclick="rejectReport('${escapeAttr(intervention.id)}', 'Changer poteau')">Changer poteau</button>
+                ` : ""}
+              </div>
+            ` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    function visibleReportInterventions() {
+      const team = currentTerrainTeam();
+      return state.interventions
+        .filter(item => !item.draft)
+        .filter(item => {
+          if (!isFieldRole(apiUser)) return true;
+          const pole = state.poles.find(candidate => candidate.id === item.poleId) || {};
+          return String(pole.assignedTeam || item.agent || "").trim() === team;
+        })
+        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    }
+
+    function reportGroupsByProjectAndTeam() {
+      const projectMap = new Map();
+      visibleReportInterventions().forEach(intervention => {
+        const pole = state.poles.find(item => item.id === intervention.poleId) || {};
+        const project = state.projects.find(item => item.id === intervention.projectId) || { id: intervention.projectId || "Sans projet", name: intervention.projectId || "Sans projet" };
+        const projectKey = project.id || intervention.projectId || "Sans projet";
+        const teamKey = pole.assignedTeam || intervention.agent || project.assignedTeam || "Equipe non renseignee";
+        if (!projectMap.has(projectKey)) projectMap.set(projectKey, { project, teams: new Map() });
+        const group = projectMap.get(projectKey);
+        if (!group.teams.has(teamKey)) group.teams.set(teamKey, []);
+        group.teams.get(teamKey).push({ intervention, pole });
+      });
+      return Array.from(projectMap.values());
     }
 
     function projectRequirementsSummary(project) {
@@ -4453,9 +4669,40 @@
         return;
       }
       const pending = terrainAssignablePoles();
+      const corrections = correctionRequestsForCurrentTerrain();
       const projects = terrainProjects();
       $("#fieldView").innerHTML = `
         <div class="grid content-grid">
+          ${corrections.length ? `
+            <div class="card" style="grid-column:1 / -1">
+              <div class="section-head">
+                <h3>Corrections demandees</h3>
+                <span class="badge danger">${corrections.length} notification(s)</span>
+              </div>
+              <div class="section-body">
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Poteau</th><th>Projet</th><th>Motif controleur</th><th>Date rejet</th><th>Action</th></tr></thead>
+                    <tbody>
+                      ${corrections.map(item => {
+                        const pole = state.poles.find(candidate => candidate.id === item.poleId) || {};
+                        const project = state.projects.find(candidate => candidate.id === item.projectId) || {};
+                        return `
+                          <tr>
+                            <td><strong>${escapeHtml(item.poleId)}</strong><br><span class="badge danger">Correction demandee</span></td>
+                            <td>${escapeHtml(project.name || item.projectId || "N/A")}<br><span class="muted">${escapeHtml(project.zone || "")}</span></td>
+                            <td><span class="badge danger">${escapeHtml(item.anomalyAction || "Reprendre implantation")}</span><br>${escapeHtml(item.anomalyReason || item.notes || "Motif non renseigne")}</td>
+                            <td>${formatDate(item.validatedAt || item.date)}</td>
+                            <td><button class="btn primary" type="button" onclick="openDrawer('${escapeAttr(pole.id || item.poleId)}')">Reprendre</button></td>
+                          </tr>
+                        `;
+                      }).join("")}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ` : ""}
           <div class="card">
             <div class="section-head">
               <h3>Projets terrain</h3>
@@ -4684,6 +4931,7 @@
     function renderReports() {
       const canCreateReport = can("write_intervention");
       const closedProjects = state.projects.filter(project => project.status === "Cloture");
+      const reportGroups = reportGroupsByProjectAndTeam();
       $("#reportsView").innerHTML = `
         ${can("admin") ? `
           <div class="card" style="margin-bottom:16px">
@@ -4717,23 +4965,44 @@
             </div>
           </div>
           <div class="section-body report-list">
-            ${state.interventions.slice().reverse().map(it => {
-              const pole = state.poles.find(p => p.id === it.poleId) || {};
-              return `
-                <div class="report-row">
+            ${reportGroups.map(group => `
+              <div class="report-project-group">
+                <div class="report-project-head">
                   <div>
-                    <strong>${it.id} - ${it.poleId}</strong>
-                    <p class="muted" style="margin:4px 0 0">${formatDate(it.date)} - ${pole.type || ""} - ${it.validation}</p>
+                    <strong>${escapeHtml(group.project.name || group.project.id || "Sans projet")}</strong>
+                    <p class="muted" style="margin:4px 0 0">${escapeHtml(group.project.zone || "Zone non renseignee")} - ${escapeHtml(group.project.client || "Client non renseigne")}</p>
                   </div>
-                  <div class="toolbar">
-                    <span class="badge ${statusClass(it.validation.replace("Pose - En attente validation", "Pose - En attente validation"))}">${it.photos.length}/5 photos</span>
-                    ${can("validate") && it.validation !== "Valide" ? `<button class="btn primary" type="button" onclick="validateReport('${it.id}', 'Valide')">Valider</button>` : ""}
-                    ${can("validate") && it.validation !== "Anomalie" ? `<button class="btn" type="button" onclick="validateReport('${it.id}', 'Anomalie')">Non conforme</button>` : ""}
-                    <button class="btn" type="button" onclick="generatePdf('${it.id}')">${icon("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3")} PDF</button>
-                  </div>
+                  <span class="badge info">${Array.from(group.teams.values()).reduce((sum, items) => sum + items.length, 0)} fiche(s)</span>
                 </div>
-              `;
-            }).join("") || `<div class="empty">Aucun rapport disponible.</div>`}
+                ${Array.from(group.teams.entries()).map(([team, items]) => `
+                  <div class="report-team-group">
+                    <div class="report-team-head">
+                      <span>${escapeHtml(team)}</span>
+                      <span>${items.length} fiche(s) - ${items.filter(row => row.intervention.validation === "Anomalie").length} anomalie(s)</span>
+                    </div>
+                    ${items.map(({ intervention: it, pole }) => {
+                      const isOpen = selectedReportId === it.id;
+                      const photoCount = (it.photos || []).length;
+                      const actionLabel = it.anomalyAction ? ` - ${it.anomalyAction}` : "";
+                      return `
+                        <div class="report-row ${isOpen ? "open" : ""}">
+                          <div class="report-main">
+                            <strong>${escapeHtml(it.id)} - ${escapeHtml(it.poleId)}</strong>
+                            <p class="muted" style="margin:4px 0 0">${formatDate(it.date)} - ${escapeHtml(pole.type || "")} - ${escapeHtml(it.validation || "N/A")}${escapeHtml(actionLabel)}</p>
+                            ${isOpen ? reportControlDetails(it, pole) : ""}
+                          </div>
+                          <div class="toolbar">
+                            <span class="badge ${statusClass((it.validation || "").replace("Pose - En attente validation", "Pose - En attente validation"))}">${photoCount}/5 photos</span>
+                            <button class="btn primary" type="button" onclick="toggleReportDetails('${escapeAttr(it.id)}')">${isOpen ? "Masquer" : "Details / controler"}</button>
+                            <button class="btn" type="button" onclick="generatePdf('${escapeAttr(it.id)}')">${icon("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3")} PDF</button>
+                          </div>
+                        </div>
+                      `;
+                    }).join("")}
+                  </div>
+                `).join("")}
+              </div>
+            `).join("") || `<div class="empty">Aucun rapport disponible.</div>`}
           </div>
         </div>
       `;
@@ -5267,6 +5536,11 @@
       if (poleId) $("#poleId").value = poleId;
       const pole = state.poles.find(item => item.id === $("#poleId").value);
       if (pole?.projectId) $("#project").value = pole.projectId;
+      const correction = correctionRequestsForCurrentTerrain().find(item => item.poleId === pole?.id);
+      if (correction) {
+        $("#notes").value = `${correction.anomalyAction || "Correction demandee"}: ${correction.anomalyReason || correction.notes || "Motif non renseigne"}`;
+        toast("Correction chargee avec le motif du controleur");
+      }
       fillFallbackGps();
       initSignaturePad();
     }
@@ -5939,7 +6213,7 @@
           method: "POST",
           body: JSON.stringify(intervention)
         });
-        state.interventions.push(payload.intervention);
+        state.interventions = payload.interventions || [...state.interventions, payload.intervention];
         state.poles = payload.poles;
         if (payload.projects) state.projects = payload.projects;
         saveState();
@@ -5949,6 +6223,7 @@
         toast(isDraft ? "Brouillon enregistre" : "Fiche de pose enregistree");
       } catch (error) {
         console.info("Fiche conservee offline:", error.message);
+        markCorrectionResolvedLocal(intervention);
         state.interventions.push(intervention);
         const pole = state.poles.find(p => p.id === poleId);
         if (pole) {
@@ -6301,25 +6576,34 @@
       doc.save(`${intervention.id}-${intervention.poleId}.pdf`);
     }
 
-    async function validateReport(reportId, validation) {
+    async function validateReport(reportId, validation, providedReason = "", providedAction = "") {
       if (!can("validate")) return toast("Permission validation requise");
       const clientSignature = apiUser?.name || "Controle Qualite";
-      const anomalyReason = validation === "Anomalie" ? prompt("Motif de l'anomalie ?") : "";
+      const anomalyReason = validation === "Anomalie" ? (providedReason || prompt("Motif de l'anomalie ?")) : "";
+      const anomalyAction = validation === "Anomalie" ? (providedAction || "Reprendre implantation") : "";
+      if (validation === "Anomalie" && !String(anomalyReason || "").trim()) return toast("Motif obligatoire pour notifier le technicien");
       try {
         await ensureApiSession();
         const payload = await apiFetch(`/interventions/${encodeURIComponent(reportId)}/validate`, {
           method: "PATCH",
-          body: JSON.stringify({ validation, clientSignature, anomalyReason })
+          body: JSON.stringify({ validation, clientSignature, anomalyReason, anomalyAction })
         });
         state.interventions = state.interventions.map(item => item.id === reportId ? payload.intervention : item);
         state.poles = payload.poles;
+        if (payload.projects) state.projects = payload.projects;
         saveState();
         renderCurrentView();
         if (state.activeView === "map") renderMap();
-        toast(validation === "Valide" ? "Rapport valide" : "Rapport marque non conforme");
+        toast(validation === "Valide" ? "Rapport valide" : "Correction demandee au technicien");
       } catch (error) {
         toast(error.message || "Validation impossible");
       }
+    }
+
+    function rejectReport(reportId, anomalyAction) {
+      const reason = prompt(`Motif pour notifier le technicien - ${anomalyAction} ?`);
+      if (!String(reason || "").trim()) return toast("Motif obligatoire pour notifier le technicien");
+      validateReport(reportId, "Anomalie", reason, anomalyAction);
     }
 
     async function updateAnomaly(reportId) {
@@ -6332,6 +6616,10 @@
       intervention.anomalyReason = reason || "";
       if (status === "Corrigee") intervention.validation = "Pose - En attente validation";
       const pole = state.poles.find(item => item.id === intervention.poleId);
+      if (pole && status === "Correction demandee") {
+        pole.status = "Correction demandee";
+        pole.depot = pole.assignedTeam ? `Terrain - ${pole.assignedTeam}` : pole.depot;
+      }
       if (pole && status === "Corrigee") pole.status = "Pose - En attente validation";
       saveState();
       try {
@@ -6645,7 +6933,9 @@
     window.removeProjectRequirement = removeProjectRequirement;
     window.generateProjectPdf = generateProjectPdf;
     window.generatePdf = generatePdf;
+    window.toggleReportDetails = toggleReportDetails;
     window.validateReport = validateReport;
+    window.rejectReport = rejectReport;
     window.refreshUsers = refreshUsers;
     window.createUserAdmin = createUserAdmin;
     window.saveUserAdmin = saveUserAdmin;

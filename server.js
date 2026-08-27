@@ -335,6 +335,9 @@ async function readSupabaseDb() {
       validatedAt: row.validated_at,
       anomalyReason: row.anomaly_reason || "",
       anomalyStatus: row.anomaly_status || "",
+      anomalyAction: row.anomaly_action || "",
+      correctedAt: row.corrected_at || "",
+      correctionReportId: row.correction_report_id || "",
       draft: row.draft,
       photos: photos
         .filter(photo => photo.intervention_id === row.id)
@@ -594,6 +597,9 @@ async function writeSupabaseDb(db) {
       validated_at: row.validatedAt || null,
       anomaly_reason: row.anomalyReason || null,
       anomaly_status: row.anomalyStatus || null,
+      anomaly_action: row.anomalyAction || null,
+      corrected_at: row.correctedAt || null,
+      correction_report_id: row.correctionReportId || null,
       draft: Boolean(row.draft)
     }))),
     upsertTable("stock_movements", (db.stockMovements || []).map(row => ({
@@ -1169,9 +1175,13 @@ function projectDone(db, projectId) {
 }
 
 function projectValidationStats(db, projectId) {
-  const interventions = projectInterventions(db, projectId);
+  const latestByPole = new Map();
+  for (const intervention of projectInterventions(db, projectId).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0))) {
+    latestByPole.set(intervention.poleId, intervention);
+  }
+  const interventions = Array.from(latestByPole.values());
   const valid = interventions.filter(item => item.validation === "Valide").length;
-  const anomalies = interventions.filter(item => item.validation === "Anomalie").length;
+  const anomalies = interventions.filter(item => item.validation === "Anomalie" && item.anomalyStatus !== "Corrigee").length;
   const pending = Math.max(0, interventions.length - valid - anomalies);
   return { interventions, valid, anomalies, pending };
 }
@@ -2629,7 +2639,7 @@ async function handleApi(req, res, url) {
     const pole = db.poles.find(item => item.id === body.poleId);
     if (!pole) return sendError(res, 404, "Poteau introuvable");
     if (!tenantMatches(actor, pole)) return sendError(res, 403, "Tenant non autorise");
-    if (isFieldAgent(actor) && (pole.status !== "En Transit" || pole.assignedTeam !== terrainTeamOf(actor))) {
+    if (isFieldAgent(actor) && (!["En Transit", "Correction demandee"].includes(pole.status) || pole.assignedTeam !== terrainTeamOf(actor))) {
       return sendError(res, 403, "Ce poteau n'est pas attribue a votre equipe terrain");
     }
     const id = body.id && !db.interventions.some(item => item.id === body.id) ? body.id : nextReportId(db);
@@ -2654,6 +2664,15 @@ async function handleApi(req, res, url) {
       photos,
       draft: Boolean(body.draft)
     };
+    if (!intervention.draft) {
+      db.interventions
+        .filter(item => item.poleId === intervention.poleId && item.validation === "Anomalie" && item.anomalyStatus === "Correction demandee")
+        .forEach(item => {
+          item.anomalyStatus = "Corrigee";
+          item.correctedAt = intervention.date;
+          item.correctionReportId = intervention.id;
+        });
+    }
     db.interventions.push(intervention);
     if (pole) {
       const fromDepot = pole.depot;
@@ -2684,14 +2703,22 @@ async function handleApi(req, res, url) {
     intervention.validatedAt = new Date().toISOString();
     if (intervention.validation === "Anomalie") {
       intervention.anomalyReason = body.anomalyReason || intervention.notes || "";
-      intervention.anomalyStatus = "Ouverte";
+      intervention.anomalyAction = body.anomalyAction || "Reprendre implantation";
+      intervention.anomalyStatus = "Correction demandee";
     }
     const pole = scopedRecords(actor, db.poles).find(item => item.id === intervention.poleId);
     if (pole) {
       const beforeStatus = pole.status;
-      pole.status = intervention.validation;
-      stockMovement(db, actor, pole.id, "Validation controle", pole.depot, pole.depot, { reportId: intervention.id, fromStatus: beforeStatus, validation: intervention.validation });
+      if (intervention.validation === "Anomalie") {
+        pole.status = "Correction demandee";
+        pole.depot = pole.assignedTeam ? `Terrain - ${pole.assignedTeam}` : pole.depot;
+      } else {
+        pole.status = intervention.validation;
+      }
+      stockMovement(db, actor, pole.id, intervention.validation === "Anomalie" ? "Correction demandee" : "Validation controle", pole.depot, pole.depot, { reportId: intervention.id, fromStatus: beforeStatus, validation: intervention.validation, anomalyReason: intervention.anomalyReason || "", anomalyAction: intervention.anomalyAction || "" });
     }
+    const project = db.projects.find(item => item.id === intervention.projectId);
+    if (project && intervention.validation === "Anomalie" && !["Cloture"].includes(project.status)) project.status = "En implantation";
     audit(db, actor, "intervention.validate", { reportId: intervention.id, validation: intervention.validation });
     await writeDb(db);
     return sendJson(res, 200, tenantPayload(db, actor, { intervention }));
@@ -2706,9 +2733,14 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     intervention.anomalyStatus = body.anomalyStatus || "Ouverte";
     intervention.anomalyReason = body.anomalyReason || "";
+    intervention.anomalyAction = body.anomalyAction || intervention.anomalyAction || "";
     if (intervention.anomalyStatus === "Corrigee") intervention.validation = "Pose - En attente validation";
     const pole = scopedRecords(actor, db.poles).find(item => item.id === intervention.poleId);
     if (pole && intervention.anomalyStatus === "Corrigee") pole.status = "Pose - En attente validation";
+    if (pole && intervention.anomalyStatus === "Correction demandee") {
+      pole.status = "Correction demandee";
+      pole.depot = pole.assignedTeam ? `Terrain - ${pole.assignedTeam}` : pole.depot;
+    }
     audit(db, actor, "intervention.anomaly_update", { reportId: intervention.id, anomalyStatus: intervention.anomalyStatus });
     await writeDb(db);
     return sendJson(res, 200, tenantPayload(db, actor, { intervention }));

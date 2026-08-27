@@ -116,6 +116,9 @@ create table if not exists public.interventions (
   validated_at timestamptz,
   anomaly_reason text,
   anomaly_status text,
+  anomaly_action text,
+  corrected_at timestamptz,
+  correction_report_id text,
   draft boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -366,6 +369,9 @@ alter table public.projects add column if not exists closed_by text;
 alter table public.projects add column if not exists closed_at timestamptz;
 alter table public.interventions add column if not exists anomaly_reason text;
 alter table public.interventions add column if not exists anomaly_status text;
+alter table public.interventions add column if not exists anomaly_action text;
+alter table public.interventions add column if not exists corrected_at timestamptz;
+alter table public.interventions add column if not exists correction_report_id text;
 alter table public.interventions add column if not exists team_signature_image text;
 
 create index if not exists idx_poles_status on public.poles(status);
