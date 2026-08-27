@@ -60,9 +60,26 @@
       font: inherit;
     }
 
+    a, button, input, select, textarea, .card, .report-row, .insight, .smart-suggestion, .photo-tile, .metric {
+      transition:
+        background-color .18s ease,
+        border-color .18s ease,
+        color .18s ease,
+        box-shadow .18s ease,
+        transform .18s ease,
+        opacity .18s ease;
+    }
+
     button {
       border: 0;
       cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .55;
+      transform: none !important;
+      box-shadow: none !important;
     }
 
     .app {
@@ -152,6 +169,7 @@
       background: transparent;
       border-radius: var(--radius);
       text-align: left;
+      position: relative;
     }
 
     .nav button svg, .icon {
@@ -168,6 +186,15 @@
     .nav button.active, .nav button:hover {
       background: var(--panel-soft);
       color: var(--primary);
+    }
+
+    .nav button:hover {
+      transform: translateX(3px);
+      box-shadow: inset 3px 0 0 var(--primary);
+    }
+
+    .nav button.active {
+      box-shadow: inset 3px 0 0 var(--primary), 0 10px 24px rgba(15, 118, 110, .08);
     }
 
     .sync-box {
@@ -259,16 +286,41 @@
       white-space: nowrap;
     }
 
+    .btn:hover {
+      border-color: color-mix(in srgb, var(--primary) 48%, var(--line));
+      color: var(--primary);
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(23, 33, 31, .09);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+      box-shadow: 0 5px 14px rgba(23, 33, 31, .06);
+    }
+
     .btn.primary {
       background: var(--primary);
       border-color: var(--primary);
       color: #fff;
     }
 
+    .btn.primary:hover {
+      background: var(--primary-dark);
+      border-color: var(--primary-dark);
+      color: #fff;
+      box-shadow: 0 14px 28px rgba(15, 118, 110, .22);
+    }
+
     .btn.warning {
       background: var(--accent);
       border-color: var(--accent);
       color: #1e1604;
+    }
+
+    .btn.warning:hover {
+      color: #1e1604;
+      filter: saturate(1.08);
+      box-shadow: 0 14px 28px rgba(216, 159, 43, .22);
     }
 
     .icon-btn {
@@ -294,10 +346,19 @@
       min-width: 0;
     }
 
+    .card:hover {
+      border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
+      box-shadow: 0 22px 54px rgba(23, 33, 31, .11);
+    }
+
     .metric {
       padding: 18px;
       display: grid;
       gap: 12px;
+    }
+
+    .metric:hover {
+      transform: translateY(-2px);
     }
 
     .metric span {
@@ -361,6 +422,15 @@
       background: color-mix(in srgb, var(--panel-soft) 65%, transparent);
     }
 
+    tbody tr {
+      transition: background-color .16s ease, box-shadow .16s ease;
+    }
+
+    tbody tr:hover {
+      background: color-mix(in srgb, var(--panel-soft) 74%, transparent);
+      box-shadow: inset 3px 0 0 color-mix(in srgb, var(--primary) 70%, transparent);
+    }
+
     .badge {
       display: inline-flex;
       align-items: center;
@@ -373,6 +443,10 @@
       white-space: nowrap;
       background: var(--panel-soft);
       color: var(--muted);
+    }
+
+    .badge:hover {
+      filter: saturate(1.12);
     }
 
     .badge.ok { background: rgba(18, 122, 67, .13); color: var(--ok); }
@@ -408,6 +482,11 @@
       outline: none;
     }
 
+    input:hover, select:hover, textarea:hover {
+      border-color: color-mix(in srgb, var(--primary) 34%, var(--line));
+      box-shadow: 0 8px 18px rgba(23, 33, 31, .04);
+    }
+
     textarea {
       min-height: 92px;
       resize: vertical;
@@ -416,6 +495,14 @@
     input:focus, select:focus, textarea:focus {
       border-color: var(--primary);
       box-shadow: 0 0 0 4px rgba(15, 118, 110, .13);
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid color-mix(in srgb, var(--primary) 72%, white);
+      outline-offset: 2px;
     }
 
     .form-grid {
@@ -443,6 +530,13 @@
       place-items: center;
       text-align: center;
       padding: 10px;
+    }
+
+    .photo-tile:hover {
+      border-style: solid;
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: 0 14px 28px rgba(15, 118, 110, .12);
     }
 
     .photo-tile input {
@@ -551,6 +645,11 @@
       height: 100%;
       background: var(--bar-color, var(--primary));
       border-radius: inherit;
+      transition: width .35s ease, filter .18s ease;
+    }
+
+    .bar-row:hover .bar-fill {
+      filter: brightness(1.08) saturate(1.08);
     }
 
     .donut-wrap {
@@ -621,6 +720,41 @@
       background: var(--panel-soft);
       border: 1px solid var(--line);
       border-radius: var(--radius);
+    }
+
+    .insight:hover,
+    .report-row:hover,
+    .smart-suggestion:hover {
+      transform: translateY(-2px);
+      border-color: color-mix(in srgb, var(--primary) 32%, var(--line));
+      box-shadow: 0 14px 30px rgba(23, 33, 31, .08);
+    }
+
+    .smart-command {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .smart-suggestion {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--info);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    .smart-suggestion.warn { border-left-color: var(--warn); }
+    .smart-suggestion.danger { border-left-color: var(--danger); }
+    .smart-suggestion.ok { border-left-color: var(--ok); }
+
+    .smart-suggestion p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
     }
 
     [data-tooltip] {
@@ -822,6 +956,7 @@
       position: absolute;
       inset: 0;
       background: rgba(0, 0, 0, .45);
+      animation: fadeIn .18s ease;
     }
 
     .drawer-panel {
@@ -834,6 +969,17 @@
       background: var(--bg);
       border-left: 1px solid var(--line);
       padding: 20px;
+      animation: drawerIn .22s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes drawerIn {
+      from { transform: translateX(20px); opacity: .92; }
+      to { transform: translateX(0); opacity: 1; }
     }
 
     .mobile-tabs {
@@ -1051,6 +1197,17 @@
       background: var(--primary);
     }
 
+    .auth-switch button:hover {
+      color: var(--primary);
+      background: color-mix(in srgb, var(--panel) 78%, transparent);
+      transform: translateY(-1px);
+    }
+
+    .auth-switch button.active:hover {
+      color: #fff;
+      background: var(--primary-dark);
+    }
+
     .auth-form.hidden {
       display: none;
     }
@@ -1134,9 +1291,15 @@
         background: transparent;
         border-radius: 8px;
       }
+      .mobile-tabs button:hover {
+        color: var(--primary);
+        background: color-mix(in srgb, var(--panel) 42%, transparent);
+        transform: translateY(-2px);
+      }
       .mobile-tabs button.active {
         color: #fff;
         background: var(--primary);
+        box-shadow: 0 8px 18px rgba(15, 118, 110, .22);
       }
       .content-grid, .stats { grid-template-columns: 1fr 1fr; }
       .chart-grid { grid-template-columns: 1fr; }
@@ -1266,6 +1429,15 @@
       }
       .login-panel h2 {
         font-size: 23px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
       }
     }
   </style>
@@ -1435,6 +1607,7 @@
 
       <section id="platformView" class="view hidden"></section>
       <section id="dashboardView" class="view"></section>
+      <section id="assistantView" class="view hidden"></section>
       <section id="profileView" class="view hidden"></section>
       <section id="projectsView" class="view hidden"></section>
       <section id="projectClosureView" class="view hidden"></section>
@@ -1711,6 +1884,7 @@
     const navItems = [
       ["platform", "Admin SaaS", "Administration globale des tenants, abonnements, facturation et securite plateforme.", "M12 3 3 8l9 5 9-5-9-5Z M3 16l9 5 9-5 M3 12l9 5 9-5"],
       ["dashboard", "Tableau de bord", "Pilotage global des stocks, poses, validations et preuves terrain.", "M4 13h6V4H4v9Zm10 7h6V4h-6v16ZM4 20h6v-4H4v4Z"],
+      ["assistant", "Assistant", "Priorites intelligentes, recherche guidee et actions rapides selon votre role.", "M12 3l1.9 5.6L20 10l-4.8 3.5L16.8 20 12 16.2 7.2 20l1.6-6.5L4 10l6.1-1.4L12 3Z"],
       ["profile", "Mon profil", "Compte, photo, coordonnees, role et preferences personnelles.", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z M20 21a8 8 0 1 0-16 0"],
       ["projects", "Projets", "Creation, planning et evolution des projets d'implantation.", "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z"],
       ["projectClosure", "Cloture projets", "Validation finale des projets termines par les equipes terrain.", "M9 12l2 2 4-4 M21 12a9 9 0 1 1-9-9"],
@@ -1728,62 +1902,62 @@
     const roleUi = {
       platform_admin: {
         home: "platform",
-        views: ["platform", "dashboard", "profile", "help"],
+        views: ["platform", "dashboard", "assistant", "profile", "help"],
         permissions: ["read", "admin", "platform_admin"]
       },
       super_admin: {
         home: "dashboard",
-        views: ["dashboard", "profile", "projects", "projectClosure", "stock", "production", "sales", "finance", "field", "map", "reports", "admin", "help"],
+        views: ["dashboard", "assistant", "profile", "projects", "projectClosure", "stock", "production", "sales", "finance", "field", "map", "reports", "admin", "help"],
         permissions: ["read", "write_stock", "write_intervention", "validate", "admin", "production", "sales", "finance"]
       },
       chef_production: {
         home: "production",
-        views: ["dashboard", "profile", "stock", "production", "help"],
+        views: ["dashboard", "assistant", "profile", "stock", "production", "help"],
         permissions: ["read", "write_stock", "production"]
       },
       commercial: {
         home: "sales",
-        views: ["dashboard", "profile", "sales", "help"],
+        views: ["dashboard", "assistant", "profile", "sales", "help"],
         permissions: ["read", "sales"]
       },
       direction_finance: {
         home: "finance",
-        views: ["dashboard", "profile", "sales", "finance", "help"],
+        views: ["dashboard", "assistant", "profile", "sales", "finance", "help"],
         permissions: ["read", "sales", "finance"]
       },
       magasinier: {
         home: "dashboard",
-        views: ["dashboard", "profile", "projects", "stock", "help"],
+        views: ["dashboard", "assistant", "profile", "projects", "stock", "help"],
         permissions: ["read", "write_stock"]
       },
       terrain: {
         home: "dashboard",
-        views: ["dashboard", "profile", "projects", "field", "map", "reports", "help"],
+        views: ["dashboard", "assistant", "profile", "projects", "field", "map", "reports", "help"],
         permissions: ["read", "write_intervention"]
       },
       controleur: {
         home: "dashboard",
-        views: ["dashboard", "profile", "map", "reports", "help"],
+        views: ["dashboard", "assistant", "profile", "map", "reports", "help"],
         permissions: ["read", "validate"]
       },
       tenant_admin: {
         home: "dashboard",
-        views: ["dashboard", "profile", "projects", "projectClosure", "stock", "production", "sales", "finance", "field", "map", "reports", "admin", "help"],
+        views: ["dashboard", "assistant", "profile", "projects", "projectClosure", "stock", "production", "sales", "finance", "field", "map", "reports", "admin", "help"],
         permissions: ["read", "write_stock", "write_intervention", "validate", "admin", "production", "sales", "finance"]
       },
       depot_manager: {
         home: "dashboard",
-        views: ["dashboard", "profile", "projects", "stock", "help"],
+        views: ["dashboard", "assistant", "profile", "projects", "stock", "help"],
         permissions: ["read", "write_stock"]
       },
       field_agent: {
         home: "dashboard",
-        views: ["dashboard", "profile", "projects", "field", "map", "reports", "help"],
+        views: ["dashboard", "assistant", "profile", "projects", "field", "map", "reports", "help"],
         permissions: ["read", "write_intervention"]
       },
       quality_inspector: {
         home: "dashboard",
-        views: ["dashboard", "profile", "map", "reports", "help"],
+        views: ["dashboard", "assistant", "profile", "map", "reports", "help"],
         permissions: ["read", "validate"]
       }
     };
@@ -2218,6 +2392,7 @@
     function renderCurrentView() {
       renderSuperAdmin();
       renderDashboard();
+      renderAssistant();
       renderProfile();
       renderProjects();
       renderProjectClosure();
@@ -2833,6 +3008,7 @@
             ${chartCard("Actions rapides", `
               <div class="insight-list">
                 <button class="btn primary" type="button" onclick="setView('platform')">Ouvrir Admin SaaS</button>
+                <button class="btn" type="button" onclick="setView('assistant')">Assistant intelligent</button>
                 <button class="btn" type="button" onclick="refreshPlatformData()">Actualiser les donnees SaaS</button>
               </div>
             `)}
@@ -2951,9 +3127,105 @@
           ${dashboard.metrics.map(([label, value, hint]) => metric(label, value, hint)).join("")}
         </div>
         ${notificationsCard()}
+        ${smartAssistantCard(4)}
         ${offlineQueueCard()}
         <div class="chart-grid">
           ${dashboard.body}
+        </div>
+      `;
+    }
+
+    function smartInsights() {
+      const insights = [];
+      const pendingStock = state.projects.filter(project => project.requestStatus === "En attente gestionnaire");
+      const closing = state.projects.filter(project => project.status === "Cloture demandee");
+      const anomalies = state.interventions.filter(item => item.validation === "Anomalie");
+      const waitingValidation = state.interventions.filter(item => item.validation === "Pose - En attente validation");
+      const lateProjects = state.projects.filter(project => projectTiming(project).badge === "danger" && project.status !== "Cloture");
+      const finalPhotoMissing = state.interventions.filter(item => !item.draft && !(item.photos || []).some(photo => /apres implantation/i.test(photo.step || "")));
+      const assignedToMe = terrainAssignablePoles();
+      const modules = appModules();
+
+      if (isPlatformRole()) {
+        const suspended = (platformState.tenants || []).filter(tenant => tenant.status === "suspended");
+        const trial = (platformState.tenants || []).filter(tenant => tenant.status === "trial");
+        if (suspended.length) insights.push({ id: "platform-suspended", severity: "danger", title: "Tenants suspendus", message: `${suspended.length} entreprise(s) demandent un suivi facturation ou support.`, view: "platform", actionLabel: "Voir SaaS" });
+        if (trial.length) insights.push({ id: "platform-trial", severity: "warn", title: "Essais actifs", message: `${trial.length} tenant(s) en periode d'essai a convertir.`, view: "platform", actionLabel: "Analyser" });
+        insights.push({ id: "platform-refresh", severity: "info", title: "Pilotage plateforme", message: "Actualise les donnees SaaS avant une action commerciale ou support.", action: "refreshPlatform", actionLabel: "Actualiser" });
+        return insights;
+      }
+
+      if (can("write_stock") && pendingStock.length) insights.push({ id: "pending-stock", severity: "warn", title: "Demandes stock en attente", message: `${pendingStock.length} projet(s) attendent une validation magasinier.`, view: "stock", actionLabel: "Traiter" });
+      if (can("admin") && closing.length) insights.push({ id: "closing", severity: "warn", title: "Clotures a valider", message: `${closing.length} projet(s) sont termines et attendent la validation finale.`, view: "projectClosure", actionLabel: "Valider" });
+      if ((can("validate") || can("admin")) && waitingValidation.length) insights.push({ id: "waiting-validation", severity: "info", title: "Fiches a controler", message: `${waitingValidation.length} fiche(s) de pose attendent le controle qualite.`, view: "reports", actionLabel: "Controler" });
+      if ((can("validate") || can("admin")) && anomalies.length) insights.push({ id: "anomalies", severity: "danger", title: "Anomalies ouvertes", message: `${anomalies.length} anomalie(s) doivent etre corrigees ou justifiees.`, view: "reports", actionLabel: "Voir" });
+      if ((can("write_intervention") || can("admin")) && lateProjects.length) insights.push({ id: "late-projects", severity: "danger", title: "Planning en retard", message: `${lateProjects.length} projet(s) depassent leur date de fin prevue.`, view: "projects", actionLabel: "Prioriser" });
+      if (can("write_intervention") && assignedToMe.length) insights.push({ id: "assigned-poles", severity: "info", title: "Poteaux a poser", message: `${assignedToMe.length} poteau(x) sont attribues a votre equipe.`, action: "openField", actionLabel: "Nouvelle fiche" });
+      if (can("admin") && finalPhotoMissing.length) insights.push({ id: "missing-final-photo", severity: "warn", title: "Photos finales manquantes", message: `${finalPhotoMissing.length} fiche(s) n'ont pas de photo Apres implantation pour le rapport de cloture.`, view: "reports", actionLabel: "Verifier" });
+      if (modules.production && can("production") && !(state.productionOrders || []).length) insights.push({ id: "first-of", severity: "info", title: "Production prete", message: "Le module usine est actif. Creez le premier ordre de fabrication pour generer matricules et QR.", view: "production", actionLabel: "Creer OF" });
+      if (modules.sales && can("sales") && !(state.clients || []).length) insights.push({ id: "first-client", severity: "info", title: "CRM a initialiser", message: "Ajoutez vos premiers clients avant de creer les ventes et bons de livraison.", view: "sales", actionLabel: "Ajouter" });
+      if (modules.finance && can("finance") && (state.sales || []).length) insights.push({ id: "finance-month", severity: "ok", title: "Bilan disponible", message: "Des ventes sont chargees. Le bilan mensuel peut etre actualise.", action: "financeMonth", actionLabel: "Voir bilan" });
+      if (state.offlineQueue?.length) insights.push({ id: "offline-sync", severity: "info", title: "Synchronisation en attente", message: `${state.offlineQueue.length} operation(s) locales attendent le backend.`, action: "sync", actionLabel: "Synchroniser" });
+
+      if (!insights.length) insights.push({ id: "all-good", severity: "ok", title: "Situation stable", message: "Aucune urgence detectee dans les donnees chargees.", view: "dashboard", actionLabel: "Rester ici" });
+      return insights;
+    }
+
+    function smartAssistantCard(limit = 5) {
+      const insights = smartInsights().slice(0, limit);
+      return chartCard("Assistant intelligent", `
+        <div class="smart-command">
+          <input id="smartCommandInput" placeholder="Ex: stock, anomalie, rapport, carte, client...">
+          <button class="btn primary" type="button" onclick="handleSmartCommand()">Executer</button>
+        </div>
+        <div class="insight-list" style="margin-top:12px">
+          ${insights.map(renderSmartInsight).join("")}
+        </div>
+      `, `${insights.length} priorite(s)`);
+    }
+
+    function renderSmartInsight(item) {
+      return `
+        <div class="smart-suggestion ${item.severity || "info"}">
+          <div class="section-head" style="padding:0;border:0">
+            <strong>${escapeHtml(item.title)}</strong>
+            <span class="badge ${item.severity || "info"}">${escapeHtml(item.severity || "info")}</span>
+          </div>
+          <p>${escapeHtml(item.message)}</p>
+          <div class="toolbar" style="justify-content:flex-start">
+            <button class="btn" type="button" onclick="runSmartAction('${escapeAttr(item.id)}')">${escapeHtml(item.actionLabel || "Ouvrir")}</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAssistant() {
+      const node = $("#assistantView");
+      if (!node) return;
+      const insights = smartInsights();
+      node.innerHTML = `
+        <div class="card">
+          <div class="section-head">
+            <div>
+              <h3>Centre intelligent</h3>
+              <p class="muted" style="margin:4px 0 0">Analyse automatique des priorites et actions disponibles selon votre role.</p>
+            </div>
+            <span class="badge info">${insights.length} signal(aux)</span>
+          </div>
+          <div class="section-body">
+            <div class="smart-command">
+              <input id="assistantCommandInput" placeholder="Demandez une action: ouvrir stock, voir retards, chercher POT-...">
+              <button class="btn primary" type="button" onclick="handleSmartCommand('assistantCommandInput')">Executer</button>
+            </div>
+          </div>
+        </div>
+        <div class="content-grid">
+          ${chartCard("Priorites detectees", `<div class="insight-list">${insights.map(renderSmartInsight).join("")}</div>`)}
+          ${chartCard("Actions rapides", `
+            <div class="insight-list">
+              ${visibleNavItems().filter(([id]) => !["assistant", "profile", "help"].includes(id)).map(([id, label]) => `<button class="btn" type="button" onclick="setView('${id}')">${escapeHtml(label)}</button>`).join("")}
+            </div>
+          `)}
         </div>
       `;
     }
@@ -5296,6 +5568,24 @@
         viewProject(project.id);
         return;
       }
+      const client = (state.clients || []).find(item => `${item.name} ${item.phone} ${item.email}`.toLowerCase().includes(query));
+      if (client && moduleEnabledForView("sales")) {
+        setView("sales");
+        toast(`Client trouve: ${client.name}`);
+        return;
+      }
+      const sale = (state.sales || []).find(item => `${item.saleNumber} ${item.deliveryNoteNumber} ${item.clientId}`.toLowerCase().includes(query));
+      if (sale && moduleEnabledForView("sales")) {
+        setView("sales");
+        toast(`Vente trouvee: ${sale.saleNumber || sale.id}`);
+        return;
+      }
+      const teamProject = state.projects.find(item => String(item.assignedTeam || "").toLowerCase().includes(query));
+      if (teamProject) {
+        setView("projects");
+        toast(`Equipe trouvee: ${teamProject.assignedTeam}`);
+        return;
+      }
       const report = state.interventions.find(item => `${item.id} ${item.poleId}`.toLowerCase().includes(query));
       if (report) {
         setView("reports");
@@ -5303,6 +5593,54 @@
         return;
       }
       toast("Aucun resultat trouve");
+    }
+
+    function runSmartAction(id) {
+      const insight = smartInsights().find(item => item.id === id);
+      if (!insight) return toast("Action indisponible");
+      if (insight.action === "refreshPlatform") {
+        refreshPlatformData();
+        return;
+      }
+      if (insight.action === "openField") {
+        setView("field");
+        openDrawer();
+        return;
+      }
+      if (insight.action === "financeMonth") {
+        setView("finance");
+        setTimeout(() => loadSalesReport("month"), 80);
+        return;
+      }
+      if (insight.action === "sync") {
+        syncQueue();
+        return;
+      }
+      if (insight.view) setView(insight.view);
+    }
+
+    function handleSmartCommand(inputId = "smartCommandInput") {
+      const value = String($(`#${inputId}`)?.value || $("#smartCommandInput")?.value || "").trim();
+      const query = value.toLowerCase();
+      if (!query) return toast("Saisissez une action ou une recherche");
+      const directView = [
+        ["stock", ["stock", "depot", "magasin"]],
+        ["projects", ["projet", "chantier", "retard"]],
+        ["projectClosure", ["cloture", "cloturer"]],
+        ["field", ["terrain", "pose", "fiche"]],
+        ["map", ["carte", "gps"]],
+        ["reports", ["rapport", "pdf", "anomalie", "controle"]],
+        ["production", ["production", "usine", "of", "fabrication"]],
+        ["sales", ["vente", "client", "bl", "livraison"]],
+        ["finance", ["finance", "marge", "bilan", "ca"]]
+      ].find(([, words]) => words.some(word => query.includes(word)));
+      if (directView && visibleNavItems().some(([id]) => id === directView[0])) {
+        setView(directView[0]);
+        if (directView[0] === "finance") setTimeout(() => loadSalesReport("month"), 80);
+        return;
+      }
+      if ($("#globalSearch")) $("#globalSearch").value = value;
+      globalSearch();
     }
 
     async function saveStockEntry() {
@@ -6260,6 +6598,8 @@
     window.validateProjectStock = validateProjectStock;
     window.advanceProductionOrder = advanceProductionOrder;
     window.loadSalesReport = loadSalesReport;
+    window.runSmartAction = runSmartAction;
+    window.handleSmartCommand = handleSmartCommand;
     window.takeOverProject = takeOverProject;
     window.requestProjectClosure = requestProjectClosure;
     window.validateProjectClosure = validateProjectClosure;
