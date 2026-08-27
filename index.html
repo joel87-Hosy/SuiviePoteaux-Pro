@@ -1575,6 +1575,9 @@
           <p id="viewSubtitle">Pilotage global des stocks, poses, validations et preuves terrain.</p>
         </div>
         <div class="toolbar">
+          <button class="btn icon-btn" id="backBtn" type="button" title="Retour a la page precedente" aria-label="Retour a la page precedente">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          </button>
           <div class="avatar small" id="topUserAvatar">?</div>
           <span class="badge info" id="topCurrentUser">Non connecte</span>
           <input id="globalSearch" placeholder="Recherche code/projet..." style="max-width:220px">
@@ -2017,6 +2020,7 @@
     let apiToken = localStorage.getItem(API_TOKEN_KEY) || "";
     let apiUser = null;
     let apiPermissions = [];
+    let viewHistory = [];
     let platformState = {
       overview: null,
       tenants: [],
@@ -2180,6 +2184,13 @@
       return visible.some(([id]) => id === view) ? view : (visible[0]?.[0] || "dashboard");
     }
 
+    function updateBackButton() {
+      const button = $("#backBtn");
+      if (!button) return;
+      button.disabled = viewHistory.length === 0;
+      button.classList.toggle("hidden", !apiUser);
+    }
+
     function updateCurrentUser() {
       $("#currentUserName").textContent = apiUser?.name || "Non connecte";
       $("#currentUserEmail").textContent = apiUser?.email || "Session locale";
@@ -2194,6 +2205,7 @@
       $("#globalSearchBtn").classList.toggle("hidden", isPlatformRole());
       $("#syncBtn").classList.toggle("hidden", isPlatformRole());
       $("#mobileSyncBtn").classList.toggle("hidden", isPlatformRole());
+      updateBackButton();
     }
 
     function showLogin(message = "") {
@@ -2225,7 +2237,8 @@
       await loadBackendData();
       hideLogin();
       renderNav();
-      setView(defaultViewForRole());
+      viewHistory = [];
+      setView(defaultViewForRole(), { fromHistory: true });
       toast(`Connecte: ${apiUser.name}`);
     }
 
@@ -2375,8 +2388,13 @@
       $all("[data-view]").forEach(btn => btn.addEventListener("click", () => setView(btn.dataset.view)));
     }
 
-    function setView(view) {
+    function setView(view, options = {}) {
       view = firstAllowedView(view);
+      const previousView = state.activeView;
+      if (!options.fromHistory && previousView && previousView !== view && visibleNavItems().some(([id]) => id === previousView)) {
+        viewHistory.push(previousView);
+        viewHistory = viewHistory.slice(-20);
+      }
       state.activeView = view;
       saveState();
       $(".view:not(.hidden)")?.classList.add("hidden");
@@ -2385,8 +2403,21 @@
       $("#viewTitle").textContent = item[1];
       $("#viewSubtitle").textContent = item[2];
       $all("[data-view]").forEach(btn => btn.classList.toggle("active", btn.dataset.view === view));
+      updateBackButton();
       if (view === "map") setTimeout(renderMap, 100);
       renderCurrentView();
+    }
+
+    function goBackView() {
+      while (viewHistory.length) {
+        const previous = viewHistory.pop();
+        if (visibleNavItems().some(([id]) => id === previous)) {
+          setView(previous, { fromHistory: true });
+          return;
+        }
+      }
+      updateBackButton();
+      toast("Aucune page precedente");
     }
 
     function renderCurrentView() {
@@ -6540,6 +6571,7 @@
         button.addEventListener("click", () => togglePassword(button.dataset.togglePassword, button));
       });
       $("#gpsBtn").addEventListener("click", captureGps);
+      $("#backBtn").addEventListener("click", goBackView);
       $("#clearSignatureBtn").addEventListener("click", clearSignature);
       $("#fieldScanQrBtn").addEventListener("click", openQrScanDrawer);
       $("#draftBtn").addEventListener("click", () => saveIntervention(true));
@@ -6589,11 +6621,13 @@
       await loadBackendData();
       updateCurrentUser();
       renderNav();
-      setView(state.activeView || "dashboard");
+      viewHistory = [];
+      setView(state.activeView || "dashboard", { fromHistory: true });
     }
 
     window.openDrawer = openDrawer;
     window.setView = setView;
+    window.goBackView = goBackView;
     window.assignPole = assignPole;
     window.validateProjectStock = validateProjectStock;
     window.advanceProductionOrder = advanceProductionOrder;
