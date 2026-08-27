@@ -3324,6 +3324,7 @@
         <tr>
           <td><strong>${escapeHtml(project.name)}</strong><br><span class="muted">${escapeHtml(project.client || "Client non renseigne")}</span></td>
           <td>${escapeHtml(project.zone || "N/A")}</td>
+          <td>${escapeHtml(project.assignedTeam || "N/A")}</td>
           <td>${projectTotal(project)}</td>
           <td>
             <div style="display:grid;gap:6px;min-width:140px">
@@ -3418,8 +3419,8 @@
             ${isFieldRole(apiUser) ? projectTimingAlerts(visibleProjects) : ""}
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Nom</th><th>Zone</th><th>Poteaux</th><th>Evolution</th><th>Timing</th><th>Statut</th><th>Actions</th></tr></thead>
-                <tbody>${visibleProjects.map(projectRow).join("") || `<tr><td colspan="7"><div class="empty">Aucun projet en cours.</div></td></tr>`}</tbody>
+                <thead><tr><th>Nom</th><th>Zone</th><th>Equipe</th><th>Poteaux</th><th>Evolution</th><th>Timing</th><th>Statut</th><th>Actions</th></tr></thead>
+                <tbody>${visibleProjects.map(projectRow).join("") || `<tr><td colspan="8"><div class="empty">Aucun projet en cours.</div></td></tr>`}</tbody>
               </table>
             </div>
           </div>
@@ -3486,7 +3487,7 @@
               <div class="report-row">
                 <div>
                   <strong>${escapeHtml(project.name)}</strong>
-                  <p class="muted" style="margin:4px 0 0">${escapeHtml(project.zone || "N/A")} - cloture le ${project.closedAt ? formatDate(project.closedAt) : "N/A"}</p>
+                  <p class="muted" style="margin:4px 0 0">${escapeHtml(project.zone || "N/A")} - Equipe: ${escapeHtml(project.assignedTeam || "N/A")} - cloture le ${project.closedAt ? formatDate(project.closedAt) : "N/A"}</p>
                 </div>
                 <div class="toolbar">
                   <button class="btn" type="button" onclick="generateProjectPdf('${project.id}')">${icon("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3")} Rapport PDF</button>
