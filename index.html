@@ -4454,7 +4454,7 @@
             ${faqItem("Que signifient les couleurs sur la carte ?", "Vert signifie poteau valide. Orange signifie pose en attente de validation. Rouge signifie anomalie signalee par le controleur ou l'admin.")}
             ${faqItem("Quels poteaux le technicien voit-il dans le champ poteau attribue ?", "Le technicien voit seulement les poteaux en transit attribues a son equipe, generalement apres validation de la demande stock par le gestionnaire.")}
             ${faqItem("A quoi sert le QR code du poteau ?", "Le QR code identifie le poteau physiquement. Il sert a selectionner le bon poteau, verifier son code avant implantation et controler apres pose que le poteau scanne correspond au poteau enregistre.")}
-            ${faqItem("Quelle photo est utilisee dans le rapport PDF ?", "Le rapport reprend les photos ajoutees dans la fiche de pose terrain, notamment la photo obligatoire Apres implantation. Les autres etapes documentent la fouille, le marquage, le levage et le massif.")}
+            ${faqItem("Quelle photo est utilisee dans le rapport PDF ?", "Le rapport de cloture projet reprend uniquement la derniere photo Apres implantation de chaque poteau. Les autres photos restent conservees dans la fiche terrain.")}
             ${faqItem("Qui valide un poteau implante ?", "Le controleur valide la conformite technique. L'admin peut aussi intervenir selon les permissions. Le technicien enregistre la pose mais ne valide pas lui-meme la conformite finale.")}
             ${faqItem("Qui cloture un projet ?", "Le technicien demande la cloture lorsque toutes les poses du projet sont terminees. L'admin valide ensuite la cloture si toutes les fiches sont conformes et sans anomalie ouverte.")}
             ${faqItem("Que se passe-t-il apres creation d'un projet ?", "Le projet passe en demande stock. Le gestionnaire verifie les disponibilites, affecte les poteaux disponibles, puis envoie le projet a l'equipe terrain.")}
@@ -5625,6 +5625,9 @@
       const dateOnly = value => value ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "short" }).format(new Date(value)) : "N/A";
       const poleIntervention = pole => interventions.find(item => item.poleId === pole.id) || {};
       const poleType = pole => `${pole.type === "BETON" ? "Beton" : pole.type === "METALLIQUE" ? "Metallique" : pole.type || "N/A"} - ${pole.height || "N/A"}${pole.effort ? `/${pole.effort}` : "m"}`;
+      const finalImplantationPhoto = intervention => (intervention.photos || [])
+        .filter(item => /apres implantation/i.test(item.step || ""))
+        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0] || null;
       const footer = () => {
         doc.setTextColor(107, 114, 128);
         doc.setFontSize(8);
@@ -5737,7 +5740,7 @@
           if (index === 0) {
             doc.setTextColor(...dark);
             doc.setFontSize(13);
-            doc.text("Detail et photos", 20, 28);
+            doc.text("Photo finale apres implantation", 20, 28);
           }
         }
         const y = 42 + (index % 3) * 78;
@@ -5756,7 +5759,7 @@
         doc.setFontSize(8);
         doc.text(`${poleType(pole)} - GPS : ${intervention.lat && intervention.lng ? `${intervention.lat}, ${intervention.lng}` : "N/A"} - Implante le ${dateOnly(intervention.date)}`, 28, y + 20, { maxWidth: 120 });
 
-        const photo = (intervention.photos || []).find(item => /apres/i.test(item.step || "")) || (intervention.photos || [])[0];
+        const photo = finalImplantationPhoto(intervention);
         doc.setDrawColor(203, 213, 225);
         doc.rect(28, y + 27, 64, 34);
         const photoData = photo?.data || await photoUrlToDataUrl(photo?.url);
@@ -5775,7 +5778,7 @@
         doc.rect(28, y + 54, 64, 7, "F");
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(7);
-        doc.text(photo?.step || "Apres", 60, y + 59, { align: "center" });
+        doc.text(photo ? `Apres implantation - ${formatDate(photo.date)}` : "Photo apres implantation manquante", 60, y + 59, { align: "center", maxWidth: 60 });
         doc.setTextColor(...text);
         doc.setFontSize(8);
         doc.text(`Fiche: ${intervention.id || "N/A"}`, 100, y + 34);
