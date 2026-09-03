@@ -4,8 +4,8 @@
   "description": "Gestion PWA du stock, de la pose et des rapports PDF de poteaux beton et metalliques.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#f6f7f4",
-  "theme_color": "#0f766e",
+  "background_color": "#f7f8fc",
+  "theme_color": "#1d4ed8",
   "orientation": "portrait-primary",
   "icons": [
     {

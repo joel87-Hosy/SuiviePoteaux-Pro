@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0f766e">
+  <meta name="theme-color" content="#1d4ed8">
   <title>SuiviPoteaux Pro</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="shortcut icon" href="./icon.svg" type="image/svg+xml">
@@ -15,20 +15,20 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f6f7f4;
+      --bg: #f7f8fc;
       --panel: #ffffff;
-      --panel-soft: #eef5f2;
-      --ink: #17211f;
-      --muted: #62706c;
-      --line: #dbe3df;
-      --primary: #0f766e;
-      --primary-dark: #0b5f59;
-      --accent: #d89f2b;
+      --panel-soft: #eef4ff;
+      --ink: #111827;
+      --muted: #637083;
+      --line: #d7deea;
+      --primary: #1d4ed8;
+      --primary-dark: #1e3a8a;
+      --accent: #f59e0b;
       --danger: #b42318;
       --ok: #127a43;
       --warn: #a15c07;
-      --info: #2563a6;
-      --shadow: 0 18px 45px rgba(23, 33, 31, .08);
+      --info: #0284c7;
+      --shadow: 0 18px 45px rgba(15, 23, 42, .10);
       --radius: 8px;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
@@ -36,11 +36,11 @@
     body.dark {
       color-scheme: dark;
       --bg: #101514;
-      --panel: #18211f;
-      --panel-soft: #202d2a;
-      --ink: #edf4f1;
-      --muted: #9dacaa;
-      --line: #31403d;
+      --panel: #161d2e;
+      --panel-soft: #1f2a44;
+      --ink: #eef4ff;
+      --muted: #a7b3c8;
+      --line: #30405f;
       --shadow: 0 18px 45px rgba(0, 0, 0, .24);
     }
 
@@ -50,8 +50,8 @@
       margin: 0;
       min-height: 100vh;
       background:
-        linear-gradient(115deg, rgba(15, 118, 110, .08), transparent 38%),
-        linear-gradient(245deg, rgba(216, 159, 43, .13), transparent 32%),
+        linear-gradient(115deg, rgba(29, 78, 216, .10), transparent 38%),
+        linear-gradient(245deg, rgba(245, 158, 11, .14), transparent 32%),
         var(--bg);
       color: var(--ink);
     }
@@ -114,10 +114,10 @@
       width: 42px;
       height: 42px;
       border-radius: 8px;
-      background: linear-gradient(145deg, var(--primary), #1c9b72);
+      background: linear-gradient(145deg, var(--primary), #0891b2 58%, var(--accent));
       display: grid;
       place-items: center;
-      box-shadow: 0 12px 24px rgba(15, 118, 110, .25);
+      box-shadow: 0 12px 24px rgba(29, 78, 216, .24);
     }
 
     .brand-mark svg { width: 26px; height: 26px; fill: #fff; }
@@ -194,7 +194,7 @@
     }
 
     .nav button.active {
-      box-shadow: inset 3px 0 0 var(--primary), 0 10px 24px rgba(15, 118, 110, .08);
+      box-shadow: inset 3px 0 0 var(--primary), 0 10px 24px rgba(29, 78, 216, .10);
     }
 
     .sync-box {
@@ -308,7 +308,7 @@
       background: var(--primary-dark);
       border-color: var(--primary-dark);
       color: #fff;
-      box-shadow: 0 14px 28px rgba(15, 118, 110, .22);
+      box-shadow: 0 14px 28px rgba(29, 78, 216, .24);
     }
 
     .btn.warning {
@@ -494,7 +494,7 @@
 
     input:focus, select:focus, textarea:focus {
       border-color: var(--primary);
-      box-shadow: 0 0 0 4px rgba(15, 118, 110, .13);
+      box-shadow: 0 0 0 4px rgba(29, 78, 216, .14);
     }
 
     button:focus-visible,
@@ -536,7 +536,7 @@
       border-style: solid;
       border-color: var(--primary);
       transform: translateY(-2px);
-      box-shadow: 0 14px 28px rgba(15, 118, 110, .12);
+      box-shadow: 0 14px 28px rgba(29, 78, 216, .13);
     }
 
     .photo-tile input {
@@ -979,7 +979,7 @@
     .report-row.open {
       align-items: flex-start;
       border-color: color-mix(in srgb, var(--primary) 34%, var(--line));
-      box-shadow: 0 14px 34px rgba(15, 118, 110, .10);
+      box-shadow: 0 14px 34px rgba(29, 78, 216, .12);
     }
 
     .report-main {
@@ -1147,7 +1147,7 @@
       flex: 0 0 auto;
       overflow: hidden;
       border: 2px solid var(--line);
-      background: linear-gradient(135deg, #0f766e, #334155);
+      background: linear-gradient(135deg, #1d4ed8, #0891b2 58%, #334155);
       color: #fff;
       font-weight: 900;
       letter-spacing: 0;
@@ -1208,8 +1208,8 @@
       grid-template-columns: minmax(360px, .82fr) minmax(0, 1.18fr);
       min-height: 100vh;
       background:
-        radial-gradient(circle at 18% 20%, rgba(15, 118, 110, .14), transparent 28%),
-        radial-gradient(circle at 42% 76%, rgba(216, 159, 43, .14), transparent 30%),
+        radial-gradient(circle at 18% 20%, rgba(29, 78, 216, .14), transparent 28%),
+        radial-gradient(circle at 42% 76%, rgba(245, 158, 11, .14), transparent 30%),
         var(--bg);
       animation: loginScreenIn .5s ease both;
     }
@@ -1221,7 +1221,7 @@
     .login-panel {
       position: relative;
       overflow: hidden;
-      padding: clamp(24px, 5vw, 56px);
+      padding: clamp(22px, 4vw, 48px);
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -1245,7 +1245,7 @@
       position: relative;
       border-bottom: 0;
       padding: 0;
-      margin-bottom: 36px;
+      margin-bottom: 26px;
       transform-origin: left center;
       animation: loginBrandIntro 1.1s cubic-bezier(.2, .85, .25, 1) both;
     }
@@ -1256,7 +1256,14 @@
 
     .login-content {
       position: relative;
-      max-width: 440px;
+      width: min(100%, 368px);
+      padding: 18px;
+      border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+      border-radius: 12px;
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--panel) 96%, transparent), color-mix(in srgb, var(--panel-soft) 50%, var(--panel))),
+        var(--panel);
+      box-shadow: 0 18px 42px rgba(15, 23, 42, .10);
       opacity: 0;
       transform: translateY(18px);
       animation: loginContentIn .72s cubic-bezier(.2, .85, .25, 1) .88s forwards;
@@ -1264,20 +1271,56 @@
 
     .login-panel h2 {
       margin: 0;
-      font-size: clamp(28px, 4vw, 42px);
+      font-size: clamp(24px, 3vw, 32px);
       letter-spacing: 0;
       line-height: 1.05;
     }
 
     .login-panel p {
       color: var(--muted);
-      line-height: 1.6;
+      line-height: 1.45;
+      margin: 8px 0 14px;
+      font-size: 14px;
     }
 
     .login-form {
       display: grid;
-      gap: 14px;
-      margin-top: 16px;
+      gap: 11px;
+      margin-top: 12px;
+    }
+
+    .login-form label {
+      color: color-mix(in srgb, var(--ink) 68%, var(--muted));
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .login-form input,
+    .login-form select {
+      min-height: 42px;
+      padding: 9px 11px;
+      border-radius: 7px;
+      background: color-mix(in srgb, var(--panel) 94%, var(--panel-soft));
+    }
+
+    .login-form input:focus,
+    .login-form select:focus {
+      background: var(--panel);
+      box-shadow: 0 0 0 3px rgba(29, 78, 216, .13);
+    }
+
+    .login-form .btn.primary {
+      min-height: 44px;
+      margin-top: 2px;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--primary), #0891b2);
+      box-shadow: 0 14px 24px rgba(29, 78, 216, .22);
+    }
+
+    .login-form .btn.primary:hover {
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+      box-shadow: 0 16px 28px rgba(29, 78, 216, .28);
     }
 
     .password-field {
@@ -1285,15 +1328,15 @@
     }
 
     .password-field input {
-      padding-right: 48px;
+      padding-right: 44px;
     }
 
     .password-toggle {
       position: absolute;
-      right: 5px;
-      bottom: 5px;
-      width: 38px;
-      height: 38px;
+      right: 4px;
+      bottom: 4px;
+      width: 34px;
+      height: 34px;
       border-radius: 7px;
       color: var(--muted);
       background: transparent;
@@ -1309,8 +1352,8 @@
     .auth-switch {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 6px;
-      padding: 5px;
+      gap: 4px;
+      padding: 4px;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--panel-soft);
@@ -1318,11 +1361,11 @@
     }
 
     .auth-switch button {
-      min-height: 36px;
+      min-height: 32px;
       border-radius: 6px;
       background: transparent;
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 650;
     }
 
@@ -1353,7 +1396,7 @@
       display: flex;
       align-items: flex-end;
       background:
-        linear-gradient(160deg, rgba(15, 118, 110, .93), rgba(13, 66, 61, .94)),
+        linear-gradient(160deg, rgba(30, 58, 138, .94), rgba(8, 145, 178, .78) 52%, rgba(17, 24, 39, .90)),
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 900'%3E%3Cpath d='M0 670 900 420v480H0z' fill='%23d89f2b' opacity='.22'/%3E%3Cpath d='M110 740h680' stroke='white' stroke-opacity='.25' stroke-width='6'/%3E%3Cg fill='white' opacity='.9'%3E%3Crect x='210' y='250' width='22' height='420'/%3E%3Crect x='172' y='310' width='98' height='18'/%3E%3Crect x='450' y='190' width='22' height='500'/%3E%3Crect x='410' y='265' width='102' height='18'/%3E%3Crect x='682' y='310' width='22' height='360'/%3E%3Crect x='646' y='365' width='94' height='18'/%3E%3C/g%3E%3C/svg%3E");
       background-size: cover;
       color: #fff;
@@ -1400,13 +1443,13 @@
     }
 
     .login-hint {
-      margin-top: 18px;
-      padding: 12px;
+      margin-top: 12px;
+      padding: 10px;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--panel-soft);
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
       line-height: 1.45;
     }
 
@@ -1433,10 +1476,10 @@
     }
 
     @keyframes loginLogoPulse {
-      0%, 100% { box-shadow: 0 12px 24px rgba(15, 118, 110, .25); }
+      0%, 100% { box-shadow: 0 12px 24px rgba(29, 78, 216, .24); }
       48% {
         transform: scale(1.06);
-        box-shadow: 0 20px 44px rgba(15, 118, 110, .34), 0 0 0 10px rgba(15, 118, 110, .1);
+        box-shadow: 0 20px 44px rgba(29, 78, 216, .34), 0 0 0 10px rgba(8, 145, 178, .12);
       }
     }
 
@@ -1469,8 +1512,8 @@
     }
 
     @keyframes loginSwitchGlow {
-      0% { box-shadow: 0 0 0 rgba(15, 118, 110, 0); }
-      55% { box-shadow: 0 0 0 5px rgba(15, 118, 110, .1); }
+      0% { box-shadow: 0 0 0 rgba(29, 78, 216, 0); }
+      55% { box-shadow: 0 0 0 5px rgba(29, 78, 216, .10); }
       100% { box-shadow: none; }
     }
 
@@ -1512,7 +1555,7 @@
       .mobile-tabs button.active {
         color: #fff;
         background: var(--primary);
-        box-shadow: 0 8px 18px rgba(15, 118, 110, .22);
+        box-shadow: 0 8px 18px rgba(29, 78, 216, .24);
       }
       .content-grid, .stats { grid-template-columns: 1fr 1fr; }
       .chart-grid { grid-template-columns: 1fr; }
@@ -1521,7 +1564,7 @@
         grid-template-rows: minmax(180px, 30vh) minmax(0, 1fr);
         overflow-y: auto;
         background:
-          linear-gradient(180deg, rgba(15, 118, 110, .10), transparent 46%),
+          linear-gradient(180deg, rgba(29, 78, 216, .10), transparent 46%),
           var(--bg);
       }
       .login-visual {
@@ -1547,9 +1590,9 @@
       }
       .login-panel {
         order: 1;
-        width: min(560px, calc(100% - 32px));
+        width: min(460px, calc(100% - 32px));
         margin: -34px auto 24px;
-        padding: 24px;
+        padding: 20px;
         border: 1px solid var(--line);
         border-radius: 12px;
         box-shadow: var(--shadow);
@@ -1559,7 +1602,7 @@
         margin-bottom: 22px;
       }
       .login-panel h2 {
-        font-size: 30px;
+        font-size: 28px;
       }
       .login-form,
       .auth-switch,
@@ -1585,7 +1628,7 @@
         grid-template-rows: 190px minmax(0, 1fr);
       }
       .login-visual {
-        padding: 18px;
+        padding: 14px;
         align-items: flex-end;
       }
       .login-copy h3 {
@@ -1610,23 +1653,23 @@
         height: 38px;
       }
       .login-panel h2 {
-        font-size: 26px;
+        font-size: 24px;
       }
       .login-panel p {
-        margin: 8px 0 14px;
-        font-size: 14px;
+        margin: 6px 0 12px;
+        font-size: 13px;
         line-height: 1.45;
       }
       .auth-switch {
-        grid-template-columns: 1fr;
-        gap: 5px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 4px;
       }
       .auth-switch button {
-        min-height: 38px;
+        min-height: 34px;
       }
       .login-form {
-        gap: 12px;
-        margin-top: 14px;
+        gap: 10px;
+        margin-top: 12px;
       }
       .login-hint {
         margin-top: 14px;
@@ -1642,7 +1685,7 @@
         font-size: 23px;
       }
       .login-panel {
-        padding: 14px;
+        padding: 12px;
       }
       .login-panel h2 {
         font-size: 23px;
@@ -2709,8 +2752,8 @@
           ${metric("Poteaux plateforme", kpis.polesTotal || 0, `${Number(kpis.storageGb || 0).toFixed(2)} GB utilises`)}
         </div>
         <div class="chart-grid">
-          ${chartCard("Croissance inscriptions", barChart((overview.growth || []).map(row => [row.month, row.signups, "#0f766e"])), "12 mois")}
-          ${chartCard("Activite poses", barChart((overview.growth || []).map(row => [row.month, row.interventions, "#d89f2b"])), "12 mois")}
+          ${chartCard("Croissance inscriptions", barChart((overview.growth || []).map(row => [row.month, row.signups, "#1d4ed8"])), "12 mois")}
+          ${chartCard("Activite poses", barChart((overview.growth || []).map(row => [row.month, row.interventions, "#f59e0b"])), "12 mois")}
         </div>
         ${renderPlatformAlerts()}
         ${renderTenantOnboarding()}
@@ -3250,11 +3293,11 @@
             ${metric("Volume plateforme", kpis.polesTotal || 0, `${Number(kpis.storageGb || 0).toFixed(2)} GB photos & PDF`)}
           </div>
           <div class="chart-grid">
-            ${chartCard("Croissance clients", barChart((overview.growth || []).map(row => [row.month, row.signups, "#0f766e"])), "12 mois")}
-            ${chartCard("Activite terrain globale", barChart((overview.growth || []).map(row => [row.month, row.interventions, "#d89f2b"])), "Poses")}
+            ${chartCard("Croissance clients", barChart((overview.growth || []).map(row => [row.month, row.signups, "#1d4ed8"])), "12 mois")}
+            ${chartCard("Activite terrain globale", barChart((overview.growth || []).map(row => [row.month, row.interventions, "#f59e0b"])), "Poses")}
             ${chartCard("Statuts tenants", donutChart([
               ["Actifs", kpis.tenantsActive || 0, "#127a43"],
-              ["Essai", kpis.tenantsTrial || 0, "#d89f2b"],
+              ["Essai", kpis.tenantsTrial || 0, "#f59e0b"],
               ["Suspendus", kpis.tenantsSuspended || 0, "#b42318"]
             ], Math.max(kpis.tenantsTotal || 0, 1)), "Portefeuille SaaS")}
             ${chartCard("Actions rapides", `
@@ -3301,12 +3344,12 @@
           body: `
             ${chartCard("Progression par statut", statusBarChart(), `${installed}/${total} implantes`)}
             ${chartCard("Repartition materiaux", donutChart([
-              ["BETON", beton, "#0f766e"],
-              ["METALLIQUE", metal, "#d89f2b"]
+              ["BETON", beton, "#1d4ed8"],
+              ["METALLIQUE", metal, "#f59e0b"]
             ], total), "Stock technique")}
             ${chartCard("Validation qualite", donutChart([
               ["Valide", validated, "#127a43"],
-              ["En attente", waiting, "#d89f2b"],
+              ["En attente", waiting, "#f59e0b"],
               ["Anomalie", anomaly, "#b42318"]
             ], Math.max(installed, 1)), `${validationRate}% conforme`)}
             ${activityCard("Dernieres operations", state.interventions)}
@@ -3322,7 +3365,7 @@
           body: `
             ${chartCard("Stock par statut", barChart([
               ["En Stock", stock, "#127a43"],
-              ["En Transit", transit, "#d89f2b"],
+              ["En Transit", transit, "#f59e0b"],
               ["Anomalie", anomaly, "#b42318"]
             ]), "Flux depot")}
             ${chartCard("Stock par depot", barChart(groupByCount(state.poles, "depot")), "Emplacements")}
@@ -3344,10 +3387,10 @@
           body: `
             ${chartCard("Mes validations", donutChart([
               ["Valide", myInterventions.filter(it => it.validation === "Valide").length, "#127a43"],
-              ["En attente", myInterventions.filter(it => it.validation.includes("attente")).length, "#d89f2b"],
+              ["En attente", myInterventions.filter(it => it.validation.includes("attente")).length, "#f59e0b"],
               ["Anomalie", myInterventions.filter(it => it.validation === "Anomalie").length, "#b42318"]
             ], Math.max(myInterventions.length, 1)), "Qualite terrain")}
-            ${chartCard("Preuves photo par fiche", barChart(myInterventions.slice(-6).map(it => [it.poleId, it.photos?.length || 0, "#2563a6"])), "Objectif 4 minimum")}
+            ${chartCard("Preuves photo par fiche", barChart(myInterventions.slice(-6).map(it => [it.poleId, it.photos?.length || 0, "#0284c7"])), "Objectif 4 minimum")}
             ${chartCard("Types de sol rencontres", barChart(groupByCount(myInterventions, "soil")), "Conditions terrain")}
             ${activityCard("Mes dernieres fiches", myInterventions)}
           `
@@ -3361,7 +3404,7 @@
           ],
           body: `
             ${chartCard("File de validation", donutChart([
-              ["A valider", waiting, "#d89f2b"],
+              ["A valider", waiting, "#f59e0b"],
               ["Valide", validated, "#127a43"],
               ["Anomalie", anomaly, "#b42318"]
             ], Math.max(installed, 1)), "Controle qualite")}
@@ -3624,9 +3667,9 @@
     function statusBarChart() {
       return barChart([
         ["En Stock", countStatus("En Stock"), "#127a43"],
-        ["En Transit", countStatus("En Transit"), "#d89f2b"],
-        ["En attente", countStatus("Pose - En attente validation"), "#2563a6"],
-        ["Valide", countStatus("Valide"), "#0f766e"],
+        ["En Transit", countStatus("En Transit"), "#f59e0b"],
+        ["En attente", countStatus("Pose - En attente validation"), "#0284c7"],
+        ["Valide", countStatus("Valide"), "#1d4ed8"],
         ["Anomalie", countStatus("Anomalie"), "#b42318"]
       ]);
     }
@@ -3644,7 +3687,7 @@
             return `
               <div class="bar-row" data-tooltip="${escapeAttr(`${label}: ${numericValue} element(s), ${share}% du total de ce graphique.`)}">
                 <span class="muted">${label}</span>
-                <div class="bar-track"><span class="bar-fill" style="--value:${percent}%;--bar-color:${color || "#0f766e"}"></span></div>
+                <div class="bar-track"><span class="bar-fill" style="--value:${percent}%;--bar-color:${color || "#1d4ed8"}"></span></div>
                 <strong>${value}</strong>
               </div>
             `;
@@ -3691,7 +3734,7 @@
     }
 
     function chartColor(index) {
-      return ["#0f766e", "#d89f2b", "#2563a6", "#127a43", "#b42318", "#7c3aed"][index % 6];
+      return ["#1d4ed8", "#f59e0b", "#0284c7", "#127a43", "#b42318", "#7c3aed"][index % 6];
     }
 
     function insightCard(title, rows) {
@@ -5011,7 +5054,7 @@
           const div = L.DomUtil.create("div", "map-status-legend");
           div.innerHTML = `
             <span><i style="--legend-color:#127a43"></i>Valide</span>
-            <span><i style="--legend-color:#d89f2b"></i>En attente</span>
+            <span><i style="--legend-color:#f59e0b"></i>En attente</span>
             <span><i style="--legend-color:#b42318"></i>Anomalie</span>
           `;
           L.DomEvent.disableClickPropagation(div);
@@ -5024,7 +5067,7 @@
       });
       const located = state.poles.filter(hasPoleCoordinates);
       located.forEach(p => {
-        const color = p.status === "Valide" ? "#127a43" : p.status === "Anomalie" ? "#b42318" : "#d89f2b";
+        const color = p.status === "Valide" ? "#127a43" : p.status === "Anomalie" ? "#b42318" : "#f59e0b";
         const details = mapPoleDetails(p);
         L.circleMarker([Number(p.lat), Number(p.lng)], {
           radius: 9,
