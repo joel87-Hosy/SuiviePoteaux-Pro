@@ -1432,6 +1432,19 @@ function tenantDetail(db, tenantId) {
   };
 }
 
+function tenantAdminAccess(db, tenantId) {
+  const mail = (db.activationEmails || []).slice().reverse().find(item => item.tenantId === tenantId && item.payload?.temporaryPassword);
+  const owner = mail
+    ? db.users.find(item => item.id === mail.userId && item.tenantId === tenantId)
+    : db.users.find(item => item.tenantId === tenantId && ["tenant_admin", "super_admin"].includes(item.role));
+  const password = mail?.payload?.temporaryPassword || "";
+  return {
+    email: owner?.email || "",
+    temporaryPassword: owner && password && verifyPassword(password, owner.passwordHash) ? password : "",
+    active: Boolean(owner && owner.active !== false)
+  };
+}
+
 function platformTeam(db) {
   return db.users
     .filter(item => item.role === "platform_admin")
@@ -1775,6 +1788,15 @@ async function handleApi(req, res, url) {
       const result = createTenantOnboarding(db, actor, body, req);
       await writeDb(db);
       return sendJson(req, res, 201, result);
+    }
+
+    const tenantAccessMatch = /^\/api\/super-admin\/tenants\/([^/]+)\/admin-access$/.exec(url.pathname);
+    if (tenantAccessMatch && req.method === "GET") {
+      const tenantId = decodeURIComponent(tenantAccessMatch[1]);
+      const tenant = db.tenants.find(item => item.id === tenantId);
+      if (!tenant) return sendError(req, res, 404, "Entreprise introuvable");
+      res.setHeader("Cache-Control", "no-store");
+      return sendJson(req, res, 200, { companyName: tenant.raisonSociale, ...tenantAdminAccess(db, tenantId) });
     }
 
     const tenantAdminMatch = /^\/api\/super-admin\/tenants\/([^/]+)$/.exec(url.pathname);

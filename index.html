@@ -2898,6 +2898,7 @@
                       <td>
                         <div class="toolbar" style="justify-content:flex-start">
                           <button class="btn" type="button" onclick="viewTenantDetail('${tenant.id}')">Detail</button>
+                          <button class="btn primary" type="button" onclick="viewTenantAdminAccess('${tenant.id}')">Acces admin</button>
                           <button class="btn" type="button" onclick="editTenantCompany('${tenant.id}')">Modifier entreprise</button>
                           <button class="btn" type="button" onclick="impersonateTenant('${tenant.id}')">Session support</button>
                           <button class="btn" type="button" onclick="editTenantPlan('${tenant.id}')">Plan & quotas</button>
@@ -3160,12 +3161,31 @@
         if (image) payload.company.logoUrl = image;
         const result = await apiFetch("/super-admin/tenants", { method: "POST", body: JSON.stringify(payload) });
         event.target.reset();
+        showTenantAdminAccess({ companyName: result.tenant.raisonSociale, email: result.owner.email, temporaryPassword: result.temporaryPassword, active: true });
         await refreshPlatformData();
-        showAppSheet("tenantCreatedSheet", "Entreprise creee", `<p>Admin : ${escapeHtml(result.owner.email)}</p><p>Mot de passe temporaire : ${escapeHtml(result.temporaryPassword)}</p>`);
       } catch (error) {
         toast(error.message || "Creation tenant impossible");
       } finally {
         submit.disabled = false;
+      }
+    }
+
+    function showTenantAdminAccess(access) {
+      showAppSheet("tenantCreatedSheet", "Acces administrateur de l'entreprise", `
+        <p><strong>${escapeHtml(access.companyName || "")}</strong></p>
+        <div class="field"><label for="tenantAccessEmail">Email de connexion</label><input id="tenantAccessEmail" readonly value="${escapeAttr(access.email || "")}"></div>
+        ${access.temporaryPassword ? `<div class="field" style="margin-top:12px"><label for="tenantAccessPassword">Mot de passe temporaire</label><input id="tenantAccessPassword" readonly value="${escapeAttr(access.temporaryPassword)}"></div>` : `<p>Le mot de passe temporaire n'est plus disponible ou a deja ete modifie. Utilisez ? Mot de passe oublie ? sur l'ecran de connexion.</p>`}
+        ${access.active ? "" : `<p>Ce compte administrateur est desactive ou introuvable.</p>`}
+        <p class="muted">Vous pouvez retrouver cette fiche dans Tenants clients, bouton Acces admin.</p>
+      `);
+    }
+
+    async function viewTenantAdminAccess(tenantId) {
+      try {
+        const access = await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}/admin-access`);
+        showTenantAdminAccess(access);
+      } catch (error) {
+        toast(error.message || "Chargement des acces impossible");
       }
     }
 
