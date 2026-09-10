@@ -1433,15 +1433,22 @@ function tenantDetail(db, tenantId) {
 }
 
 function tenantAdminAccess(db, tenantId) {
-  const mail = (db.activationEmails || []).slice().reverse().find(item => item.tenantId === tenantId && item.payload?.temporaryPassword);
-  const owner = mail
-    ? db.users.find(item => item.id === mail.userId && item.tenantId === tenantId)
-    : db.users.find(item => item.tenantId === tenantId && ["tenant_admin", "super_admin"].includes(item.role));
+  const mails = (db.activationEmails || []).filter(item => (item.tenantId || item.tenant_id) === tenantId).slice().reverse();
+  const admins = db.users.filter(item => (item.tenantId || item.tenant_id) === tenantId && ["tenant_admin", "super_admin"].includes(item.role));
+  const normalizeEmail = value => String(value || "").trim().toLowerCase();
+  const owner = admins.find(user => mails.some(mail => user.id === (mail.userId || mail.user_id)))
+    || admins.find(user => user.email && mails.some(mail => normalizeEmail(mail.email) === normalizeEmail(user.email)))
+    || admins.find(user => user.active !== false)
+    || admins[0];
+  const mail = owner
+    ? mails.find(item => owner.id === (item.userId || item.user_id) || (owner.email && normalizeEmail(item.email) === normalizeEmail(owner.email)))
+    : mails.find(item => item.email);
   const password = mail?.payload?.temporaryPassword || "";
   return {
-    email: owner?.email || "",
+    email: owner?.email || mail?.email || "",
     temporaryPassword: owner && password && verifyPassword(password, owner.passwordHash) ? password : "",
-    active: Boolean(owner && owner.active !== false)
+    active: Boolean(owner && owner.active !== false),
+    accountFound: Boolean(owner)
   };
 }
 

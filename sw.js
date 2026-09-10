@@ -1,4 +1,4 @@
-const CACHE_NAME = "suivi-poteaux-pro-v31";
+const CACHE_NAME = "suivi-poteaux-pro-v33";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -25,6 +25,7 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
+  if (new URL(event.request.url).pathname.startsWith("/api/")) return;
   event.respondWith(
     fetch(event.request).then(response => {
       const copy = response.clone();

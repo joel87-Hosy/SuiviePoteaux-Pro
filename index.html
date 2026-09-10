@@ -2888,7 +2888,11 @@
                 <tbody>
                   ${(platformState.tenants || []).map(tenant => `
                     <tr>
-                      <td><strong>${escapeHtml(tenant.raisonSociale)}</strong><br><span class="muted">${escapeHtml(tenant.slug)} - ${escapeHtml(tenant.pays || "")}</span></td>
+                      <td>
+                        <strong>${escapeHtml(tenant.raisonSociale)}</strong><br>
+                        <span class="muted">${escapeHtml(tenant.slug)} - ${escapeHtml(tenant.pays || "")}</span>
+                        <div style="margin-top:10px"><button class="btn primary" type="button" onclick="viewTenantAdminAccess('${tenant.id}')">Acces admin</button></div>
+                      </td>
                       <td>${escapeHtml(tenant.subscription?.planName || "-")}<br><span class="muted">${escapeHtml(tenant.subscription?.billingCycle || "monthly")}</span></td>
                       <td>${tenantModulesBadges(tenant.modules)}</td>
                       <td><span class="badge ${tenant.status === "active" ? "ok" : tenant.status === "suspended" ? "danger" : "warn"}">${tenantStatusLabel(tenant.status)}</span></td>
@@ -2898,7 +2902,6 @@
                       <td>
                         <div class="toolbar" style="justify-content:flex-start">
                           <button class="btn" type="button" onclick="viewTenantDetail('${tenant.id}')">Detail</button>
-                          <button class="btn primary" type="button" onclick="viewTenantAdminAccess('${tenant.id}')">Acces admin</button>
                           <button class="btn" type="button" onclick="editTenantCompany('${tenant.id}')">Modifier entreprise</button>
                           <button class="btn" type="button" onclick="impersonateTenant('${tenant.id}')">Session support</button>
                           <button class="btn" type="button" onclick="editTenantPlan('${tenant.id}')">Plan & quotas</button>
@@ -3173,9 +3176,9 @@
     function showTenantAdminAccess(access) {
       showAppSheet("tenantCreatedSheet", "Acces administrateur de l'entreprise", `
         <p><strong>${escapeHtml(access.companyName || "")}</strong></p>
-        <div class="field"><label for="tenantAccessEmail">Email de connexion</label><input id="tenantAccessEmail" readonly value="${escapeAttr(access.email || "")}"></div>
+        <div class="field"><label for="tenantAccessEmail">Email de connexion</label><input id="tenantAccessEmail" readonly value="${escapeAttr(access.email || "")}" placeholder="Aucun email administrateur enregistre"></div>
         ${access.temporaryPassword ? `<div class="field" style="margin-top:12px"><label for="tenantAccessPassword">Mot de passe temporaire</label><input id="tenantAccessPassword" readonly value="${escapeAttr(access.temporaryPassword)}"></div>` : `<p>Le mot de passe temporaire n'est plus disponible ou a deja ete modifie. Utilisez ? Mot de passe oublie ? sur l'ecran de connexion.</p>`}
-        ${access.active ? "" : `<p>Ce compte administrateur est desactive ou introuvable.</p>`}
+        ${access.accountFound === false ? `<p>L'adresse ci-dessus provient de l'inscription de l'entreprise. Aucun compte administrateur correspondant n'a ete retrouve.</p>` : access.active ? "" : `<p>Ce compte administrateur est desactive.</p>`}
         <p class="muted">Vous pouvez retrouver cette fiche dans Tenants clients, bouton Acces admin.</p>
       `);
     }
@@ -7305,6 +7308,7 @@
     window.changeTenantStatus = changeTenantStatus;
     window.impersonateTenant = impersonateTenant;
     window.viewTenantDetail = viewTenantDetail;
+    window.viewTenantAdminAccess = viewTenantAdminAccess;
     window.archiveTenant = archiveTenant;
     window.runDunning = runDunning;
     window.changePlatformPage = changePlatformPage;
