@@ -1773,6 +1773,9 @@ async function handleApi(req, res, url) {
       const tenant = db.tenants.find(item => item.id === tenantId);
       if (!tenant) return sendError(req, res, 404, "Tenant introuvable");
       const body = await readBody(req);
+      if (body.raisonSociale !== undefined && !String(body.raisonSociale || "").trim()) {
+        return sendError(req, res, 400, "La raison sociale est obligatoire");
+      }
       if (body.status !== undefined) {
         if (!TENANT_STATUSES.includes(body.status)) return sendError(req, res, 400, "Statut tenant invalide");
         tenant.status = body.status;

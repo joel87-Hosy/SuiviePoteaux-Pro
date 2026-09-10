@@ -1052,7 +1052,7 @@
       z-index: 50;
     }
 
-    .drawer.open { display: block; }
+    .drawer[open] { display: block; }
 
     .drawer-backdrop {
       position: absolute;
@@ -1701,6 +1701,48 @@
         transition-duration: .01ms !important;
       }
     }
+    .app-sheet {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      width: min(860px, calc(100vw - 32px));
+      max-width: none;
+      max-height: calc(100dvh - 32px);
+      margin: auto;
+      padding: 0;
+      border: 0;
+      border-radius: 18px;
+      background: transparent;
+      color: inherit;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.3);
+    }
+
+    .app-sheet::backdrop {
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(7px);
+      -webkit-backdrop-filter: blur(7px);
+    }
+
+    .app-sheet > .card { margin: 0; }
+    dialog.card.app-sheet { background: var(--surface, #fff); }
+    .drawer.app-sheet .drawer-panel {
+      position: relative;
+      width: 100%;
+      height: auto;
+      border: 0;
+      overflow: visible;
+      animation: fadeIn .18s ease;
+    }
+    .app-sheet .section-head { position: sticky; top: 0; z-index: 1; background: var(--surface, #fff); }
+    .app-sheet .report-row { overflow-wrap: anywhere; }
+    body:has(dialog[open]) { overflow: hidden; }
+
+    @media (max-width: 600px) {
+      .app-sheet { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+      .app-sheet .section-head { gap: 12px; flex-wrap: wrap; }
+    }
   </style>
 </head>
 <body>
@@ -1891,8 +1933,7 @@
 
   <nav class="mobile-tabs" id="mobileNav"></nav>
 
-  <div class="drawer" id="interventionDrawer" aria-hidden="true">
-    <div class="drawer-backdrop" data-close-drawer></div>
+  <dialog class="drawer app-sheet" id="interventionDrawer" aria-label="Fiche de pose">
     <div class="drawer-panel">
       <div class="section-head" style="padding:0 0 14px;border-bottom:1px solid var(--line);margin-bottom:16px">
         <div>
@@ -2000,10 +2041,9 @@
         </div>
       </form>
     </div>
-  </div>
+  </dialog>
 
-  <div class="drawer" id="stockEntryDrawer" aria-hidden="true">
-    <div class="drawer-backdrop" data-close-stock-drawer></div>
+  <dialog class="drawer app-sheet" id="stockEntryDrawer" aria-label="Entree en stock">
     <div class="drawer-panel">
       <div class="section-head" style="padding:0 0 14px;border-bottom:1px solid var(--line);margin-bottom:16px">
         <div>
@@ -2072,10 +2112,9 @@
         </div>
       </form>
     </div>
-  </div>
+  </dialog>
 
-  <div class="drawer" id="qrScanDrawer" aria-hidden="true">
-    <div class="drawer-backdrop" data-close-qr-drawer></div>
+  <dialog class="drawer app-sheet" id="qrScanDrawer" aria-label="Scan QR">
     <div class="drawer-panel">
       <div class="section-head" style="padding:0 0 14px;border-bottom:1px solid var(--line);margin-bottom:16px">
         <div>
@@ -2118,7 +2157,7 @@
         <div id="qrVerificationResult"></div>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <div class="toast" id="toast"></div>
 
@@ -2858,7 +2897,8 @@
                       <td>
                         <div class="toolbar" style="justify-content:flex-start">
                           <button class="btn" type="button" onclick="viewTenantDetail('${tenant.id}')">Detail</button>
-                          <button class="btn" type="button" onclick="impersonateTenant('${tenant.id}')">Impersonate</button>
+                          <button class="btn" type="button" onclick="editTenantCompany('${tenant.id}')">Modifier entreprise</button>
+                          <button class="btn" type="button" onclick="impersonateTenant('${tenant.id}')">Session support</button>
                           <button class="btn" type="button" onclick="editTenantPlan('${tenant.id}')">Plan & quotas</button>
                           <button class="btn warning" type="button" onclick="changeTenantStatus('${tenant.id}')">Statut</button>
                           ${tenant.id === "tenant-demo" ? "" : `<button class="btn" type="button" onclick="archiveTenant('${tenant.id}')">Archiver</button>`}
@@ -3079,94 +3119,181 @@
         const result = await apiFetch("/super-admin/tenants", { method: "POST", body: JSON.stringify(payload) });
         event.target.reset();
         await refreshPlatformData();
-        alert(`Tenant cree.\nAdmin: ${result.owner.email}\nMot de passe temporaire: ${result.temporaryPassword}`);
+        showAppSheet("tenantCreatedSheet", "Entreprise creee", `<p>Admin : ${escapeHtml(result.owner.email)}</p><p>Mot de passe temporaire : ${escapeHtml(result.temporaryPassword)}</p>`);
       } catch (error) {
         toast(error.message || "Creation tenant impossible");
       }
     }
 
-    async function editTenantPlan(tenantId) {
-      const tenant = platformState.tenants.find(item => item.id === tenantId);
-      if (!tenant) return;
-      const planName = prompt("Plan: starter, pro ou enterprise", tenant.subscription?.planName || "starter");
-      if (!planName) return;
-      const maxUsers = prompt("Nombre max utilisateurs", tenant.limits?.maxUsers || 10);
-      const maxDepots = prompt("Nombre max depots", tenant.limits?.maxDepots || 2);
-      const maxStorageGb = prompt("Stockage max GB", tenant.limits?.maxStorageGb || 10);
-      const currentModules = { ...DEFAULT_MODULES, ...(tenant.modules || {}) };
-      const production = prompt("Module Production usine: oui ou non", currentModules.production ? "oui" : "non");
-      const sales = prompt("Module Ventes & Clients: oui ou non", currentModules.sales ? "oui" : "non");
-      const finance = prompt("Module Finance / Reporting: oui ou non", currentModules.finance ? "oui" : "non");
-      if ([production, sales, finance].some(value => value === null)) return;
-      try {
-        await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            subscription: { planName },
-            limits: { maxUsers: Number(maxUsers), maxDepots: Number(maxDepots), maxStorageGb: Number(maxStorageGb) },
-            modules: {
-              production: /^oui|yes|true|1$/i.test(production.trim()),
-              sales: /^oui|yes|true|1$/i.test(sales.trim()),
-              finance: /^oui|yes|true|1$/i.test(finance.trim())
-            }
-          })
+    function openAppDialog(dialog, onClose) {
+      if (!dialog) return;
+      dialog.oncancel = event => {
+        event.preventDefault();
+        onClose();
+      };
+      dialog.classList.add("open");
+      if (!dialog.open) dialog.showModal();
+      dialog.scrollTop = 0;
+    }
+
+    function closeAppDialog(dialog) {
+      if (!dialog) return;
+      if (dialog.open) dialog.close();
+      dialog.classList.remove("open");
+    }
+
+    function showAppSheet(id, title, content, onClose = () => {}) {
+      let dialog = document.getElementById(id);
+      if (!dialog) {
+        dialog = document.createElement("dialog");
+        dialog.id = id;
+        dialog.className = "app-sheet";
+        document.body.appendChild(dialog);
+      }
+      const close = () => { closeAppDialog(dialog); dialog.innerHTML = ""; onClose(); };
+      dialog.setAttribute("aria-label", title);
+      dialog.innerHTML = `<section class="card"><div class="section-head"><h3 tabindex="-1">${escapeHtml(title)}</h3><button class="btn" type="button" data-sheet-close>Fermer</button></div><div class="section-body">${content}</div></section>`;
+      dialog.querySelector("[data-sheet-close]").onclick = close;
+      openAppDialog(dialog, close);
+      dialog.querySelector("h3").focus({ preventScroll: true });
+      return dialog;
+    }
+
+    function requestSheetFields(title, fields) {
+      return new Promise(resolve => {
+        const content = `<form data-sheet-form class="grid">${fields.map(field => `<div class="field"><label for="action-${field.name}">${escapeHtml(field.label)}</label>${field.options
+          ? `<select id="action-${field.name}" name="${field.name}">${field.options.map(value => `<option ${value === field.value ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select>`
+          : `<textarea id="action-${field.name}" name="${field.name}" ${field.required ? "required" : ""}>${escapeHtml(field.value || "")}</textarea>`}</div>`).join("")}<button class="btn primary" type="submit">Continuer</button></form>`;
+        const dialog = showAppSheet("actionSheet", title, content, () => resolve(null));
+        dialog.querySelector("form").onsubmit = event => {
+          event.preventDefault();
+          const values = Object.fromEntries(new FormData(event.currentTarget));
+          if (fields.some(field => field.required && !String(values[field.name] || "").trim())) return;
+          closeAppDialog(dialog);
+          dialog.innerHTML = "";
+          resolve(values);
+        };
+      });
+    }
+
+    let tenantSheetRequest = 0;
+
+    function closeTenantSheet() {
+      tenantSheetRequest++;
+      const host = $("#tenantSheetHost");
+      if (host) {
+        if (host.open) host.close();
+        host.innerHTML = "";
+      }
+    }
+
+    function editTenantPlan(tenantId) { return openTenantSheet(tenantId, "plan"); }
+    function changeTenantStatus(tenantId) { return openTenantSheet(tenantId, "status"); }
+    function impersonateTenant(tenantId) { return openTenantSheet(tenantId, "support"); }
+    function viewTenantDetail(tenantId) { return openTenantSheet(tenantId, "detail"); }
+    function archiveTenant(tenantId) { return openTenantSheet(tenantId, "archive"); }
+    function editTenantCompany(tenantId) { return openTenantSheet(tenantId, "company"); }
+
+    async function openTenantSheet(tenantId, mode) {
+      let host = $("#tenantSheetHost");
+      if (!host) {
+        host = document.createElement("dialog");
+        host.id = "tenantSheetHost";
+        host.className = "app-sheet";
+        host.setAttribute("aria-label", "Fiche entreprise cliente");
+        host.addEventListener("cancel", event => {
+          event.preventDefault();
+          closeTenantSheet();
         });
-        await refreshPlatformData();
-      } catch (error) {
-        toast(error.message || "Modification tenant impossible");
+        document.body.appendChild(host);
       }
-    }
-
-    async function changeTenantStatus(tenantId) {
-      const tenant = platformState.tenants.find(item => item.id === tenantId);
-      const status = prompt("Statut: active, trial ou suspended", tenant?.status || "active");
-      if (!status) return;
-      try {
-        await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}/status`, { method: "POST", body: JSON.stringify({ status }) });
-        await refreshPlatformData();
-      } catch (error) {
-        toast(error.message || "Changement statut impossible");
-      }
-    }
-
-    async function impersonateTenant(tenantId) {
-      if (!confirm("Generer une session temporaire de support pour ce tenant ?")) return;
-      try {
-        const payload = await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}/impersonate`, { method: "POST", body: JSON.stringify({}) });
-        alert(`Token support temporaire genere pour ${payload.user.email}.\nExpiration: ${payload.expiresInMinutes} minutes.`);
-      } catch (error) {
-        toast(error.message || "Impersonation impossible");
-      }
-    }
-
-    async function viewTenantDetail(tenantId) {
+      const request = ++tenantSheetRequest;
+      host.innerHTML = `<div class="card section-body"><p role="status">Chargement de la fiche entreprise...</p><button class="btn" type="button" onclick="closeTenantSheet()">Fermer</button></div>`;
+      if (!host.open) host.showModal();
+      host.scrollTop = 0;
       try {
         const detail = await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}`);
+        if (request !== tenantSheetRequest || !host.isConnected) return;
         const tenant = detail.tenant;
-        alert([
-          `${tenant.raisonSociale} (${tenant.slug})`,
-          `Statut: ${tenantStatusLabel(tenant.status)}`,
-          `Plan: ${tenant.subscription?.planName || "-"} / ${tenant.subscription?.billingCycle || "monthly"}`,
-          `Utilisateurs: ${detail.users.length} / ${tenant.limits?.maxUsers || "-"}`,
-          `Poteaux: ${detail.poles.length}`,
-          `Projets: ${detail.projects.length}`,
-          `Fiches: ${detail.interventions.length}`,
-          `Stockage: ${tenant.usage?.storageGb || 0} / ${tenant.limits?.maxStorageGb || "-"} GB`,
-          `Emails activation: ${detail.activationEmails.length}`,
-          `Transactions: ${detail.transactions.length}`
-        ].join("\n"));
+        const titles = { detail: "Fiche entreprise", company: "Modifier entreprise", plan: "Plan et quotas", status: "Statut entreprise", support: "Session support", archive: "Archiver entreprise" };
+        const input = (name, label, value, type = "text", extra = "") => `<div class="field"><label for="sheet-${name}">${label}</label><input id="sheet-${name}" name="${name}" type="${type}" value="${escapeAttr(value ?? "")}" ${extra}></div>`;
+        const select = (name, label, value, options) => `<div class="field"><label for="sheet-${name}">${label}</label><select id="sheet-${name}" name="${name}">${options.map(([key, text]) => `<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></div>`;
+        const row = (label, value) => `<div class="report-row"><strong>${label}</strong><span>${escapeHtml(String(value ?? "-"))}</span></div>`;
+        let content = "";
+        if (mode === "detail") {
+          content = `<div class="report-list">${[
+            row("Raison sociale", tenant.raisonSociale), row("Identifiant", tenant.slug),
+            row("Secteur d'activite", tenant.secteurActivite), row("Pays", tenant.pays), row("Ville", tenant.ville), row("Logo URL", tenant.logoUrl),
+            row("Statut", tenantStatusLabel(tenant.status)), row("Plan", tenant.subscription?.planName),
+            row("Facturation", tenant.subscription?.billingCycle === "annual" ? "Annuelle" : "Mensuelle"),
+            row("Utilisateurs", `${detail.users.length} / ${tenant.limits?.maxUsers || "-"}`),
+            row("Poteaux", detail.poles.length), row("Projets", detail.projects.length), row("Fiches", detail.interventions.length),
+            row("Stockage GB", `${tenant.usage?.storageGb || 0} / ${tenant.limits?.maxStorageGb || "-"}`),
+            row("Emails activation", detail.activationEmails.length), row("Transactions", detail.transactions.length)
+          ].join("")}</div><div class="toolbar" style="margin-top:16px"><button class="btn primary" id="sheetEditCompany" type="button">Modifier les informations</button></div>`;
+        } else if (mode === "company") {
+          content = `<div class="grid">${input("raisonSociale", "Raison sociale", tenant.raisonSociale, "text", "required")}${input("secteurActivite", "Secteur d'activite", tenant.secteurActivite)}${input("pays", "Pays", tenant.pays)}${input("ville", "Ville", tenant.ville)}${input("logoUrl", "Logo URL", tenant.logoUrl, "url")}</div>`;
+        } else if (mode === "plan") {
+          content = `<div class="grid">${select("planName", "Plan", tenant.subscription?.planName || "starter", [["starter", "Starter"], ["pro", "Pro"], ["enterprise", "Enterprise"]])}${select("billingCycle", "Facturation", tenant.subscription?.billingCycle || "monthly", [["monthly", "Mensuelle"], ["annual", "Annuelle"]])}${input("maxUsers", "Nombre maximal d'utilisateurs", tenant.limits?.maxUsers || 10, "number", 'min="1" step="1" required')}${input("maxDepots", "Nombre maximal de depots", tenant.limits?.maxDepots || 2, "number", 'min="1" step="1" required')}${input("maxStorageGb", "Stockage maximal (GB)", tenant.limits?.maxStorageGb || 10, "number", 'min="1" step="any" required')}</div><div class="toolbar" style="margin-top:16px">${[["production", "Production usine"], ["sales", "Ventes clients"], ["finance", "Finance / Reporting"]].map(([key, label]) => `<label><input name="${key}" type="checkbox" style="width:auto" ${tenant.modules?.[key] ? "checked" : ""}> ${label}</label>`).join("")}</div>`;
+        } else if (mode === "status") {
+          content = select("status", "Statut", tenant.status, [["active", "Actif"], ["trial", "Essai"], ["suspended", "Suspendu"]]);
+        } else if (mode === "support") {
+          content = `<p>Generer une session temporaire de support pour cette entreprise.</p>`;
+        } else if (mode === "archive") {
+          content = `<p>Les comptes de cette entreprise seront desactives. Les donnees seront conservees.</p>`;
+          if (tenant.id === "tenant-demo") throw new Error("Le compte demo ne peut pas etre archive.");
+        }
+        const action = mode === "archive" ? "Confirmer l'archivage" : mode === "support" ? "Generer la session" : "Enregistrer";
+        host.innerHTML = `<section class="card" aria-labelledby="tenantSheetTitle"><div class="section-head"><div><h3 id="tenantSheetTitle" tabindex="-1">${titles[mode]}</h3><span class="muted">${escapeHtml(tenant.raisonSociale)} &mdash; ${escapeHtml(tenant.slug)}</span></div><button class="btn" type="button" id="sheetClose">Fermer</button></div><div class="section-body"><form id="tenantSheetForm">${content}<p id="tenantSheetMessage" role="status" aria-live="polite"></p>${mode === "detail" ? "" : `<div class="toolbar" style="margin-top:16px"><button class="btn ${mode === "archive" ? "warning" : "primary"}" type="submit">${action}</button><button class="btn" type="button" id="sheetCancel">Annuler</button></div>`}</form></div></section>`;
+        host.querySelector("#sheetClose").onclick = closeTenantSheet;
+        host.querySelector("#sheetCancel")?.addEventListener("click", closeTenantSheet);
+        host.querySelector("#sheetEditCompany")?.addEventListener("click", () => editTenantCompany(tenantId));
+        host.querySelector("#tenantSheetTitle").focus({ preventScroll: true });
+        host.querySelector("#tenantSheetForm").addEventListener("submit", async event => {
+          event.preventDefault();
+          if (mode === "detail") return;
+          const form = event.currentTarget;
+          const data = new FormData(form);
+          const message = host.querySelector("#tenantSheetMessage");
+          let body = {};
+          let method = "PATCH";
+          let suffix = "";
+          if (mode === "company") {
+            for (const field of ["raisonSociale", "secteurActivite", "pays", "ville", "logoUrl"]) body[field] = String(data.get(field) || "").trim();
+            if (!body.raisonSociale) { message.textContent = "La raison sociale est obligatoire."; return; }
+          } else if (mode === "plan") {
+            body = { subscription: { planName: data.get("planName"), billingCycle: data.get("billingCycle") }, limits: {}, modules: {} };
+            for (const field of ["maxUsers", "maxDepots", "maxStorageGb"]) body.limits[field] = Number(data.get(field));
+            for (const field of ["production", "sales", "finance"]) body.modules[field] = data.has(field);
+          } else if (mode === "status") {
+            method = "POST"; suffix = "/status"; body = { status: data.get("status") };
+          } else if (mode === "support") {
+            method = "POST"; suffix = "/impersonate";
+          } else if (mode === "archive") {
+            method = "DELETE";
+          }
+          const submit = form.querySelector('[type="submit"]');
+          submit.disabled = true;
+          message.textContent = "Enregistrement en cours...";
+          try {
+            const payload = await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}${suffix}`, { method, ...(method === "DELETE" ? {} : { body: JSON.stringify(body) }) });
+            if (mode === "support") {
+              message.textContent = `Session temporaire generee pour ${payload.user.email}. Expiration : ${payload.expiresInMinutes} minutes.`;
+              return;
+            }
+            if (request === tenantSheetRequest && host.isConnected) {
+              closeTenantSheet();
+              await refreshPlatformData();
+              toast(mode === "archive" ? "Entreprise archivee" : "Entreprise mise a jour");
+            }
+          } catch (error) {
+            message.textContent = error.message || "Enregistrement impossible. Reessayez.";
+            submit.disabled = false;
+          }
+        });
       } catch (error) {
-        toast(error.message || "Detail tenant impossible");
-      }
-    }
-
-    async function archiveTenant(tenantId) {
-      if (!confirm("Archiver cette entreprise ? Les comptes seront desactives, les donnees restent conservees.")) return;
-      try {
-        await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}`, { method: "DELETE" });
-        await refreshPlatformData();
-      } catch (error) {
-        toast(error.message || "Archivage impossible");
+        if (request !== tenantSheetRequest || !host.isConnected) return;
+        host.innerHTML = `<div class="card section-body"><p role="alert">${escapeHtml(error.message || "Chargement impossible")}</p><button class="btn" type="button" onclick="closeTenantSheet()">Fermer</button></div>`;
       }
     }
 
@@ -3953,7 +4080,7 @@
           </div>
         ` : ""}
         ${can("admin") ? `
-          <div class="card hidden" id="projectFormCard" style="margin-bottom:16px">
+          <dialog class="card app-sheet" id="projectFormCard" aria-labelledby="projectFormTitle">
             <div class="section-head">
               <h3 id="projectFormTitle">Nouveau projet</h3>
               <button class="btn" type="button" onclick="closeProjectForm()">Fermer</button>
@@ -3989,7 +4116,7 @@
                 </div>
               </form>
             </div>
-          </div>
+          </dialog>
         ` : ""}
         <div class="card">
           <div class="section-head">
@@ -4229,8 +4356,11 @@
     }
 
     function toggleReportDetails(reportId) {
-      selectedReportId = selectedReportId === reportId ? "" : reportId;
-      renderReports();
+      const intervention = visibleReportInterventions().find(item => item.id === reportId);
+      if (!intervention) return;
+      selectedReportId = reportId;
+      const pole = state.poles.find(item => item.id === intervention.poleId) || {};
+      showAppSheet("reportDetailSheet", `Fiche ${intervention.id}`, reportControlDetails(intervention, pole), () => { selectedReportId = ""; });
     }
 
     function reportControlDetails(intervention, pole) {
@@ -5078,7 +5208,7 @@
         })
           .addTo(map)
           .bindTooltip(`${escapeHtml(p.id)} - ${escapeHtml(p.status || "N/A")}`, { sticky: true, direction: "top", opacity: .94, className: "pole-tooltip" })
-          .bindPopup(details);
+          .on("click", () => showAppSheet("poleDetailSheet", `Fiche poteau ${p.id}`, details));
       });
       if (located.length) {
         map.fitBounds(located.map(p => [Number(p.lat), Number(p.lng)]), { padding: [28, 28], maxZoom: 14 });
@@ -5087,6 +5217,7 @@
     }
 
     function renderReports() {
+      if ($("#reportDetailSheet")?.open && selectedReportId) toggleReportDetails(selectedReportId);
       const canCreateReport = can("write_intervention");
       const closedProjects = state.projects.filter(project => project.status === "Cloture");
       const reportGroups = reportGroupsByProjectAndTeam();
@@ -5147,11 +5278,11 @@
                           <div class="report-main">
                             <strong>${escapeHtml(it.id)} - ${escapeHtml(it.poleId)}</strong>
                             <p class="muted" style="margin:4px 0 0">${formatDate(it.date)} - ${escapeHtml(pole.type || "")} - ${escapeHtml(it.validation || "N/A")}${escapeHtml(actionLabel)}</p>
-                            ${isOpen ? reportControlDetails(it, pole) : ""}
+
                           </div>
                           <div class="toolbar">
                             <span class="badge ${statusClass((it.validation || "").replace("Pose - En attente validation", "Pose - En attente validation"))}">${photoCount}/5 photos</span>
-                            <button class="btn primary" type="button" onclick="toggleReportDetails('${escapeAttr(it.id)}')">${isOpen ? "Masquer" : "Details / controler"}</button>
+                            <button class="btn primary" type="button" onclick="toggleReportDetails('${escapeAttr(it.id)}')">Details / controler</button>
                             <button class="btn" type="button" onclick="generatePdf('${escapeAttr(it.id)}')">${icon("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3")} PDF</button>
                           </div>
                         </div>
@@ -5465,12 +5596,11 @@
       const formCard = $("#projectFormCard");
       if (!formCard) return;
       resetProjectForm();
-      formCard.classList.remove("hidden");
-      formCard.scrollIntoView({ behavior: "smooth", block: "start" });
+      openAppDialog(formCard, closeProjectForm);
     }
 
     function closeProjectForm() {
-      $("#projectFormCard")?.classList.add("hidden");
+      closeAppDialog($("#projectFormCard"));
     }
 
     function resetProjectForm() {
@@ -5482,7 +5612,7 @@
 
     function fillProjectForm(project) {
       setView("projects");
-      $("#projectFormCard")?.classList.remove("hidden");
+      openAppDialog($("#projectFormCard"), closeProjectForm);
       $("#projectEditId").value = project.id;
       $("#projectFormTitle").textContent = `Modifier ${project.id}`;
       $("#projectName").value = project.name || "";
@@ -5507,7 +5637,7 @@
         `Evolution: ${projectProgress(project)}% (${projectDone(project)}/${projectTotal(project)})`,
         `Poteaux: ${poles.map(pole => pole.id).join(", ") || "Aucun poteau affecte"}`
       ].join("\n");
-      alert(details);
+      showAppSheet("projectDetailSheet", "Fiche projet", `<div style="white-space:pre-wrap">${escapeHtml(details)}</div>`);
     }
 
     function editProject(projectId) {
@@ -5676,8 +5806,7 @@
     }
 
     function openDrawer(poleId) {
-      $("#interventionDrawer").classList.add("open");
-      $("#interventionDrawer").setAttribute("aria-hidden", "false");
+      openAppDialog($("#interventionDrawer"), closeDrawer);
       $("#interventionForm").reset();
       $("#agent").value = apiUser?.name || currentTerrainTeam();
       $("#depth").value = "1.20";
@@ -5704,8 +5833,7 @@
     }
 
     function closeDrawer() {
-      $("#interventionDrawer").classList.remove("open");
-      $("#interventionDrawer").setAttribute("aria-hidden", "true");
+      closeAppDialog($("#interventionDrawer"));
     }
 
     function initSignaturePad() {
@@ -5785,8 +5913,7 @@
 
     function openStockEntryDrawer() {
       const settings = appSettings();
-      $("#stockEntryDrawer").classList.add("open");
-      $("#stockEntryDrawer").setAttribute("aria-hidden", "false");
+      openAppDialog($("#stockEntryDrawer"), closeStockEntryDrawer);
       refreshStockEntryOptions();
       $("#stockEntryForm").reset();
       $("#entryType").value = settings.poleTypes[0] || "BETON";
@@ -5801,8 +5928,7 @@
     }
 
     function closeStockEntryDrawer() {
-      $("#stockEntryDrawer").classList.remove("open");
-      $("#stockEntryDrawer").setAttribute("aria-hidden", "true");
+      closeAppDialog($("#stockEntryDrawer"));
     }
 
     function generatePoleCode() {
@@ -5890,8 +6016,7 @@
 
     function openQrScanDrawer() {
       if (!(can("write_intervention") || can("validate") || can("admin"))) return toast("Permission scan QR requise");
-      $("#qrScanDrawer").classList.add("open");
-      $("#qrScanDrawer").setAttribute("aria-hidden", "false");
+      openAppDialog($("#qrScanDrawer"), closeQrScanDrawer);
       $("#manualQrCode").value = "";
       $("#qrVerificationResult").innerHTML = `<div class="empty">Scannez un QR ou saisissez un code poteau pour lancer la verification.</div>`;
       $("#qrScanStatus").textContent = "Pret";
@@ -5899,8 +6024,7 @@
 
     function closeQrScanDrawer() {
       stopQrScanner();
-      $("#qrScanDrawer").classList.remove("open");
-      $("#qrScanDrawer").setAttribute("aria-hidden", "true");
+      closeAppDialog($("#qrScanDrawer"));
     }
 
     function extractPoleCodeFromQr(value) {
@@ -6737,7 +6861,7 @@
     async function validateReport(reportId, validation, providedReason = "", providedAction = "") {
       if (!can("validate")) return toast("Permission validation requise");
       const clientSignature = apiUser?.name || "Controle Qualite";
-      const anomalyReason = validation === "Anomalie" ? (providedReason || prompt("Motif de l'anomalie ?")) : "";
+      const anomalyReason = validation === "Anomalie" ? (providedReason || (await requestSheetFields("Motif de l'anomalie", [{ name: "reason", label: "Motif", required: true }]))?.reason) : "";
       const anomalyAction = validation === "Anomalie" ? (providedAction || "Reprendre implantation") : "";
       if (validation === "Anomalie" && !String(anomalyReason || "").trim()) return toast("Motif obligatoire pour notifier le technicien");
       try {
@@ -6758,8 +6882,10 @@
       }
     }
 
-    function rejectReport(reportId, anomalyAction) {
-      const reason = prompt(`Motif pour notifier le technicien - ${anomalyAction} ?`);
+    async function rejectReport(reportId, anomalyAction) {
+      const result = await requestSheetFields(anomalyAction, [{ name: "reason", label: "Motif pour notifier le technicien", required: true }]);
+      if (!result) return;
+      const reason = result.reason;
       if (!String(reason || "").trim()) return toast("Motif obligatoire pour notifier le technicien");
       validateReport(reportId, "Anomalie", reason, anomalyAction);
     }
@@ -6767,9 +6893,12 @@
     async function updateAnomaly(reportId) {
       const intervention = state.interventions.find(item => item.id === reportId);
       if (!intervention) return;
-      const status = prompt("Etat anomalie: Ouverte, Correction demandee, Corrigee", intervention.anomalyStatus || "Ouverte");
-      if (!status) return;
-      const reason = prompt("Motif / action corrective", intervention.anomalyReason || intervention.notes || "");
+      const result = await requestSheetFields("Suivi de l'anomalie", [
+        { name: "status", label: "Etat", value: intervention.anomalyStatus || "Ouverte", options: ["Ouverte", "Correction demandee", "Corrigee"] },
+        { name: "reason", label: "Motif / action corrective", value: intervention.anomalyReason || intervention.notes || "" }
+      ]);
+      if (!result) return;
+      const { status, reason } = result;
       intervention.anomalyStatus = status;
       intervention.anomalyReason = reason || "";
       if (status === "Corrigee") intervention.validation = "Pose - En attente validation";
