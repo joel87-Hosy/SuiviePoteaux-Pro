@@ -1,4 +1,4 @@
-const CACHE_NAME = "suivi-poteaux-pro-v29";
+const CACHE_NAME = "suivi-poteaux-pro-v30";
 const APP_SHELL = [
   "./",
   "./index.html",

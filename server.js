@@ -1476,7 +1476,7 @@ function createTenantOnboarding(db, actor, body, req) {
     secteurActivite: String(company.secteurActivite || "").trim(),
     pays: String(company.pays || "").trim(),
     ville: String(company.ville || "").trim(),
-    logoUrl: String(company.logoUrl || "").trim(),
+    logoUrl: normalizeTenantLogo(company.logoUrl),
     modules: { ...DEFAULT_TENANT_MODULES, ...(body.modules || {}) },
     status: trialDays ? "trial" : "active",
     createdAt: now.toISOString(),
@@ -1601,6 +1601,23 @@ function normalizeProfilePhoto(value) {
   if (buffer.length > MAX_PROFILE_PHOTO_BYTES) throw Object.assign(new Error("Photo de profil trop volumineuse"), { statusCode: 413 });
   if (!validImageSignature(buffer, ext)) throw Object.assign(new Error("Format image invalide"), { statusCode: 400 });
   return photo;
+}
+
+function normalizeTenantLogo(value) {
+  const logo = String(value || "").trim();
+  if (!logo) return "";
+  if (/^data:/i.test(logo)) {
+    try {
+      return normalizeProfilePhoto(logo);
+    } catch (error) {
+      throw Object.assign(new Error(error.statusCode === 413 ? "Le logo ne doit pas depasser 1 Mo" : "Logo invalide : utilisez une image PNG, JPG ou WebP"), { statusCode: error.statusCode || 400 });
+    }
+  }
+  try {
+    const url = new URL(logo);
+    if (["http:", "https:"].includes(url.protocol)) return logo;
+  } catch {}
+  throw Object.assign(new Error("Lien du logo invalide : utilisez une URL HTTP ou HTTPS"), { statusCode: 400 });
 }
 
 function slug(value) {
@@ -1776,6 +1793,7 @@ async function handleApi(req, res, url) {
       if (body.raisonSociale !== undefined && !String(body.raisonSociale || "").trim()) {
         return sendError(req, res, 400, "La raison sociale est obligatoire");
       }
+      if (body.logoUrl !== undefined) body.logoUrl = normalizeTenantLogo(body.logoUrl);
       if (body.status !== undefined) {
         if (!TENANT_STATUSES.includes(body.status)) return sendError(req, res, 400, "Statut tenant invalide");
         tenant.status = body.status;
