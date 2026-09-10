@@ -1336,6 +1336,15 @@ function planPrice(plan, cycle = "monthly") {
 }
 
 function platformOverview(db) {
+  // Demo data remains available in the app but never contributes to SaaS metrics.
+  db = {
+    ...db,
+    tenants: (db.tenants || []).filter(item => item.id !== DEFAULT_TENANT_ID),
+    subscriptions: (db.subscriptions || []).filter(item => item.tenantId !== DEFAULT_TENANT_ID),
+    transactions: (db.transactions || []).filter(item => item.tenantId !== DEFAULT_TENANT_ID),
+    poles: db.poles.filter(item => item.tenantId !== DEFAULT_TENANT_ID),
+    interventions: db.interventions.filter(item => item.tenantId !== DEFAULT_TENANT_ID)
+  };
   const subscriptions = db.subscriptions || [];
   const monthlyMrr = subscriptions
     .filter(item => ["active", "trialing"].includes(item.status))
