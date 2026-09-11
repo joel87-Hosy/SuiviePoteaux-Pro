@@ -1743,6 +1743,11 @@
       .app-sheet { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
       .app-sheet .section-head { gap: 12px; flex-wrap: wrap; }
     }
+    .mobile-tenant-brand { display: none; }
+    @media (max-width: 1100px) {
+      .mobile-tenant-brand:not([hidden]) { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+      .mobile-tenant-brand .brand-mark { width: 40px; height: 40px; flex-shrink: 0; }
+    }
   </style>
 </head>
 <body>
@@ -1876,6 +1881,7 @@
     <main class="main">
       <header class="topbar">
         <div class="page-title">
+          <div id="mobileTenantBrand" class="mobile-tenant-brand" hidden></div>
           <h2 id="viewTitle">Tableau de bord</h2>
           <p id="viewSubtitle">Pilotage global des stocks, poses, validations et preuves terrain.</p>
         </div>
@@ -2321,6 +2327,7 @@
     let profilePhotoDraft = "";
     let apiToken = localStorage.getItem(API_TOKEN_KEY) || "";
     let apiUser = null;
+    let apiTenant = null;
     let apiPermissions = [];
     let viewHistory = [];
     let selectedReportId = "";
@@ -2582,6 +2589,28 @@
         : `<svg class="icon" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><path d="M4 4l16 16"/></svg>`;
     }
 
+    function renderTenantBrand() {
+      const brand = document.querySelector(".sidebar .brand");
+      if (!brand) return;
+      const tenant = apiUser && apiUser.role !== "platform_admin" && apiTenant?.id === apiUser.tenantId ? apiTenant : null;
+      const name = tenant?.raisonSociale || "SuiviPoteaux Pro";
+      const logo = tenant?.logoUrl || "";
+      const defaultMark = `<svg viewBox="0 0 24 24"><path d="M11 2h2v20h-2zM5 6h14v3H5zM7 12h10v3H7z"/></svg>`;
+      const mark = logo ? `<img src="${escapeAttr(logo)}" alt="Logo ${escapeAttr(name)}" style="width:100%;height:100%;object-fit:contain">` : defaultMark;
+      brand.innerHTML = `<div class="brand-mark" ${logo ? 'style="background:transparent"' : 'aria-hidden="true"'}>${mark}</div><div><h1>${escapeHtml(name)}</h1><p>${tenant ? "SuiviPoteaux Pro" : "ERP terrain & depot"}</p></div>`;
+      const mobile = document.getElementById("mobileTenantBrand");
+      if (mobile) {
+        mobile.hidden = !tenant;
+        mobile.innerHTML = tenant ? `<div class="brand-mark" ${logo ? 'style="background:transparent"' : ""}>${mark}</div><strong>${escapeHtml(name)}</strong>` : "";
+      }
+      for (const img of document.querySelectorAll(".sidebar .brand img, #mobileTenantBrand img")) {
+        img.onerror = () => {
+          img.parentElement.style.background = "";
+          img.parentElement.innerHTML = defaultMark;
+        };
+      }
+    }
+
     async function loadBackendData() {
       if (!apiToken) {
         showLogin();
@@ -2590,6 +2619,8 @@
       try {
         const payload = await apiFetch("/bootstrap");
         apiUser = payload.user;
+        apiTenant = payload.tenant || null;
+        renderTenantBrand();
         profilePhotoDraft = "";
         apiPermissions = payload.permissions || roleUi[apiUser.role]?.permissions || [];
         if (apiUser.role === "platform_admin") await loadPlatformData();
@@ -2617,6 +2648,8 @@
       } catch (error) {
         apiToken = "";
         apiUser = null;
+        apiTenant = null;
+        renderTenantBrand();
         profilePhotoDraft = "";
         apiPermissions = [];
         localStorage.removeItem(API_TOKEN_KEY);
@@ -2634,6 +2667,8 @@
       } finally {
         apiToken = "";
         apiUser = null;
+        apiTenant = null;
+        renderTenantBrand();
         apiPermissions = [];
         localStorage.removeItem(API_TOKEN_KEY);
         renderNav();
