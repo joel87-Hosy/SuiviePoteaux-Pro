@@ -3180,6 +3180,10 @@
         if (image) payload.company.logoUrl = image;
         const result = await apiFetch("/super-admin/tenants", { method: "POST", body: JSON.stringify(payload) });
         event.target.reset();
+        if (result.overview) {
+          platformState.overview = result.overview;
+          renderSuperAdmin();
+        }
         showTenantAdminAccess({ companyName: result.tenant.raisonSociale, email: result.owner.email, temporaryPassword: result.temporaryPassword, active: true });
         await refreshPlatformData();
       } catch (error) {

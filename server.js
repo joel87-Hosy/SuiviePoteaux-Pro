@@ -506,8 +506,22 @@ async function selectTable(table) {
 }
 
 async function writeSupabaseDb(db) {
-  await Promise.all([
-    upsertTable("app_users", db.users.map(row => ({
+  await upsertTable("tenants", (db.tenants || []).map(row => ({
+      id: row.id,
+      raison_sociale: row.raisonSociale,
+      slug: row.slug,
+      secteur_activite: row.secteurActivite || null,
+      pays: row.pays || null,
+      ville: row.ville || null,
+      logo_url: row.logoUrl || null,
+      branding: row.branding || {},
+      modules: { ...DEFAULT_TENANT_MODULES, ...(row.modules || row.branding?.modules || {}) },
+      status: row.status,
+      archived_at: row.archivedAt || null,
+      created_at: row.createdAt || new Date().toISOString(),
+      updated_at: row.updatedAt || new Date().toISOString()
+    })));
+  await upsertTable("app_users", db.users.map(row => ({
       id: row.id,
       tenant_id: row.tenantId || null,
       email: row.email,
@@ -522,7 +536,8 @@ async function writeSupabaseDb(db) {
       job_title: row.jobTitle || null,
       profile_photo: row.profilePhoto || null,
       platform_role: row.platformRole || null
-    }))),
+    })));
+  await Promise.all([
     upsertTable("projects", db.projects.map(row => ({
       id: row.id,
       tenant_id: row.tenantId || DEFAULT_TENANT_ID,
@@ -626,21 +641,6 @@ async function writeSupabaseDb(db) {
       value: normalizeSettings(db.settings),
       updated_at: new Date().toISOString()
     }]),
-    upsertTable("tenants", (db.tenants || []).map(row => ({
-      id: row.id,
-      raison_sociale: row.raisonSociale,
-      slug: row.slug,
-      secteur_activite: row.secteurActivite || null,
-      pays: row.pays || null,
-      ville: row.ville || null,
-      logo_url: row.logoUrl || null,
-      branding: row.branding || {},
-      modules: { ...DEFAULT_TENANT_MODULES, ...(row.modules || row.branding?.modules || {}) },
-      status: row.status,
-      archived_at: row.archivedAt || null,
-      created_at: row.createdAt || new Date().toISOString(),
-      updated_at: row.updatedAt || new Date().toISOString()
-    }))),
     upsertTable("subscriptions", (db.subscriptions || []).map(row => ({
       id: row.id,
       tenant_id: row.tenantId,
@@ -1811,7 +1811,7 @@ async function handleApi(req, res, url) {
       const body = await readBody(req);
       const result = createTenantOnboarding(db, actor, body, req);
       await writeDb(db);
-      return sendJson(req, res, 201, result);
+      return sendJson(req, res, 201, { ...result, overview: platformOverview(db) });
     }
 
     const tenantAccessMatch = /^\/api\/super-admin\/tenants\/([^/]+)\/admin-access$/.exec(url.pathname);
