@@ -1330,9 +1330,11 @@ function tenantUsage(db, tenantId) {
   };
 }
 
-function planPrice(plan, cycle = "monthly") {
-  const config = planDefaults[plan] || planDefaults.starter;
-  return cycle === "annual" ? config.priceAnnual : config.priceMonthly;
+function planPrice(plan, cycle = "monthly", plans = planDefaults) {
+  const defaults = planDefaults[plan] || planDefaults.starter;
+  const field = cycle === "annual" ? "priceAnnual" : "priceMonthly";
+  const value = plans?.[plan]?.[field];
+  return value === undefined || value === null ? defaults[field] : Number(value);
 }
 
 function platformOverview(db) {
@@ -1349,8 +1351,8 @@ function platformOverview(db) {
   const monthlyMrr = subscriptions
     .filter(item => ["active", "trialing"].includes(item.status))
     .reduce((sum, item) => {
-      const price = planPrice(item.planName, item.billingCycle);
-      return sum + (item.billingCycle === "annual" ? Math.round(price / 12) : price);
+      const price = planPrice(item.planName, item.billingCycle, db.platformPlans);
+      return sum + (item.billingCycle === "annual" ? price / 12 : price);
     }, 0);
   const tenants = (db.tenants || []).filter(item => !item.archivedAt);
   const failedTransactions = (db.transactions || []).filter(item => ["failed", "past_due"].includes(item.status));
@@ -1360,7 +1362,7 @@ function platformOverview(db) {
     count: subscriptions.filter(item => item.planName === plan && ["active", "trialing"].includes(item.status)).length,
     mrr: subscriptions
       .filter(item => item.planName === plan && ["active", "trialing"].includes(item.status))
-      .reduce((sum, item) => sum + (item.billingCycle === "annual" ? Math.round(planPrice(item.planName, item.billingCycle) / 12) : planPrice(item.planName, item.billingCycle)), 0)
+      .reduce((sum, item) => sum + (item.billingCycle === "annual" ? planPrice(item.planName, item.billingCycle, db.platformPlans) / 12 : planPrice(item.planName, item.billingCycle, db.platformPlans)), 0)
   }));
   const monthKeys = Array.from({ length: 12 }, (_, index) => {
     const date = new Date();
@@ -1369,8 +1371,8 @@ function platformOverview(db) {
   });
   return {
     kpis: {
-      mrr: monthlyMrr,
-      arr: monthlyMrr * 12,
+      mrr: Math.round(monthlyMrr),
+      arr: Math.round(monthlyMrr * 12),
       tenantsTotal: tenants.length,
       tenantsActive: tenants.filter(item => item.status === "active").length,
       tenantsTrial: tenants.filter(item => item.status === "trial").length,
