@@ -1860,7 +1860,23 @@ async function handleApi(req, res, url) {
         };
       }
       tenant.updatedAt = new Date().toISOString();
-      const subscription = db.subscriptions.find(item => item.tenantId === tenantId);
+      let subscription = db.subscriptions.find(item => item.tenantId === tenantId);
+      if (!subscription && body.subscription) {
+        if (!PLAN_NAMES.includes(body.subscription.planName) || !BILLING_CYCLES.includes(body.subscription.billingCycle)) {
+          return sendError(req, res, 400, "Choisissez un plan et une periodicite valides");
+        }
+        const periodEnd = new Date();
+        if (body.subscription.billingCycle === "annual") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+        else periodEnd.setMonth(periodEnd.getMonth() + 1);
+        subscription = normalizeSubscriptionRecord({
+          tenantId,
+          planName: body.subscription.planName,
+          billingCycle: body.subscription.billingCycle,
+          status: tenant.status === "trial" ? "trialing" : tenant.status === "suspended" ? "paused" : "active",
+          currentPeriodEnd: periodEnd.toISOString()
+        });
+        db.subscriptions.push(subscription);
+      }
       if (subscription && body.subscription) {
         if (PLAN_NAMES.includes(body.subscription.planName)) subscription.planName = body.subscription.planName;
         if (body.subscription.status !== undefined) subscription.status = String(body.subscription.status || subscription.status);
