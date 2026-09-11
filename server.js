@@ -1893,7 +1893,15 @@ async function handleApi(req, res, url) {
       const userIds = new Set(db.users.filter(item => item.tenantId === tenantId).map(item => item.id));
       if (SUPABASE_ENABLED) {
         const { error } = await supabase.rpc("delete_tenant_permanently", { target_id: tenantId });
-        if (error) throw Object.assign(new Error("Suppression non effectuee. Verifiez la migration delete_tenant_permanently dans Supabase."), { statusCode: 500 });
+        if (error) {
+          console.error("tenant.delete failed", { code: error.code, message: error.message });
+          const message = ["PGRST202", "42883"].includes(error.code)
+            ? "Suppression indisponible : la mise a jour de la base doit etre installee par l'administrateur de la plateforme."
+            : error.code === "23503"
+              ? "Suppression annulee : des donnees liees empechent la suppression. Contactez l'administrateur de la plateforme."
+              : "Suppression non effectuee. Contactez l'administrateur de la plateforme avec le code " + (error.code || "inconnu") + ".";
+          throw Object.assign(new Error(message), { statusCode: 500 });
+        }
       } else {
         await writeDb(removeTenantData(db, tenantId));
       }

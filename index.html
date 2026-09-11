@@ -3298,7 +3298,7 @@
         const detail = await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}`);
         if (request !== tenantSheetRequest || !host.isConnected) return;
         const tenant = detail.tenant;
-        const titles = { detail: "Fiche entreprise", company: "Modifier entreprise", plan: "Plan et quotas", status: "Statut entreprise", support: "Session support", archive: "Archiver entreprise", delete: "Supprimer definitivement l?entreprise" };
+        const titles = { detail: "Fiche entreprise", company: "Modifier entreprise", plan: "Plan et quotas", status: "Statut entreprise", support: "Session support", archive: "Archiver entreprise", delete: "Supprimer definitivement cette entreprise" };
         const input = (name, label, value, type = "text", extra = "") => `<div class="field"><label for="sheet-${name}">${label}</label><input id="sheet-${name}" name="${name}" type="${type}" value="${escapeAttr(value ?? "")}" ${extra}></div>`;
         const select = (name, label, value, options) => `<div class="field"><label for="sheet-${name}">${label}</label><select id="sheet-${name}" name="${name}">${options.map(([key, text]) => `<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></div>`;
         const row = (label, value) => `<div class="report-row"><strong>${label}</strong><span>${escapeHtml(String(value ?? "-"))}</span></div>`;

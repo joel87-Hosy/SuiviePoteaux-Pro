@@ -558,3 +558,6 @@ end;
 $$;
 revoke all on function public.delete_tenant_permanently(text) from public, anon, authenticated;
 grant execute on function public.delete_tenant_permanently(text) to service_role;
+
+-- Refresh the API function cache after installation.
+notify pgrst, 'reload schema';
