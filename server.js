@@ -1446,6 +1446,22 @@ function removeTenantData(db, tenantId) {
   return result;
 }
 
+function createMissingTenantAdmin(db, tenantId, body) {
+  const fail = (message, statusCode = 400) => { throw Object.assign(new Error(message), { statusCode }); };
+  const tenant = db.tenants.find(item => item.id === tenantId);
+  if (!tenant || tenant.archivedAt) fail("Entreprise introuvable ou archivee", 404);
+  if (db.users.some(item => item.tenantId === tenantId && ["tenant_admin", "super_admin"].includes(item.role))) fail("Un administrateur existe deja pour cette entreprise", 409);
+  const email = String(body.email || "").trim().toLowerCase();
+  const firstName = String(body.firstName || "").trim();
+  const lastName = String(body.lastName || "").trim();
+  if (!firstName || !lastName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail("Prenom, nom et email valide requis");
+  if (db.users.some(item => String(item.email || "").trim().toLowerCase() === email)) fail("Cet email appartient deja a un compte. Aucun doublon n'a ete cree.", 409);
+  if (!strongPassword(body.password)) fail("Mot de passe requis : 10 caracteres, majuscule, minuscule, chiffre et caractere special");
+  const owner = user(`USR-${crypto.randomUUID()}`, email, body.password, `${firstName} ${lastName}`, "tenant_admin", { tenantId, active: true, approved: true, jobTitle: "Owner client" });
+  db.users.push(owner);
+  return owner;
+}
+
 function tenantAdminAccess(db, tenantId) {
   const mails = (db.activationEmails || []).filter(item => (item.tenantId || item.tenant_id) === tenantId).slice().reverse();
   const admins = db.users.filter(item => (item.tenantId || item.tenant_id) === tenantId && ["tenant_admin", "super_admin"].includes(item.role));
@@ -1815,12 +1831,20 @@ async function handleApi(req, res, url) {
     }
 
     const tenantAccessMatch = /^\/api\/super-admin\/tenants\/([^/]+)\/admin-access$/.exec(url.pathname);
+    if (tenantAccessMatch && req.method === "POST") {
+      const tenantId = decodeURIComponent(tenantAccessMatch[1]);
+      const body = await readBody(req);
+      const owner = createMissingTenantAdmin(db, tenantId, body);
+      await writeDb(db);
+      return sendJson(req, res, 201, { tenantId, companyName: db.tenants.find(item => item.id === tenantId).raisonSociale, email: owner.email, active: true, accountFound: true });
+    }
+
     if (tenantAccessMatch && req.method === "GET") {
       const tenantId = decodeURIComponent(tenantAccessMatch[1]);
       const tenant = db.tenants.find(item => item.id === tenantId);
       if (!tenant) return sendError(req, res, 404, "Entreprise introuvable");
       res.setHeader("Cache-Control", "no-store");
-      return sendJson(req, res, 200, { companyName: tenant.raisonSociale, ...tenantAdminAccess(db, tenantId) });
+      return sendJson(req, res, 200, { tenantId, companyName: tenant.raisonSociale, ...tenantAdminAccess(db, tenantId) });
     }
 
     const tenantAdminMatch = /^\/api\/super-admin\/tenants\/([^/]+)$/.exec(url.pathname);
