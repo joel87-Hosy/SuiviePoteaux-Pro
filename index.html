@@ -2841,10 +2841,22 @@
                 <div class="field"><label for="tenantCity">Ville</label><input id="tenantCity" placeholder="Abidjan"></div>
                 <div class="field"><label for="tenantLogo">Lien du logo (facultatif)</label><input id="tenantLogo" type="url" placeholder="https://..."></div>
                 ${tenantLogoUploadField("tenantLogoImage", "tenantLogo")}
+              </div>
+              <fieldset style="border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0">
+                <legend><strong>Compte administrateur de l'entreprise</strong></legend>
+                <p class="muted">Definissez les acces qui permettront a l'administrateur de se connecter.</p>
+                <div class="form-grid">
                 <div class="field"><label for="tenantAdminFirst">Prenom admin</label><input id="tenantAdminFirst" required></div>
                 <div class="field"><label for="tenantAdminLast">Nom admin</label><input id="tenantAdminLast" required></div>
-                <div class="field"><label for="tenantAdminEmail">Email pro</label><input id="tenantAdminEmail" type="email" required></div>
+                <div class="field"><label for="tenantAdminEmail">Email de connexion</label><input id="tenantAdminEmail" type="email" required></div>
                 <div class="field"><label for="tenantAdminPhone">Telephone</label><input id="tenantAdminPhone"></div>
+                  <div class="field"><label for="tenantAdminPassword">Mot de passe</label><input id="tenantAdminPassword" type="password" autocomplete="new-password" minlength="10" required aria-describedby="tenantPasswordHelp"></div>
+                  <div class="field"><label for="tenantAdminPasswordConfirm">Confirmer le mot de passe</label><input id="tenantAdminPasswordConfirm" type="password" autocomplete="new-password" minlength="10" required></div>
+                </div>
+                <p id="tenantPasswordHelp" class="muted">10 caracteres minimum, avec une majuscule, une minuscule, un chiffre et un caractere special.</p>
+                <label><input type="checkbox" style="width:auto" onchange="document.getElementById('tenantAdminPassword').type = this.checked ? 'text' : 'password'; document.getElementById('tenantAdminPasswordConfirm').type = this.checked ? 'text' : 'password'"> Afficher les mots de passe</label>
+              </fieldset>
+              <div class="form-grid">
                 <div class="field"><label for="tenantPlan">Plan</label><select id="tenantPlan"><option value="starter">Starter</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></div>
                 <div class="field"><label for="tenantBilling">Facturation</label><select id="tenantBilling"><option value="monthly">Mensuel</option><option value="annual">Annuel</option></select></div>
                 <div class="field"><label for="tenantTrial">Essai</label><select id="tenantTrial"><option value="yes">Oui</option><option value="no">Non</option></select></div>
@@ -2906,7 +2918,7 @@
                           <button class="btn" type="button" onclick="impersonateTenant('${tenant.id}')">Session support</button>
                           <button class="btn" type="button" onclick="editTenantPlan('${tenant.id}')">Plan & quotas</button>
                           <button class="btn warning" type="button" onclick="changeTenantStatus('${tenant.id}')">Statut</button>
-                          ${tenant.id === "tenant-demo" ? "" : `<button class="btn" type="button" onclick="archiveTenant('${tenant.id}')">Archiver</button>`}
+                          ${tenant.id === "tenant-demo" ? "" : `<button class="btn" type="button" onclick="archiveTenant('${tenant.id}')">Archiver</button><button class="btn warning" type="button" onclick="openTenantSheet('${tenant.id}', 'delete')">Supprimer</button>`}
                         </div>
                       </td>
                     </tr>
@@ -3125,6 +3137,9 @@
 
     async function createPlatformTenant(event) {
       event.preventDefault();
+      const password = $("#tenantAdminPassword").value;
+      if (password !== $("#tenantAdminPasswordConfirm").value) return toast("Les mots de passe ne correspondent pas.");
+      if (password.length < 10 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) return toast("Le mot de passe doit respecter les criteres indiques.");
       const payload = {
         company: {
           raisonSociale: $("#tenantCompany").value.trim(),
@@ -3138,7 +3153,8 @@
           firstName: $("#tenantAdminFirst").value.trim(),
           lastName: $("#tenantAdminLast").value.trim(),
           email: $("#tenantAdminEmail").value.trim(),
-          phone: $("#tenantAdminPhone").value.trim()
+          phone: $("#tenantAdminPhone").value.trim(),
+          password
         },
         subscription: {
           planName: $("#tenantPlan").value,
@@ -3282,7 +3298,7 @@
         const detail = await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}`);
         if (request !== tenantSheetRequest || !host.isConnected) return;
         const tenant = detail.tenant;
-        const titles = { detail: "Fiche entreprise", company: "Modifier entreprise", plan: "Plan et quotas", status: "Statut entreprise", support: "Session support", archive: "Archiver entreprise" };
+        const titles = { detail: "Fiche entreprise", company: "Modifier entreprise", plan: "Plan et quotas", status: "Statut entreprise", support: "Session support", archive: "Archiver entreprise", delete: "Supprimer definitivement l?entreprise" };
         const input = (name, label, value, type = "text", extra = "") => `<div class="field"><label for="sheet-${name}">${label}</label><input id="sheet-${name}" name="${name}" type="${type}" value="${escapeAttr(value ?? "")}" ${extra}></div>`;
         const select = (name, label, value, options) => `<div class="field"><label for="sheet-${name}">${label}</label><select id="sheet-${name}" name="${name}">${options.map(([key, text]) => `<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></div>`;
         const row = (label, value) => `<div class="report-row"><strong>${label}</strong><span>${escapeHtml(String(value ?? "-"))}</span></div>`;
@@ -3306,11 +3322,14 @@
           content = select("status", "Statut", tenant.status, [["active", "Actif"], ["trial", "Essai"], ["suspended", "Suspendu"]]);
         } else if (mode === "support") {
           content = `<p>Generer une session temporaire de support pour cette entreprise.</p>`;
+        } else if (mode === "delete") {
+          if (tenant.id === "tenant-demo") throw new Error("Le compte demo ne peut pas etre supprime.");
+          content = `<p>Suppression definitive de cette entreprise, de ses comptes utilisateurs et de toutes ses donnees metier en base. Cette action est irreversible.</p><p>Saisissez <strong>${escapeHtml(tenant.slug)}</strong> pour confirmer.</p>${input("confirmSlug", "Slug de confirmation", "", "text", "required")}`;
         } else if (mode === "archive") {
           content = `<p>Les comptes de cette entreprise seront desactives. Les donnees seront conservees.</p>`;
           if (tenant.id === "tenant-demo") throw new Error("Le compte demo ne peut pas etre archive.");
         }
-        const action = mode === "archive" ? "Confirmer l'archivage" : mode === "support" ? "Generer la session" : "Enregistrer";
+        const action = mode === "delete" ? "Supprimer definitivement" : mode === "archive" ? "Confirmer l'archivage" : mode === "support" ? "Generer la session" : "Enregistrer";
         host.innerHTML = `<section class="card" aria-labelledby="tenantSheetTitle"><div class="section-head"><div><h3 id="tenantSheetTitle" tabindex="-1">${titles[mode]}</h3><span class="muted">${escapeHtml(tenant.raisonSociale)} &mdash; ${escapeHtml(tenant.slug)}</span></div><button class="btn" type="button" id="sheetClose">Fermer</button></div><div class="section-body"><form id="tenantSheetForm">${content}<p id="tenantSheetMessage" role="status" aria-live="polite"></p>${mode === "detail" ? "" : `<div class="toolbar" style="margin-top:16px"><button class="btn ${mode === "archive" ? "warning" : "primary"}" type="submit">${action}</button><button class="btn" type="button" id="sheetCancel">Annuler</button></div>`}</form></div></section>`;
         host.querySelector("#sheetClose").onclick = closeTenantSheet;
         host.querySelector("#sheetCancel")?.addEventListener("click", closeTenantSheet);
@@ -3336,6 +3355,9 @@
             method = "POST"; suffix = "/status"; body = { status: data.get("status") };
           } else if (mode === "support") {
             method = "POST"; suffix = "/impersonate";
+          } else if (mode === "delete") {
+            if (data.get("confirmSlug") !== tenant.slug) { message.textContent = "Le slug ne correspond pas a cette entreprise."; return; }
+            method = "DELETE"; suffix = "/permanent"; body = { confirmSlug: data.get("confirmSlug") };
           } else if (mode === "archive") {
             method = "DELETE";
           }
@@ -3348,7 +3370,7 @@
               if (image) body.logoUrl = image;
               else if (!body.logoUrl) body.logoUrl = form.querySelector("#sheet-logoUrl").value.trim();
             }
-            const payload = await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}${suffix}`, { method, ...(method === "DELETE" ? {} : { body: JSON.stringify(body) }) });
+            const payload = await apiFetch(`/super-admin/tenants/${encodeURIComponent(tenantId)}${suffix}`, { method, ...(method === "DELETE" && mode !== "delete" ? {} : { body: JSON.stringify(body) }) });
             if (mode === "support") {
               message.textContent = `Session temporaire generee pour ${payload.user.email}. Expiration : ${payload.expiresInMinutes} minutes.`;
               return;
@@ -3356,7 +3378,7 @@
             if (request === tenantSheetRequest && host.isConnected) {
               closeTenantSheet();
               await refreshPlatformData();
-              toast(mode === "archive" ? "Entreprise archivee" : "Entreprise mise a jour");
+              toast(mode === "delete" ? "Entreprise supprimee definitivement" : mode === "archive" ? "Entreprise archivee" : "Entreprise mise a jour");
             }
           } catch (error) {
             message.textContent = error.message || "Enregistrement impossible. Reessayez.";

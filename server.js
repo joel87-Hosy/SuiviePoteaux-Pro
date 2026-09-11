@@ -1432,6 +1432,18 @@ function tenantDetail(db, tenantId) {
   };
 }
 
+function removeTenantData(db, tenantId) {
+  const result = { ...db };
+  const userIds = new Set(db.users.filter(item => item.tenantId === tenantId).map(item => item.id));
+  for (const [key, rows] of Object.entries(db)) {
+    if (!Array.isArray(rows)) continue;
+    result[key] = rows.filter(item => key === "tenants" ? item.id !== tenantId :
+      item.tenantId !== tenantId && item.tenant_id !== tenantId && item.targetTenantId !== tenantId &&
+      !(key === "platformAuditLogs" && userIds.has(item.actorId)));
+  }
+  return result;
+}
+
 function tenantAdminAccess(db, tenantId) {
   const mails = (db.activationEmails || []).filter(item => (item.tenantId || item.tenant_id) === tenantId).slice().reverse();
   const admins = db.users.filter(item => (item.tenantId || item.tenant_id) === tenantId && ["tenant_admin", "super_admin"].includes(item.role));
@@ -1474,6 +1486,10 @@ function platformPlanLimits(planName, overrides = {}) {
 function createTenantOnboarding(db, actor, body, req) {
   const company = body.company || {};
   const admin = body.admin || {};
+  const password = String(admin.password || "");
+  if (!strongPassword(password)) {
+    throw Object.assign(new Error("Mot de passe administrateur requis : 10 caracteres minimum, majuscule, minuscule, chiffre et caractere special"), { statusCode: 400 });
+  }
   const subscriptionInput = body.subscription || {};
   const planName = PLAN_NAMES.includes(subscriptionInput.planName) ? subscriptionInput.planName : "starter";
   const tenantSlug = slug(company.slug || company.raisonSociale);
@@ -1502,7 +1518,6 @@ function createTenantOnboarding(db, actor, body, req) {
     createdAt: now.toISOString(),
     updatedAt: now.toISOString()
   });
-  const password = tempPassword();
   const owner = {
     ...user(`USR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, email, password, `${admin.firstName} ${admin.lastName}`.trim(), "tenant_admin"),
     tenantId: tenant.id,
@@ -1863,6 +1878,27 @@ async function handleApi(req, res, url) {
       platformAudit(db, actor, "tenant.update", { tenantId, fields: Object.keys(body) }, req);
       await writeDb(db);
       return sendJson(req, res, 200, { tenant: platformTenantRows(db).find(item => item.id === tenantId), tenants: platformTenantRows(db) });
+    }
+
+    const tenantDeleteMatch = /^\/api\/super-admin\/tenants\/([^/]+)\/permanent$/.exec(url.pathname);
+    if (tenantDeleteMatch && req.method === "DELETE") {
+      const tenantId = decodeURIComponent(tenantDeleteMatch[1]);
+      const tenant = db.tenants.find(item => item.id === tenantId);
+      if (!tenant) return sendError(req, res, 404, "Entreprise introuvable");
+      if (tenantId === DEFAULT_TENANT_ID) return sendError(req, res, 409, "Le compte demo ne peut pas etre supprime");
+      const body = await readBody(req);
+      if (body.confirmSlug !== tenant.slug) return sendError(req, res, 400, "Saisissez le slug de l'entreprise pour confirmer");
+      const userIds = new Set(db.users.filter(item => item.tenantId === tenantId).map(item => item.id));
+      if (SUPABASE_ENABLED) {
+        const { error } = await supabase.rpc("delete_tenant_permanently", { target_id: tenantId });
+        if (error) throw Object.assign(new Error("Suppression non effectuee. Verifiez la migration delete_tenant_permanently dans Supabase."), { statusCode: 500 });
+      } else {
+        await writeDb(removeTenantData(db, tenantId));
+      }
+      for (const [token, session] of sessions) {
+        if (session.tenantId === tenantId || userIds.has(session.userId)) sessions.delete(token);
+      }
+      return sendJson(req, res, 200, { deleted: true, tenantId });
     }
 
     if (tenantAdminMatch && req.method === "DELETE") {
