@@ -7173,6 +7173,39 @@
       }
     }
 
+    function showPwaUpdate() {
+      if (document.getElementById("pwaUpdateNotice")) return;
+      const notice = document.createElement("div");
+      notice.id = "pwaUpdateNotice";
+      notice.setAttribute("role", "status");
+      notice.style.cssText = "position:fixed;bottom:16px;left:16px;right:16px;z-index:3000;background:#fff;color:#172033;border:1px solid #d6deed;border-radius:12px;padding:14px;box-shadow:0 8px 30px #0003;display:flex;gap:12px;align-items:center;flex-wrap:wrap";
+      notice.innerHTML = `<span>Nouvelle version disponible. Enregistrez votre saisie, puis rechargez l'application.</span><button class="btn primary" type="button">Mettre a jour</button>`;
+      notice.querySelector("button").onclick = () => window.location.reload();
+      document.body.appendChild(notice);
+    }
+
+    async function setupPwaUpdates() {
+      if (!("serviceWorker" in navigator)) return;
+      const wasControlled = Boolean(navigator.serviceWorker.controller);
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (wasControlled) showPwaUpdate();
+      });
+      try {
+        const registration = await navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" });
+        let lastCheck = 0;
+        const check = () => {
+          if (!navigator.onLine || document.visibilityState === "hidden" || Date.now() - lastCheck < 60000) return;
+          lastCheck = Date.now();
+          registration.update().catch(() => {});
+        };
+        window.addEventListener("online", check);
+        document.addEventListener("visibilitychange", check);
+        check();
+      } catch (error) {
+        console.info("Verification de mise a jour indisponible", error.message);
+      }
+    }
+
     async function boot() {
       renderNav();
       document.body.classList.toggle("dark", state.theme === "dark");
@@ -7287,9 +7320,7 @@
       });
       window.addEventListener("online", updateNetwork);
       window.addEventListener("offline", updateNetwork);
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./sw.js").catch(() => {});
-      }
+      setupPwaUpdates();
       renderPhotoInputs();
       await loadBackendData();
       updateCurrentUser();
